@@ -1,0 +1,73 @@
+{
+  "res_id": "tool_vac_gripper.2021_5_24",
+  "name": "Vacuum Gripper (30mm)",
+  "py_name": "vac_gripper",
+  "type": "moveable",
+  "subtype": "tool",
+  "grid": {
+    "origin": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "count": [
+      1,
+      1,
+      1
+    ],
+    "pitch": [
+      0.005,
+      0.005,
+      0.005
+    ]
+  },
+  "tool": null,
+  "defaults": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0,
+    "rot": 0.0
+  },
+  "links": {
+    "tool": {
+      "obj_name": "tool.obj",
+      "joint_settings": {
+        "name": "tool",
+        "max": 1.0,
+        "min": 0.0,
+        "type": 0,
+        "tform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "dh": null,
+        "chain": 0,
+        "follower": false,
+        "defaults": {
+          "counts": 0,
+          "channel": 0
+        },
+        "kinematics": {
+          "slope": 1e-05,
+          "y_int": 0.0
+        }
+      },
+      "mates": []
+    }
+  }
+}

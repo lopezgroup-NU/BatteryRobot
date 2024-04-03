@@ -1,0 +1,581 @@
+{
+  "modules": {
+    "1": {
+      "res_id": "rack_48x8ml.2022_01_25",
+      "name": "48x8ml vial rack",
+      "py_name": "rack_48x8ml",
+      "type": "static",
+      "subtype": "rack",
+      "grid": {
+        "origin": [
+          -0.03475,
+          -0.04625,
+          0.07,
+          0
+        ],
+        "count": [
+          8,
+          6,
+          1
+        ],
+        "pitch": [
+          0.026,
+          0.026,
+          0.0
+        ]
+      },
+      "tool": "gripper",
+      "moveable_type": "vial",
+      "kinematics": null,
+      "x": -0.1875,
+      "y": 0.15,
+      "z": 0.0,
+      "rot": 0.0,
+      "moveable_res_id": null,
+      "moveable_name": "20ml vial",
+      "fill_range": "0-10",
+      "m_id": 1,
+      "enabled": true,
+      "moveable_id": "vial_20ml.2021_03_20"
+    },
+    "2": {
+      "res_id": "sbs_heater.2021_03_20",
+      "name": "SBS heater clamp",
+      "py_name": "sbs_heater",
+      "type": "static",
+      "subtype": "none",
+      "grid": {
+        "origin": [
+          0.027,
+          0.0175,
+          0.1207,
+          0
+        ],
+        "count": [
+          4,
+          2,
+          1
+        ],
+        "pitch": [
+          0.032,
+          0.04,
+          0.0
+        ]
+      },
+      "tool": "gripper",
+      "moveable_type": "None",
+      "kinematics": null,
+      "x": 0.075,
+      "y": -0.1125,
+      "z": 0.0,
+      "rot": 0.0,
+      "moveable_res_id": null,
+      "moveable_name": "None",
+      "fill_range": "None",
+      "m_id": 2,
+      "enabled": true
+    },
+    "3": {
+      "res_id": "tool_mount.2021_03_20",
+      "name": "Tool mount",
+      "py_name": "tool_mount",
+      "type": "static",
+      "subtype": "rack",
+      "grid": {
+        "origin": [
+          0.0,
+          0.01875,
+          0.08386,
+          -90
+        ],
+        "count": [
+          1,
+          1,
+          1
+        ],
+        "pitch": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "tool": "gripper",
+      "moveable_type": "tool",
+      "kinematics": null,
+      "x": 0.0,
+      "y": 0.3,
+      "z": 0.0,
+      "rot": 0.0,
+      "moveable_res_id": null,
+      "moveable_name": "Vacuum Gripper (30mm)",
+      "fill_range": "0",
+      "m_id": 3,
+      "enabled": true,
+      "moveable_id": "tool_vac_gripper.2021_5_24"
+    }
+  },
+  "pumps": {
+    "Pump 0": {
+      "enabled": false,
+      "volume": 1.0
+    },
+    "Pump 1": {
+      "enabled": false,
+      "volume": 1.0
+    },
+    "Pump 2": {
+      "enabled": false,
+      "volume": 1.0
+    },
+    "Pump 3": {
+      "enabled": false,
+      "volume": 1.0
+    },
+    "Pump 4": {
+      "enabled": false,
+      "volume": 1.0
+    },
+    "Pump 5": {
+      "enabled": false,
+      "volume": 1.0
+    },
+    "Pump 6": {
+      "enabled": false,
+      "volume": 1.0
+    },
+    "Pump 7": {
+      "enabled": false,
+      "volume": 1.0
+    },
+    "Pump 8": {
+      "enabled": false,
+      "volume": 1.0
+    },
+    "Pump 9": {
+      "enabled": false,
+      "volume": 1.0
+    },
+    "Pump 10": {
+      "enabled": false,
+      "volume": 1.0
+    },
+    "Pump 11": {
+      "enabled": false,
+      "volume": 1.0
+    },
+    "Pump 12": {
+      "enabled": false,
+      "volume": 1.0
+    },
+    "Pump 13": {
+      "enabled": false,
+      "volume": 1.0
+    },
+    "Pump 14": {
+      "enabled": false,
+      "volume": 1.0
+    }
+  },
+  "locations": {
+    "Pick_up_tip": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        -23,
+        33911,
+        12320,
+        11701
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "droptip1": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -68,
+        26821,
+        6462,
+        8589
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "droptip2": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -68,
+        26826,
+        6459,
+        7460
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "waterdeep": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        349,
+        14744,
+        41463,
+        19399
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "water_not_deep": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        349,
+        14744,
+        41460,
+        13032
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "well1": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -1261,
+        40122,
+        39569,
+        18090
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "well2": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        236,
+        2920,
+        1478,
+        18093
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "well3": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        234,
+        3536,
+        1032,
+        18094
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "well4": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        -1004,
+        39609,
+        39381,
+        18070
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    }
+  },
+  "sim_inputs": {
+    "GETI": {
+      "name": "get_input",
+      "channels": {
+        "0": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "1": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "2": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "3": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "4": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "5": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "6": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "7": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "8": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "9": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "10": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "11": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "12": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "13": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "14": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "15": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "16": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "17": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "18": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "19": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "20": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "21": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "22": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "23": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "24": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "25": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "26": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "27": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "28": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "29": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "30": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "31": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        }
+      }
+    },
+    "GETA": {
+      "name": "get_analog",
+      "channels": {
+        "0": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        },
+        "1": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        }
+      }
+    },
+    "GTBC": {
+      "name": "get_barcode",
+      "channels": {
+        "0": {
+          "mode": "List",
+          "list": [],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        }
+      }
+    },
+    "RDSC": {
+      "name": "read_scale",
+      "channels": {
+        "0": {
+          "mode": "List",
+          "list": [
+            [
+              0,
+              0
+            ]
+          ],
+          "rand_min": 0,
+          "rand_max": 1,
+          "expr_str": ""
+        }
+      }
+    }
+  },
+  "version": 0.1,
+  "id_cnt": 3,
+  "visionconfigs": {},
+  "visionpanes": {}
+}

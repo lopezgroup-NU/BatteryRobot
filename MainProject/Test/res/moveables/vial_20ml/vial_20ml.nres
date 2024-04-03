@@ -1,0 +1,112 @@
+{
+  "res_id": "vial_20ml.2021_03_20",
+  "name": "20ml vial",
+  "py_name": "vial_20ml",
+  "type": "moveable",
+  "subtype": "vial",
+  "grid": {
+    "origin": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "count": [
+      1,
+      1,
+      1
+    ],
+    "pitch": [
+      0.005,
+      0.005,
+      0.005
+    ]
+  },
+  "tool": null,
+  "defaults": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0,
+    "rot": 0.0
+  },
+  "links": {
+    "body": {
+      "obj_name": "body.obj",
+      "joint_settings": {
+        "name": "body",
+        "max": 1.0,
+        "min": 0.0,
+        "type": 0,
+        "tform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "dh": null,
+        "chain": 0,
+        "follower": false,
+        "defaults": {
+          "counts": 0,
+          "channel": 0
+        },
+        "kinematics": {
+          "slope": 1e-05,
+          "y_int": 0.0
+        }
+      },
+      "mates": []
+    },
+    "cap": {
+      "obj_name": "cap.obj",
+      "joint_settings": {
+        "name": "cap",
+        "max": 1.0,
+        "min": 0.0,
+        "type": 0,
+        "tform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "dh": null,
+        "chain": 0,
+        "follower": false,
+        "defaults": {
+          "counts": 0,
+          "channel": 0
+        },
+        "kinematics": {
+          "slope": 1e-05,
+          "y_int": 0.0
+        }
+      },
+      "mates": []
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "res_id": "tool_mount.2021_03_20",
+  "name": "Tool mount",
+  "py_name": "tool_mount",
+  "type": "static",
+  "subtype": "rack",
+  "grid": {
+    "origin": [
+      0.0,
+      0.01875,
+      0.08386,
+      -90
+    ],
+    "count": [
+      1,
+      1,
+      1
+    ],
+    "pitch": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "tool": "gripper",
+  "moveable_type": "tool",
+  "defaults": {
+    "x": 0.0,
+    "y": 0.3,
+    "z": 0,
+    "rot": 0,
+    "moveable_name": "None",
+    "fill_range": "None"
+  },
+  "links": {
+    "tool_mount": {
+      "obj_name": "tool_mount.obj",
+      "joint_settings": {
+        "name": "tool_mount",
+        "max": 1.0,
+        "min": 0.0,
+        "type": 0,
+        "tform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "dh": null,
+        "chain": 0,
+        "follower": false,
+        "defaults": {
+          "counts": 0,
+          "channel": 0
+        },
+        "kinematics": {
+          "slope": 1e-05,
+          "y_int": 0.0
+        }
+      },
+      "mates": []
+    }
+  }
+}

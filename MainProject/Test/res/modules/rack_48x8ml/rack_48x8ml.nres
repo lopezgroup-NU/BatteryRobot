@@ -1,0 +1,76 @@
+{
+  "res_id": "rack_48x8ml.2022_01_25",
+  "name": "48x8ml vial rack",
+  "py_name": "rack_48x8ml",
+  "type": "static",
+  "subtype": "rack",
+  "grid": {
+    "origin": [
+      -0.03475,
+      -0.04625,
+      0.07,
+      0
+    ],
+    "count": [
+      8,
+      6,
+      1
+    ],
+    "pitch": [
+      0.026,
+      0.026,
+      0.0
+    ]
+  },
+  "tool": "gripper",
+  "moveable_type": "vial",
+  "defaults": {
+    "x": 0.075,
+    "y": 0.15,
+    "z": 0.0,
+    "rot": 0,
+    "moveable_name": "None",
+    "fill_range": "None"
+  },
+  "links": {
+    "rack_48x8ml": {
+      "obj_name": "rack_48x8ml.obj",
+      "joint_settings": {
+        "name": "rack_48x8ml",
+        "max": 1.0,
+        "min": 0.0,
+        "type": 0,
+        "tform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "dh": null,
+        "chain": 0,
+        "follower": false,
+        "defaults": {
+          "counts": 0,
+          "channel": 0
+        },
+        "kinematics": {
+          "slope": 1e-05,
+          "y_int": 0.0
+        }
+      },
+      "mates": []
+    }
+  }
+}
