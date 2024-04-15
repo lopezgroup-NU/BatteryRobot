@@ -1,298 +1,387 @@
 {
+  "controllers": [
+    {
+      "id": 1,
+      "name": "C9",
+      "address": 65
+    }
+  ],
   "modules": {
     "1": {
-      "res_id": "rack_48x8ml.2022_01_25",
-      "name": "48x8ml vial rack",
-      "py_name": "rack_48x8ml",
-      "type": "static",
-      "subtype": "rack",
-      "grid": {
-        "origin": [
-          -0.03475,
-          -0.04625,
-          0.07,
-          0
-        ],
-        "count": [
-          8,
-          6,
-          1
-        ],
-        "pitch": [
-          0.026,
-          0.026,
-          0.0
-        ]
-      },
-      "tool": "gripper",
-      "moveable_type": "vial",
-      "kinematics": null,
-      "x": -0.1875,
-      "y": 0.15,
+      "res_id": "deck.2023_04_17",
+      "name": "deck",
+      "pyname": "deck",
+      "enabled": true,
+      "coord_sys": -1,
+      "x": 0.0,
+      "y": 0.0,
       "z": 0.0,
       "rot": 0.0,
-      "moveable_res_id": null,
-      "moveable_name": "20ml vial",
-      "fill_range": "0-10",
-      "m_id": 1,
-      "enabled": true,
-      "moveable_id": "vial_20ml.2021_03_20"
+      "channels": []
     },
     "2": {
-      "res_id": "sbs_heater.2021_03_20",
-      "name": "SBS heater clamp",
-      "py_name": "sbs_heater",
-      "type": "static",
-      "subtype": "none",
-      "grid": {
-        "origin": [
-          0.027,
-          0.0175,
-          0.1207,
-          0
-        ],
-        "count": [
-          4,
-          2,
-          1
-        ],
-        "pitch": [
-          0.032,
-          0.04,
-          0.0
-        ]
-      },
-      "tool": "gripper",
-      "moveable_type": "None",
-      "kinematics": null,
-      "x": 0.075,
-      "y": -0.1125,
-      "z": 0.0,
-      "rot": 0.0,
-      "moveable_res_id": null,
-      "moveable_name": "None",
-      "fill_range": "None",
-      "m_id": 2,
-      "enabled": true
-    },
-    "3": {
-      "res_id": "tool_mount.2021_03_20",
-      "name": "Tool mount",
-      "py_name": "tool_mount",
-      "type": "static",
-      "subtype": "rack",
-      "grid": {
-        "origin": [
-          0.0,
-          0.01875,
-          0.08386,
-          -90
-        ],
-        "count": [
-          1,
-          1,
-          1
-        ],
-        "pitch": [
-          0.0,
-          0.0,
-          0.0
-        ]
-      },
-      "tool": "gripper",
-      "moveable_type": "tool",
-      "kinematics": null,
-      "x": 0.0,
-      "y": 0.3,
-      "z": 0.0,
-      "rot": 0.0,
-      "moveable_res_id": null,
-      "moveable_name": "Vacuum Gripper (30mm)",
-      "fill_range": "0",
-      "m_id": 3,
+      "res_id": "n9.2023_04_17",
+      "name": "N9",
+      "pyname": "N9",
       "enabled": true,
-      "moveable_id": "tool_vac_gripper.2021_5_24"
-    }
-  },
-  "pumps": {
-    "Pump 0": {
-      "enabled": false,
-      "volume": 1.0
-    },
-    "Pump 1": {
-      "enabled": false,
-      "volume": 1.0
-    },
-    "Pump 2": {
-      "enabled": false,
-      "volume": 1.0
-    },
-    "Pump 3": {
-      "enabled": false,
-      "volume": 1.0
-    },
-    "Pump 4": {
-      "enabled": false,
-      "volume": 1.0
-    },
-    "Pump 5": {
-      "enabled": false,
-      "volume": 1.0
-    },
-    "Pump 6": {
-      "enabled": false,
-      "volume": 1.0
-    },
-    "Pump 7": {
-      "enabled": false,
-      "volume": 1.0
-    },
-    "Pump 8": {
-      "enabled": false,
-      "volume": 1.0
-    },
-    "Pump 9": {
-      "enabled": false,
-      "volume": 1.0
-    },
-    "Pump 10": {
-      "enabled": false,
-      "volume": 1.0
-    },
-    "Pump 11": {
-      "enabled": false,
-      "volume": 1.0
-    },
-    "Pump 12": {
-      "enabled": false,
-      "volume": 1.0
-    },
-    "Pump 13": {
-      "enabled": false,
-      "volume": 1.0
-    },
-    "Pump 14": {
-      "enabled": false,
-      "volume": 1.0
+      "coord_sys": -1,
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0,
+      "rot": 0.0,
+      "channels": [
+        {
+          "axis_name": "Z Axis",
+          "controller_id": 1,
+          "channel_n": 3
+        },
+        {
+          "axis_name": "Shoulder",
+          "controller_id": 1,
+          "channel_n": 2
+        },
+        {
+          "axis_name": "Elbow",
+          "controller_id": 1,
+          "channel_n": 1
+        },
+        {
+          "axis_name": "Gripper",
+          "controller_id": 1,
+          "channel_n": 0
+        },
+        {
+          "axis_name": "Gripper fingerS",
+          "controller_id": 1,
+          "channel_n": 8
+        }
+      ]
     }
   },
   "locations": {
-    "Pick_up_tip": {
+    "CE_Cell_Test": {
       "type": "Location",
       "tool": 1,
       "counts": [
-        -23,
-        33911,
-        12320,
-        11701
+        -62,
+        40050,
+        48497,
+        18860
       ],
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null
     },
-    "droptip1": {
-      "type": "Location",
-      "tool": 0,
+    "CE_Cell_grid": {
+      "type": "Grid",
+      "tool": 1,
       "counts": [
-        -68,
-        26821,
-        6462,
-        8589
+        -1230,
+        39895,
+        47977,
+        18899
       ],
       "ik_soln": 0,
       "reference": false,
-      "linked_parent_name": null
-    },
-    "droptip2": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -68,
-        26826,
-        6459,
-        7460
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        8,
+        4,
+        1
       ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
+      "pitch": [
+        20,
+        20,
+        0.0
+      ]
     },
-    "waterdeep": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        349,
-        14744,
-        41463,
-        19399
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "water_not_deep": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        349,
-        14744,
-        41460,
-        13032
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "well1": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -1261,
-        40122,
-        39569,
-        18090
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "well2": {
+    "p_remover_capture_approach": {
       "type": "Location",
       "tool": 1,
       "counts": [
-        236,
-        2920,
-        1478,
-        18093
+        -1383,
+        28180,
+        9084,
+        9828
       ],
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null
     },
-    "well3": {
+    "water_source": {
       "type": "Location",
       "tool": 1,
       "counts": [
-        234,
-        3536,
-        1032,
-        18094
+        2014,
+        2616,
+        15242,
+        21494
       ],
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null
     },
-    "well4": {
+    "tiplocal": {
       "type": "Location",
       "tool": 1,
       "counts": [
-        -1004,
-        39609,
-        39381,
-        18070
+        2311,
+        38339,
+        10220,
+        12417
       ],
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null
+    },
+    "pipette_grid": {
+      "type": "Grid",
+      "tool": 1,
+      "counts": [
+        -2601,
+        38305,
+        10127,
+        12500
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        16,
+        3,
+        1
+      ],
+      "pitch": [
+        9,
+        9,
+        0.0
+      ]
+    },
+    "cap": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -28,
+        39348,
+        43008,
+        22919
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "tipCenter": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        -1230,
+        40042,
+        47986,
+        18899
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "new_grid": {
+      "type": "Grid",
+      "tool": 1,
+      "counts": [
+        -1237,
+        40042,
+        47987,
+        18899
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        8,
+        4,
+        1
+      ],
+      "pitch": [
+        20,
+        20,
+        0.0
+      ]
+    },
+    "CE_Cell_center": {
+      "type": "Grid",
+      "tool": 1,
+      "counts": [
+        -1240,
+        40042,
+        47987,
+        18899
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        8,
+        4,
+        1
+      ],
+      "pitch": [
+        20,
+        20,
+        0.0
+      ]
+    },
+    "e_cell_screw_left": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        542,
+        26833,
+        37203,
+        23872
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "e_cell_screw_right": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        1266,
+        15628,
+        30158,
+        23856
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "carousel_powder": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -525,
+        7737,
+        44200,
+        8666
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "powder_rack": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -405,
+        20172,
+        46310,
+        20052
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "kevin": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        771,
+        10016,
+        24863,
+        18960
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "rackOfficial": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        66,
+        2035,
+        24458,
+        22428
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        8,
+        6,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "p_remover_capture": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        -1328,
+        27184,
+        7142,
+        8778
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "microplate_official": {
+      "type": "Grid",
+      "tool": 1,
+      "counts": [
+        1015,
+        10072,
+        24947,
+        19211
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        8,
+        4,
+        1
+      ],
+      "pitch": [
+        20,
+        20,
+        0.0
+      ]
+    },
+    "microplate_side_official": {
+      "type": "Grid",
+      "tool": 1,
+      "counts": [
+        179,
+        10254,
+        24947,
+        19212
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        8,
+        4,
+        1
+      ],
+      "pitch": [
+        20,
+        0.0,
+        0.0
+      ]
     }
   },
   "sim_inputs": {
@@ -574,8 +663,7 @@
       }
     }
   },
-  "version": 0.1,
-  "id_cnt": 3,
   "visionconfigs": {},
-  "visionpanes": {}
+  "visionpanes": {},
+  "version": 0.3
 }
