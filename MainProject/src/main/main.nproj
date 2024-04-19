@@ -56,6 +56,96 @@
           "channel_n": 8
         }
       ]
+    },
+    "3": {
+      "m_id": 3,
+      "res_id": "pump.2023_04_17",
+      "name": "syringe_pump",
+      "pyname": "syringe_pump",
+      "enabled": true,
+      "type": "poseable",
+      "subtype": "pump",
+      "tool": "None",
+      "grid": null,
+      "coord_sys": -1,
+      "x": -0.097423,
+      "y": -0.12,
+      "z": 0.46358,
+      "rot": 0.0,
+      "mates": [],
+      "channels": [
+        {
+          "axis_name": "Plunger",
+          "controller_id": 1,
+          "channel_n": 30
+        },
+        {
+          "axis_name": "Valve",
+          "controller_id": 1,
+          "channel_n": 31
+        }
+      ],
+      "kinematics": [
+        {
+          "slope": -1.133e-05,
+          "y_int": 0.034
+        },
+        {
+          "slope": 0.0031415,
+          "y_int": -1.570796
+        }
+      ],
+      "init_counts": [
+        0,
+        0
+      ],
+      "volume": 1.0,
+      "address": 3
+    },
+    "4": {
+      "m_id": 4,
+      "res_id": "pump.2023_04_17",
+      "name": "syringe_pump_2",
+      "pyname": "syringe_pump_2",
+      "enabled": true,
+      "type": "poseable",
+      "subtype": "pump",
+      "tool": "None",
+      "grid": null,
+      "coord_sys": -1,
+      "x": -0.097423,
+      "y": -0.12,
+      "z": 0.46358,
+      "rot": 0.0,
+      "mates": [],
+      "channels": [
+        {
+          "axis_name": "Plunger",
+          "controller_id": 1,
+          "channel_n": 26
+        },
+        {
+          "axis_name": "Valve",
+          "controller_id": 1,
+          "channel_n": 27
+        }
+      ],
+      "kinematics": [
+        {
+          "slope": -1.133e-05,
+          "y_int": 0.034
+        },
+        {
+          "slope": 0.0031415,
+          "y_int": -1.570796
+        }
+      ],
+      "init_counts": [
+        0,
+        0
+      ],
+      "volume": 1.0,
+      "address": 1
     }
   },
   "locations": {
@@ -285,43 +375,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "kevin": {
-      "type": "Location",
-      "tool": 1,
-      "counts": [
-        771,
-        10016,
-        24863,
-        18960
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "rackOfficial": {
-      "type": "Grid",
-      "tool": 0,
-      "counts": [
-        66,
-        2035,
-        24458,
-        22428
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0,
-      "n": [
-        8,
-        6,
-        1
-      ],
-      "pitch": [
-        26,
-        26,
-        0.0
-      ]
-    },
     "p_remover_capture": {
       "type": "Location",
       "tool": 1,
@@ -382,6 +435,178 @@
         0.0,
         0.0
       ]
+    },
+    "heatplate_official": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        -609,
+        35192,
+        17588,
+        14602
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        4,
+        3,
+        1
+      ],
+      "pitch": [
+        32,
+        28,
+        0.0
+      ]
+    },
+    "rack_pipette_dispense": {
+      "type": "Grid",
+      "tool": 1,
+      "counts": [
+        -2722,
+        992,
+        17867,
+        17132
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        8,
+        4,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "carousel_dispense": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        -554,
+        5983,
+        39899,
+        11919
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "vial_carousel": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        503,
+        7627,
+        44074,
+        17400
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "rack_official": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        66,
+        2035,
+        24458,
+        22428
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        8,
+        6,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "rack_dispense_official": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        66,
+        2035,
+        24458,
+        22428
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        8,
+        4,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "carousel_cap_approach": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -2097,
+        7627,
+        44074,
+        17200
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "rack_pipette_aspirate": {
+      "type": "Grid",
+      "tool": 1,
+      "counts": [
+        -2829,
+        5594,
+        20920,
+        21400
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        8,
+        2,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "safe_zone": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        399,
+        36541,
+        48808,
+        682
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
     }
   },
   "sim_inputs": {
