@@ -1,32 +1,32 @@
+import sys
+sys.path.append('C:\\Users\\llf1362\\Desktop\\BatteryRobot\\MainProject\\src\\main\\settings')
+
 from powder_settings import PowderProtocol, PowderSettings
 from north import NorthC9
 from time import perf_counter
+import pandas as pd
 
 class PowderShaker(NorthC9):
     
-    def init():
+    def init(self):
         self.home_OL_stepper(0, 300)
 
-    def set_opening(deg):
+    def set_opening(self, deg):
         self.move_axis(0, deg*(1000/360.0), accel=5000)
 
-    def shake(t, f=120, a=100, wait=True):
+    def shake(self, t, f=120, a=100, wait=True):
         #t in ms
         #f in hz [40, 80, 100, 120]
         #a in %
         return self.amc_pwm(int(f), int(t), int(a), wait=wait)
     
-    def cl_pow_dispense (robot, mg_target, protocol=None, zero_scale=True, write_file=False):        
+    def cl_pow_dispense(self, robot, mg_target, protocol=None, zero_scale=True, write_file=False):        
+
         start_t = perf_counter()
         mg_togo = mg_target
-        print(protocol)
         if protocol is None:
             protocol = default_ps 
         ps = protocol.fast_settings
-        if mg_togo < protocol.slow_settings.thresh:
-            ps = protocol.slow_settings
-        elif mg_togo < protocol.med_settings.thresh:
-            ps = protocol.med_settings
             
         #intialize
         self.set_opening(0)  # make sure everything starts closed  
@@ -41,8 +41,7 @@ class PowderShaker(NorthC9):
         
         count = 0
         while mg_togo > protocol.tol:  # should have a max count condition? other timeout?
-            count += 1
-            
+            count += 1                
             #todo: rewrite below:
             #if write_file:
                 #file.record(shake_t, delta_mass, iter_target, mg_togo)
@@ -59,9 +58,11 @@ class PowderShaker(NorthC9):
             delta_mass = meas_mass - prev_mass
             prev_mass = meas_mass
 
-            if mg_togo < protocol.slow_settings.thresh:
+            if mg_togo <= protocol.ultra_slow_settings.thresh:
+                ps = protocol.ultra_slow_settings
+            elif mg_togo <= protocol.slow_settings.thresh:
                 ps = protocol.slow_settings
-            elif mg_togo < protocol.med_settings.thresh:
+            elif mg_togo <= protocol.med_settings.thresh:
                 ps = protocol.med_settings
 
             iter_target = (ps.percent_target*mg_togo)

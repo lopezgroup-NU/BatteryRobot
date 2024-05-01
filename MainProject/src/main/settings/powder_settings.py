@@ -19,4 +19,5 @@ class PowderProtocol:
     fast_settings: PowderSettings
     med_settings: PowderSettings
     slow_settings: PowderSettings
+    ultra_slow_settings: PowderSettings
     scale_delay: float = 0.5  # seconds before measuring powder... fall time for small amounts of solids

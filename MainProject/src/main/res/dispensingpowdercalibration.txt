@@ -1,0 +1,167 @@
+Recalibrated...
+iteration 0 dispensed: 13.7 time = 6.900907278060913
+iteration 1 dispensed: 11.899999999999999 time = 6.016520977020264
+iteration 2 dispensed: 11.7 time = 7.590240955352783
+iteration 3 dispensed: 9.9 time = 12.486947059631348
+iteration 4 dispensed: 11.899999999999999 time = 6.107199192047119
+iteration 5 dispensed: 16.499999999999996 time = 10.207324028015137
+iteration 6 dispensed: 17.1 time = 6.200495004653931
+iteration 7 dispensed: 20.800000000000004 time = 5.198685169219971
+iteration 8 dispensed: 19.599999999999998 time = 6.60034966468811
+iteration 9 dispensed: 16.499999999999996 time = 5.199817657470703
+
+Recalibrated...
+iteration 0 dispensed: 11.400000000000002 time = 54.14354157447815
+iteration 1 dispensed: 11.000000000000002 time = 37.001466035842896
+iteration 2 dispensed: 11.000000000000002 time = 7.125791788101196
+iteration 3 dispensed: 10.699999999999998 time = 42.27511978149414
+iteration 4 dispensed: 10.600000000000001 time = 14.812056064605713
+iteration 5 dispensed: 10.200000000000001 time = 11.39286208152771
+iteration 6 dispensed: 9.9 time = 10.413547992706299
+iteration 7 dispensed: 10.0 time = 13.595204591751099
+iteration 8 dispensed: 10.200000000000001 time = 36.997021198272705
+iteration 9 dispensed: 9.9 time = 29.982582330703735
+
+Recalibrated...
+iteration 0 dispensed: 10.8 time = 11.692798614501953
+iteration 1 dispensed: 10.200000000000001 time = 25.614743947982788
+iteration 2 dispensed: 11.500000000000002 time = 20.59364104270935
+iteration 3 dispensed: 12.7 time = 20.79576539993286
+iteration 4 dispensed: 10.400000000000002 time = 7.918027400970459
+iteration 5 dispensed: 12.6 time = 6.408431768417358
+iteration 6 dispensed: 11.400000000000002 time = 10.470002174377441
+iteration 7 dispensed: 23.0 time = 8.13314938545227
+iteration 8 dispensed: 11.899999999999999 time = 9.47154712677002
+iteration 9 dispensed: 16.2 time = 6.928577423095703
+avg mass = 13.069999999999999 avg time taken = 12.80266842842102
+Recalibrated...
+iteration 0 dispensed: 12.5 time = 5.444814682006836
+
+Recalibrated...
+iteration 0 dispensed: 12.7 time = 21.601330280303955
+iteration 1 dispensed: 15.6 time = 7.939525604248047
+iteration 2 dispensed: 20.6 time = 5.787913084030151
+iteration 3 dispensed: 17.8 time = 6.0009379386901855
+iteration 4 dispensed: 10.100000000000001 time = 15.076699018478394
+iteration 5 dispensed: 18.700000000000003 time = 5.727737188339233
+
+Recalibrated...
+iteration 0 dispensed: 9.8 time = 6.132975101470947
+iteration 1 dispensed: 18.099999999999998 time = 5.590731859207153
+
+Recalibrated...
+
+Recalibrated...
+
+Recalibrated...
+iteration 0 dispensed: 11.199999999999998 time = 15.276455402374268
+iteration 1 dispensed: 19.599999999999998 time = 8.500126361846924
+
+Recalibrated...
+iteration 0 dispensed: 10.100000000000001 time = 9.223517179489136
+avg mass = 10.100000000000001 avg time taken = 9.223517179489136
+Recalibrated...
+iteration 0 dispensed: 9.9 time = 21.084468364715576
+iteration 1 dispensed: 11.3 time = 27.799192905426025
+iteration 2 dispensed: 10.0 time = 35.80923104286194
+iteration 3 dispensed: 10.200000000000001 time = 15.39195704460144
+iteration 4 dispensed: 10.3 time = 25.598743438720703
+iteration 5 dispensed: 10.0 time = 40.61276817321777
+iteration 6 dispensed: 10.0 time = 24.587649822235107
+iteration 7 dispensed: 10.5 time = 29.002617597579956
+iteration 8 dispensed: 12.8 time = 21.006465911865234
+iteration 9 dispensed: 11.5 time = 22.402575731277466
+avg mass = 10.65 avg time taken = 26.329567003250123
+Recalibrated...
+iteration 0 dispensed: 10.0 time = 39.34214186668396
+iteration 1 dispensed: 16.7 time = 49.00346398353577
+iteration 2 dispensed: 9.9 time = 112.78327202796936
+iteration 3 dispensed: 9.9 time = 52.016685485839844
+iteration 4 dispensed: 10.5 time = 32.79760766029358
+iteration 5 dispensed: 9.9 time = 48.602152824401855
+iteration 6 dispensed: 10.600000000000001 time = 17.604449033737183
+iteration 7 dispensed: 9.9 time = 67.00607657432556
+iteration 8 dispensed: 10.3 time = 42.98008847236633
+iteration 9 dispensed: 12.3 time = 32.41648626327515
+avg mass = 11.0 avg time taken = 49.45524241924286
+
+Recalibrated...
+iteration 0 dispensed: 10.200000000000001 time = 34.37467575073242
+iteration 1 dispensed: 10.200000000000001 time = 23.598909378051758
+iteration 2 dispensed: 15.1 time = 23.810028791427612
+iteration 3 dispensed: 10.0 time = 29.99471139907837
+iteration 4 dispensed: 10.400000000000002 time = 16.20410466194153
+iteration 5 dispensed: 10.400000000000002 time = 18.59218454360962
+iteration 6 dispensed: 10.100000000000001 time = 18.004122495651245
+iteration 7 dispensed: 17.499999999999996 time = 14.010379552841187
+iteration 8 dispensed: 9.9 time = 13.394618272781372
+iteration 9 dispensed: 10.5 time = 13.800832986831665
+avg mass = 11.430000000000001 avg time taken = 20.578456783294676
+
+Recalibrated...
+iteration 0 dispensed: 10.3 time = 16.964540004730225
+iteration 1 dispensed: 11.7 time = 15.793148517608643
+iteration 2 dispensed: 13.7 time = 18.804534196853638
+iteration 3 dispensed: 11.5 time = 12.810985088348389
+iteration 4 dispensed: 10.900000000000002 time = 10.591859340667725
+iteration 5 dispensed: 10.900000000000002 time = 18.602126598358154
+iteration 6 dispensed: 10.3 time = 23.841880798339844
+iteration 7 dispensed: 11.3 time = 16.20057201385498
+iteration 8 dispensed: 11.899999999999999 time = 12.359300136566162
+iteration 9 dispensed: 10.400000000000002 time = 6.252341032028198
+avg mass = 11.290000000000001 avg time taken = 15.222128772735596
+
+Recalibrated...
+iteration 0 dispensed: 10.600000000000001 time = 61.8703351020813
+iteration 1 dispensed: 10.3 time = 20.843697547912598
+iteration 2 dispensed: 10.200000000000001 time = 30.150829553604126
+iteration 3 dispensed: 10.100000000000001 time = 11.852646589279175
+iteration 4 dispensed: 11.6 time = 14.195171117782593
+iteration 5 dispensed: 10.900000000000002 time = 12.959247827529907
+iteration 6 dispensed: 10.200000000000001 time = 8.648675680160522
+iteration 7 dispensed: 9.9 time = 12.93955945968628
+iteration 8 dispensed: 14.099999999999998 time = 14.649987697601318
+iteration 9 dispensed: 16.7 time = 5.61479640007019
+avg mass = 11.46 avg time taken = 19.3724946975708
+
+Recalibrated...
+
+Recalibrated...
+
+Recalibrated...
+
+Recalibrated...
+iteration 0 dispensed: 10.100000000000001 time = 39.15425229072571
+iteration 1 dispensed: 10.200000000000001 time = 40.997849225997925
+iteration 2 dispensed: 10.3 time = 45.593384742736816
+iteration 3 dispensed: 9.9 time = 48.41535758972168
+iteration 4 dispensed: 10.400000000000002 time = 36.587708711624146
+iteration 5 dispensed: 10.0 time = 36.19370460510254
+iteration 6 dispensed: 10.3 time = 43.60695195198059
+iteration 7 dispensed: 10.3 time = 36.99426293373108
+iteration 8 dispensed: 10.400000000000002 time = 35.20491027832031
+iteration 9 dispensed: 9.9 time = 37.79780578613281
+avg mass = 10.180000000000001 avg time taken = 40.05461881160736
+
+Recalibrated...
+iteration 0 dispensed: 25.0 time = 41.66016602516174
+iteration 1 dispensed: 24.9 time = 56.5965039730072
+iteration 2 dispensed: 25.2 time = 45.594324350357056
+iteration 3 dispensed: 25.3 time = 40.41543745994568
+iteration 4 dispensed: 25.3 time = 42.788978576660156
+iteration 5 dispensed: 24.9 time = 54.60794639587402
+iteration 6 dispensed: 25.7 time = 53.787545680999756
+iteration 7 dispensed: 25.6 time = 63.61410164833069
+iteration 8 dispensed: 25.1 time = 60.987998247146606
+iteration 9 dispensed: 25.7 time = 55.61366128921509
+avg mass = 25.269999999999996 avg time taken = 51.5666663646698
+
+Recalibrated...
+
+Recalibrated...
+
+Recalibrated...
+
+Recalibrated...
+
+Recalibrated...

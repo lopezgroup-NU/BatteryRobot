@@ -1,0 +1,32 @@
+Results of dispensing and scaling powder: 
+Intended: 10ml Real: 10.199999999999998g Vial: 0 time: 47.682069063186646
+Intended: 10ml Real: 10.299999999999999g Vial: 1 time: 45.627379179000854
+Intended: 10ml Real: 11.0g Vial: 2 time: 61.259313106536865
+Intended: 10ml Real: 9.899999999999999g Vial: 3 time: 55.95603537559509
+Intended: 10ml Real: 10.5g Vial: 4 time: 27.53360629081726
+Intended: 10ml Real: 9.9g Vial: 5 time: 58.05130648612976
+Intended: 10ml Real: 10.5g Vial: 6 time: 62.69315552711487
+Intended: 10ml Real: 10.100000000000001g Vial: 7 time: 62.406094551086426
+
+Results of dispensing and scaling powder: 
+Intended: 25ml Real: 24.9g Vial: 8 time: 41.22443389892578
+Intended: 25ml Real: 26.200000000000003g Vial: 9 time: 19.37283754348755
+Intended: 25ml Real: 24.8g Vial: 10 time: 51.10773777961731
+Intended: 25ml Real: 26.7g Vial: 11 time: 40.89228558540344
+Intended: 25ml Real: 25.2g Vial: 12 time: 67.81149077415466
+Intended: 25ml Real: 25.3g Vial: 13 time: 74.12510776519775
+Intended: 25ml Real: 25.400000000000002g Vial: 14 time: 34.32112431526184
+Intended: 25ml Real: 24.8g Vial: 15 time: 43.63630270957947
+
+2nd time runningResults of dispensing and scaling powder: 
+Intended: 10ml Real: 10.100000000000001g Vial: 0 time: 61.78481197357178
+Intended: 10ml Real: 10.399999999999999g Vial: 1 time: 39.34611105918884
+Intended: 10ml Real: 10.100000000000001g Vial: 2 time: 42.66937804222107
+Intended: 10ml Real: 10.600000000000001g Vial: 3 time: 49.43079948425293
+Intended: 25ml Real: 25.0g Vial: 4 time: 43.029268980026245
+Intended: 25ml Real: 25.1g Vial: 5 time: 58.83561944961548
+Intended: 25ml Real: 24.8g Vial: 6 time: 86.26863479614258
+Intended: 25ml Real: 25.3g Vial: 7 time: 53.091102838516235
+
+
+730 mg dispensed
