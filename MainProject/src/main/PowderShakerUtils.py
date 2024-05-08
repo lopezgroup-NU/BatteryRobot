@@ -81,7 +81,7 @@ class PowderShaker(NorthC9):
             print(f'\tNext target:     {iter_target:.1f} mg')
             print(f'\tNext time:       {int(shake_t)} ms')
             print('')
-            
+        self.set_opening(100)
         self.set_opening(0)
      
         print(f'Result:')

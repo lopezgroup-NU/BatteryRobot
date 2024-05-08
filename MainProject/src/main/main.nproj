@@ -673,14 +673,79 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "silverplate_screw": {
+    "microplate_screw": {
       "type": "Location",
       "tool": 0,
       "counts": [
-        -109,
-        16431,
-        20378,
-        23766
+        480,
+        12056,
+        28031,
+        23372
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "lidholder_screw": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -163,
+        16473,
+        20439,
+        23720
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "screw_1": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -841,
+        9869,
+        15365,
+        21507
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "screw_2": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -707,
+        9169,
+        16181,
+        21550
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "microplate_screw_approach_2": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        7442,
+        15906,
+        30438,
+        23025
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "microplate_screw_approach_1": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        7202,
+        16195,
+        26751,
+        23084
       ],
       "ik_soln": 0,
       "reference": false,
