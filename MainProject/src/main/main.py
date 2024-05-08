@@ -12,7 +12,8 @@ t2 = BatteryRobot('B', network = rob.network)
 p2 = PowderShaker('C', network = rob.network)
 
 rob.home_robot(wait=False)
-rob.home_carousel()
+# rob.home_carousel()
+
 # rob.dispense_powder_and_scale(LiOAc)
 # rob.home_robot(wait=False)
 # rob.home_carousel()

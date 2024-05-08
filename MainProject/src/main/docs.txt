@@ -1,0 +1,7 @@
+todo
+replace cartridges
+dispenseworkflowauto
+    csv for dispense workflow auto
+
+
+get how many loops to move electrolyte// 28 loops of move_pump(0,2000)

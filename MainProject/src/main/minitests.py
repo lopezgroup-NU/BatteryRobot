@@ -1,0 +1,27 @@
+from north import NorthC9
+c9 = NorthC9('A', network_serial='AU06EZ1P')
+
+# c9.delay(1)
+# c9.set_pump_valve(0, 0)
+# c9.delay(1)
+# c9.aspirate_ml(0, 0.1)
+# c9.delay(1)
+# c9.set_pump_valve(0, 1)
+# c9.delay(1)
+# c9.dispense_ml(0, 0.1)
+# c9.delay(1)
+# c9.move_carousel(315, 0)
+# c9.delay(1)
+# c9.move_carousel(315, 70)
+for i in range(35):
+    print(i)
+    c9.set_pump_valve(0,0)
+    c9.delay(3)
+    c9.move_pump(0,2000)
+    c9.delay(3)
+    c9.set_pump_valve(0,1)
+    c9.delay(3)
+    c9.move_pump(0, 0)
+    c9.delay(3)
+#28 loops with move_pump(0,2000)
+    

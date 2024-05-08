@@ -6,49 +6,14 @@ import time, sys
 
 rob = BatteryRobot('A', network_serial='AU06EZ1P')
 p2 = PowderShaker('C', network = rob.network)
-# rob.close_clamp()
-# rob.delay(1)
-# rob.open_clamp()
-# rob.delay(1)
 
-# rob.move_carousel(68,77)
-#best so far
-# LiOAc = PowderProtocol(tol = 0.2,
-#                             fast_settings = PowderSettings(
-#                                 opening_deg = 40,
-#                                 percent_target = 0.9,
-#                                 max_growth = 3
-#                                 ),
-#                             med_settings = PowderSettings(
-#                                 thresh = 50,
-#                                 opening_deg = 35,
-#                                 percent_target = 0.9,
-#                                 max_growth = 1.3
-#                                 ),
-#                             slow_settings = PowderSettings(
-#                                 thresh = 10,
-#                                 opening_deg = 28,
-#                                 percent_target = 0.8,
-#                                 max_growth = 1.1,
-#                                 amplitude = 80,
-#                                 shut_valve = False
-#                                 ),
-#                             ultra_slow_settings = PowderSettings(
-#                                 thresh = 2,
-#                                 opening_deg = 27,
-#                                 percent_target = 0.8,
-#                                 max_growth = 1.1,
-#                                 amplitude = 70,
-#                                 shut_valve = False
-#                                 ),
-#                              scale_delay=1
-#                             )
+
 
 with open("dispensingpowdercalibration.txt", "a") as f:
     f.write("\nRecalibrated...\n")
     dispensed = 0
     total_time = 0
-    iters = 10
+    iters = 1
     for i in range(iters): # todo make p2.clpowdispense return settings and add to txt file
         print(i)
         now = time.time()

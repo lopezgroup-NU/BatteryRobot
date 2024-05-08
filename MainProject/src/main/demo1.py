@@ -73,7 +73,7 @@ rob.close_clamp()
 rob.delay(.7)
 rob.uncap()
 rob.goto_safe(safe_zone)
-rob.move_carousel(315,73)
+rob.move_carousel(315,70)
 
 
 

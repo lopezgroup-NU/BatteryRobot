@@ -122,12 +122,12 @@
         {
           "axis_name": "Plunger",
           "controller_id": 1,
-          "channel_n": 26
+          "channel_n": 24
         },
         {
           "axis_name": "Valve",
           "controller_id": 1,
-          "channel_n": 27
+          "channel_n": 25
         }
       ],
       "kinematics": [
@@ -144,8 +144,8 @@
         0,
         0
       ],
-      "volume": 1.0,
-      "address": 1
+      "volume": 0.1,
+      "address": 0
     }
   },
   "locations": {
@@ -603,6 +603,84 @@
         36541,
         48808,
         682
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "active_cartridge": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        1462,
+        7675,
+        44185,
+        9397
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "powder_4": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        1629,
+        18840,
+        44969,
+        20275
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "powder_3": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        1903,
+        14171,
+        42337,
+        20258
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "powder_2": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        2097,
+        11784,
+        42203,
+        20327
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "powder_1": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        2206,
+        10391,
+        43342,
+        20329
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "silverplate_screw": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -109,
+        16431,
+        20378,
+        23766
       ],
       "ik_soln": 0,
       "reference": false,
