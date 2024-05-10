@@ -1,7 +1,10 @@
 todo
-replace cartridges
-dispenseworkflowauto
-    csv for dispense workflow auto
+adjust height when aspirating (use marked vial)
+dispense specific concentration
 
 
+replace cartridges //
+dispenseworkflowauto //
+    csv for dispense workflow auto // 
 get how many loops to move electrolyte// 28 loops of move_pump(0,2000)
+screw capping // rob.cap(revs = 9.5, pitch = 0.8, torque_thresh=1850)

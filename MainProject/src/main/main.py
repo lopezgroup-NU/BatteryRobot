@@ -8,11 +8,17 @@ from powder_protocols import *
 import time
 
 rob = BatteryRobot('A', network_serial='AU06EZ1P')
-t2 = BatteryRobot('B', network = rob.network)
+t8 = BatteryRobot('B', network = rob.network)
 p2 = PowderShaker('C', network = rob.network)
 
-rob.home_robot(wait=False)
-rob.home_carousel()
+# rob.home_robot(wait=False)
+# rob.home_carousel()
+t8.enable_channel(0)
+# t8.set_temp(0, 50)  # set axis 0 to 50*
+rob.spin_axis(6, 0)
+ 
+
+t8.set_temp(0, 10)  # set temp below room temp.. non cooling
 
 # rob.dispense_powder_and_scale(LiOAc)
 # rob.home_robot(wait=False)

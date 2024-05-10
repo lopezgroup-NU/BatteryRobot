@@ -362,19 +362,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "powder_rack": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -405,
-        20172,
-        46310,
-        20052
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
     "p_remover_capture": {
       "type": "Location",
       "tool": 1,
@@ -673,32 +660,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "microplate_screw": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        480,
-        12056,
-        28031,
-        23372
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "lidholder_screw": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -163,
-        16473,
-        20439,
-        23720
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
     "screw_1": {
       "type": "Location",
       "tool": 0,
@@ -725,14 +686,40 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "microplate_screw_approach_2": {
+    "new_loc": {
       "type": "Location",
       "tool": 0,
       "counts": [
-        7442,
-        15906,
-        30438,
-        23025
+        -850,
+        15982,
+        26509,
+        22945
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "microplate_holder": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        480,
+        12056,
+        28031,
+        23372
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "lidholder_holder": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -163,
+        16473,
+        20439,
+        23720
       ],
       "ik_soln": 0,
       "reference": false,
@@ -742,10 +729,23 @@
       "type": "Location",
       "tool": 0,
       "counts": [
-        7202,
-        16195,
-        26751,
-        23084
+        -850,
+        15982,
+        26509,
+        22945
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "microplate_screw_approach_2": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -850,
+        15983,
+        30515,
+        22953
       ],
       "ik_soln": 0,
       "reference": false,

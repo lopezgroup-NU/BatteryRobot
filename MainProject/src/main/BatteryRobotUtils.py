@@ -13,6 +13,10 @@ import time, math
 class BatteryRobot(NorthC9):
     holding_pipette = False
     holding_vial = False
+    cartridge_on_carousel = None
+    cartridge_pos= {
+        LiOAc: 1    
+    }
 #     t8 = BatteryRobot('B', network=self.network)
 
 #     def __init__(self):        
@@ -132,8 +136,8 @@ class BatteryRobot(NorthC9):
         return data
     
     """
-    dispense liquid into specified vial (dest_id) from source vial(source_id)
-    dest vials are from rack_pipette_dispense & source vials are from rack_pipette_aspirate (see "Locators")
+    Dispense {volume}ml of liquid into vial with id {dest_id} form vial with id {source_id}.
+    Destination vials/source vials are from rack_pipette_dispense and rack_pipette_aspirate respectively (see "Locator.py")
     """
     def dispense_liquid_and_scale(self, dest_id, source_id, volume, collect = False):
         pip_id = source_id     
@@ -179,37 +183,95 @@ class BatteryRobot(NorthC9):
         data["Real(ml)"] = reading
 
         return data
-                                
     
+    """
+    Dispenses powder associated with {protocol} and then dispenses solvent based on desired concentration {conc}
+    """
+    def make_solution(self, dest_id, source_id, conc, protocol):
+        pass
+        
+                                
+    """
+    Get vial from {rack_type} at index {vial_id}.
+    Examples of {rack_type} are rack_dispense_official and heatplate_official
+    Indexing for an n x m rack are as follows:
+    
+    (n*m)-3 ... 0
+    (n*m)-2 ... 1
+    (n*m)-1 ... 2
+    
+    """
     def get_vial_from_rack(self, vial_id, rack_type): #racks/heatplate 
         print(f"getting vial at index {vial_id}")
         self.open_gripper()
         self.goto_safe(rack_type[vial_id])
         self.close_gripper()
         time.sleep(0.5)
+        
+        #move up to a safe spot where gripper will not collide with anything
         self.move_z(400)
         self.holding_vial = True
         
     """
-    gets cartridge from carousel, swap with new 
+    If there is a cartridge on carousel (active cartridge), replace with {new}, where {new} is a protocol for a powder
+    E.g. get_new_cartridge(LiOAc) replaces the active cartridge (if present) with the LiOAc cartridge
+    If {new} is not specified, robot returns active cartridge to holder without replacing it
+    Defined protocols can be found in settings/powder_protocols.py
     """
-    def swap_cartridge(self, new):
-        #ensure carousel is properly aligned for gripper to collect cartridge
+    def get_new_cartridge(self, new=None):
+        #ensure carousel is properly aligned for gripper to collect and place cartridge
         self.move_carousel(68,77)
         
-        #each cartridge should have designated spot
-        self.goto_safe(active_cartridge)
-        self.close_gripper()
-        self.goto_safe()
-    
+        #check if there is an active cartridge 
+        if self.cartridge_on_carousel:
+            #put active cartridge back to designated holder
+            self.goto_safe(active_cartridge)
+            self.close_gripper()
+            
+            if cartridge_pos[active_cartridge] == 1:
+                self.goto_safe(powder_1)
+            elif cartridge_pos[active_cartridge] == 2:
+                self.goto_safe(powder_2)        
+            elif cartridge_pos[active_cartridge] == 3:
+                self.goto_safe(powder_3)
+            elif cartridge_pos[active_cartridge] == 4:
+                self.goto_safe(powder_4)
+                
+            self.open_gripper()
+            self.cartridge_on_carousel = None
+        
+        #if user specifies new, place new cartridge on carousel
+        if new:
+            if cartridge_pos[new] == 1:
+                self.goto_safe(powder_1)
+            elif cartridge_pos[new] == 2:
+                self.goto_safe(powder_2)        
+            elif cartridge_pos[new] == 3:
+                self.goto_safe(powder_3)
+            elif cartridge_pos[new] == 4:
+                self.goto_safe(powder_4)
+            self.close_gripper()
+            self.goto_safe(active_cartridge)
+            self.open_gripper()
+            self.cartridge_on_carousel = new
+            
+         self.goto_safe(safe_zone)
+         
     """
-    gets new pipette at specified position from pipette rack. Will throw an error if robot is holding a vial
+    gets new pipette at specified position {pip_index} from pipette rack. Will throw an error if robot is holding a vial.
+    Pipette rack is indexed as follows:
+      47 ...... 8 5 2
+      46 ...... 7 4 1
+      45 ...... 6 3 0
+    By default, robot takes pipette from index 0 (bottom right corner as shown above)
     """
     def get_pipette(self, pip_index=0):
         # Checks if robot is currently holding a vial, will throw an error if True.
         
         if self.holding_vial:
             raise Exception("Holding vial! Unsafe to perform pipette operations")
+        if pip_index > 47:
+            raise Exception(f"No pipette at index {pip_index}")
         
         pipette_order = [i for i in range(2, 48, 3)] \
             + [i for i in range(1, 48, 3)] \
@@ -222,13 +284,16 @@ class BatteryRobot(NorthC9):
         self.holding_pipette = True
 
     """
-    If robot is holdiing pipette, remove it
+    If robot is holding pipette, remove it
     """
     def check_remove_pipette(self):
         if self.holding_pipette:
             print("Rob is holding pipette! Removing pipette...")
             self.remove_pipette()      
 
+    """
+    Simple function that removes pipette when robot is holdng it
+    """
     def remove_pipette(self):
         self.goto_safe(p_remover_capture_approach)
         self.goto(p_remover_capture)
