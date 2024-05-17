@@ -750,6 +750,19 @@
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null
+    },
+    "microplate_holder_approach": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        479,
+        12056,
+        28031,
+        21200
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
     }
   },
   "sim_inputs": {

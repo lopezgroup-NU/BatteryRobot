@@ -15,6 +15,7 @@ class PowderSettings:
     
 @dataclass
 class PowderProtocol:
+    name : str
     tol : float  # best expected dispense tolerance
     fast_settings: PowderSettings
     med_settings: PowderSettings

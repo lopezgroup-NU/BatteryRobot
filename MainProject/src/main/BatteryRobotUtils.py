@@ -1,5 +1,5 @@
 import sys
-sys.path.append('C:\\Users\\llf1362\\Desktop\\BatteryRobot\\MainProject\\src\\main\\settings')
+sys.path.append('\\settings')
 #add settings folder to path ( otherwise python can't import protocols and settings)
 
 from north import NorthC9
@@ -15,7 +15,7 @@ class BatteryRobot(NorthC9):
     holding_vial = False
     cartridge_on_carousel = None
     cartridge_pos= {
-        LiOAc: 1    
+         "LiOAc": 1    
     }
 #     t8 = BatteryRobot('B', network=self.network)
 
@@ -67,7 +67,7 @@ class BatteryRobot(NorthC9):
             #dispensing powder 
             col = dispense_vial_id // vials_per_col
             mass = pow_masses[col]
-            pow_data = self.dispense_powder_and_scale(protocol, dispense_vial_id, mass)
+            pow_data = self.dispense_powder_and_scale(protocol, dispense_vial_id, mass, False)
             
             data["PowMass/mg (Intended)"].append(pow_data["Intended(mg)"])
             data["PowMass/mg (Real)"].append(pow_data["Real(mg)"])
@@ -81,7 +81,7 @@ class BatteryRobot(NorthC9):
             else:
                 source_vial_id = 1 + column * 2
                 
-            liq_data = self.dispense_liquid_and_scale(dispense_vial_id, source_vial_id, volume)
+            liq_data = self.dispense_liquid_and_scale(dispense_vial_id, source_vial_id, volume, False)
             data["LiqVol/ml (Intended)"].append(pow_data["Intended(ml)"])
             data["LiqVol/ml (Real)"].append(pow_data["Real(ml)"])
             
@@ -97,7 +97,8 @@ class BatteryRobot(NorthC9):
             self.open_clamp()                
             self.goto_safe(rack_dispense_official[dispense_vial_id])
             self.open_gripper()
-            self.goto_safe(safe_zone)   
+            self.goto_safe(safe_zone)
+            self.holding_vial = False
             
         df = pd.DataFrame(data)
         df.to_csv('res/dispense.csv', index=True, mode='w')
@@ -105,7 +106,7 @@ class BatteryRobot(NorthC9):
     """
     dispense powder into specified vial (dest_id)
     """
-    def dispense_powder_and_scale(self, protocol, dest_id, mass, collect_vial = False):
+    def dispense_powder_and_scale(self, protocol, dest_id, mass, collect_vial):
         if collect_vial:
             self.get_vial_from_rack(dest_id, rack_dispense_official)
             self.goto_safe(vial_carousel)
@@ -139,13 +140,15 @@ class BatteryRobot(NorthC9):
     Dispense {volume}ml of liquid into vial with id {dest_id} form vial with id {source_id}.
     Destination vials/source vials are from rack_pipette_dispense and rack_pipette_aspirate respectively (see "Locator.py")
     """
-    def dispense_liquid_and_scale(self, dest_id, source_id, volume, collect = False):
+    #work on how
+    #takes in full half low, if full draw from top, half draw from middle, and low draw from bottom
+    def dispense_liquid_and_scale(self, dest_id, source_id, volume, collect_vial):
         pip_id = source_id     
         data = {}
                 
         self.check_remove_pipette()
 
-        if collect:
+        if collect_vial:
             self.get_vial_from_rack(dest_id, rack_dispense_official)
             self.goto_safe(vial_carousel)
             self.close_clamp()
@@ -187,9 +190,21 @@ class BatteryRobot(NorthC9):
     """
     Dispenses powder associated with {protocol} and then dispenses solvent based on desired concentration {conc}
     """
-    def make_solution(self, dest_id, source_id, conc, protocol):
+    def make_solution(self, dest_id, source_id, pow_mass, conc, protocol):
         pass
-        
+        # perform calculations using conc
+#         pow_dispensed = self.dispense_powder_and_scale(protocol, dest_id, pow_mass, collect_vial = True,)
+#         volume = conc
+#         self.dispense_liquid_and_scale(dest_id, source_id, volume)
+#         self.close_clamp()
+#         self.goto_safe(carousel_cap_approach)
+#         self.cap()
+#         self.holding_vial = True
+#         self.open_clamp()                
+#         self.goto_safe(rack_dispense_official[dispense_vial_id])
+#         self.open_gripper()
+#         self.holding_vial = False
+#         self.goto_safe(safe_zone) 
                                 
     """
     Get vial from {rack_type} at index {vial_id}.
@@ -228,13 +243,13 @@ class BatteryRobot(NorthC9):
             self.goto_safe(active_cartridge)
             self.close_gripper()
             
-            if cartridge_pos[active_cartridge] == 1:
+            if cartridge_pos[cartridge_on_carousel.name] == 1:
                 self.goto_safe(powder_1)
-            elif cartridge_pos[active_cartridge] == 2:
+            elif cartridge_pos[cartridge_on_carousel.name] == 2:
                 self.goto_safe(powder_2)        
-            elif cartridge_pos[active_cartridge] == 3:
+            elif cartridge_pos[cartridge_on_carousel.name] == 3:
                 self.goto_safe(powder_3)
-            elif cartridge_pos[active_cartridge] == 4:
+            elif cartridge_pos[cartridge_on_carousel.name] == 4:
                 self.goto_safe(powder_4)
                 
             self.open_gripper()
@@ -242,20 +257,20 @@ class BatteryRobot(NorthC9):
         
         #if user specifies new, place new cartridge on carousel
         if new:
-            if cartridge_pos[new] == 1:
+            if cartridge_pos[new.name] == 1:
                 self.goto_safe(powder_1)
-            elif cartridge_pos[new] == 2:
+            elif cartridge_pos[new.name] == 2:
                 self.goto_safe(powder_2)        
-            elif cartridge_pos[new] == 3:
+            elif cartridge_pos[new.name] == 3:
                 self.goto_safe(powder_3)
-            elif cartridge_pos[new] == 4:
+            elif cartridge_pos[new.name] == 4:
                 self.goto_safe(powder_4)
             self.close_gripper()
             self.goto_safe(active_cartridge)
             self.open_gripper()
             self.cartridge_on_carousel = new
             
-         self.goto_safe(safe_zone)
+#          self.goto_safe(safe_zone)
          
     """
     gets new pipette at specified position {pip_index} from pipette rack. Will throw an error if robot is holding a vial.

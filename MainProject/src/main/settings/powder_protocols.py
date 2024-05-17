@@ -1,6 +1,7 @@
 from powder_settings import PowderProtocol, PowderSettings
 
-default_ps = PowderProtocol(tol = 0.2,
+default = PowderProtocol(name = "default",
+                            tol = 0.2,
                             fast_settings = PowderSettings(
                                 opening_deg = 50,
                                 percent_target = 0.75,
@@ -31,7 +32,8 @@ default_ps = PowderProtocol(tol = 0.2,
                              scale_delay=1
                             )
 
-alconox = PowderProtocol(tol = 0.2,
+alconox = PowderProtocol(name = "alconox",
+                            tol = 0.2,
                             fast_settings = PowderSettings(
                                 opening_deg = 40,
                                 percent_target = 0.75,
@@ -60,7 +62,8 @@ alconox = PowderProtocol(tol = 0.2,
                                 ),
                              scale_delay=1
                             )
-LiOAc = PowderProtocol(tol = 0.2,
+LiOAc = PowderProtocol(name = "LiOAc",
+                       tol = 0.2,
                             fast_settings = PowderSettings(
                                 opening_deg = 45,
                                 percent_target = 0.9,
