@@ -1,10 +1,9 @@
 import sys
-sys.path.append('\\settings')
-#add settings folder to path ( otherwise python can't import protocols and settings)
+sys.path.append('..')
 
 from north import NorthC9
 from Locator import *
-from PowderShakerUtils import PowderShaker
+from utils.PowderShakerUtils import PowderShaker
 from powder_protocols import *
 import pandas as pd
 import time, math
@@ -13,12 +12,17 @@ import time, math
 class BatteryRobot(NorthC9):
     holding_pipette = False
     holding_vial = False
-    cartridge_on_carousel = None
+    cartridge_on_carousel = None # protocol of powder (not a boolean)
     cartridge_pos= {
-         "LiOAc": 1    
+         "LiOAc": 1,
+         "default": 2,
+         "alconox": 3
     }
 #     t8 = BatteryRobot('B', network=self.network)
 
+    """
+    Initialize 
+    """
 #     def __init__(self):        
 #         self.home_robot() #Robot arm homing
 #         self.home_carousel() #Robot carousel homing
@@ -28,7 +32,13 @@ class BatteryRobot(NorthC9):
 #         t8 = NorthC9("B", network=c9.network)
 #         for temp_channel in range(8):
 #             t8.disable_channel(temp_channel) #Clears the temp Sensor
-
+    """
+    Some safety precautions to take during robot startup
+    """
+    def startup(self):
+        self.home_robot(wait=False)
+        self.home_carousel()
+        
     """
     populate grid of vials with specific powder AND liquid, one vial by one vial
     """
@@ -125,7 +135,6 @@ class BatteryRobot(NorthC9):
         self.move_carousel(68, 77) # carousel moves 68 degrees, 75 mm down
         start = time.time()
         dispensed = p2.cl_pow_dispense(robot = self, mg_target = mass, protocol = protocol)
-        p2.set_opening(0)
         t_taken = time.time() - start
         self.delay(1)
         self.move_carousel(0,0)
@@ -138,7 +147,7 @@ class BatteryRobot(NorthC9):
     
     """
     Dispense {volume}ml of liquid into vial with id {dest_id} form vial with id {source_id}.
-    Destination vials/source vials are from rack_pipette_dispense and rack_pipette_aspirate respectively (see "Locator.py")
+    Destination vials/source vials are from rack_dispense_official and rack_pipette_aspirate respectively (see "Locator.py")
     """
     #work on how
     #takes in full half low, if full draw from top, half draw from middle, and low draw from bottom
@@ -166,7 +175,7 @@ class BatteryRobot(NorthC9):
         remaining = volume
         
         for i in range(math.ceil(volume)):
-            self.goto_safe(rack_pipette_aspirate[source_id])
+            self.goto_safe(p_aspirate_low[source_id])
             self.aspirate_ml(3, min(remaining,1))
             self.delay(.5)
             self.goto_safe(carousel_dispense)
@@ -237,19 +246,19 @@ class BatteryRobot(NorthC9):
         #ensure carousel is properly aligned for gripper to collect and place cartridge
         self.move_carousel(68,77)
         
-        #check if there is an active cartridge 
+        #check which cartridge is on carousel, if any
         if self.cartridge_on_carousel:
             #put active cartridge back to designated holder
-            self.goto_safe(active_cartridge)
+            self.goto_safe(active_powder_cartridge)
             self.close_gripper()
-            
-            if cartridge_pos[cartridge_on_carousel.name] == 1:
+            self.delay(1)
+            if self.cartridge_pos[self.cartridge_on_carousel.name] == 1:
                 self.goto_safe(powder_1)
-            elif cartridge_pos[cartridge_on_carousel.name] == 2:
+            elif self.cartridge_pos[self.cartridge_on_carousel.name] == 2:
                 self.goto_safe(powder_2)        
-            elif cartridge_pos[cartridge_on_carousel.name] == 3:
+            elif self.cartridge_pos[self.cartridge_on_carousel.name] == 3:
                 self.goto_safe(powder_3)
-            elif cartridge_pos[cartridge_on_carousel.name] == 4:
+            elif self.cartridge_pos[self.cartridge_on_carousel.name] == 4:
                 self.goto_safe(powder_4)
                 
             self.open_gripper()
@@ -257,20 +266,22 @@ class BatteryRobot(NorthC9):
         
         #if user specifies new, place new cartridge on carousel
         if new:
-            if cartridge_pos[new.name] == 1:
+            if self.cartridge_pos[new.name] == 1:
                 self.goto_safe(powder_1)
-            elif cartridge_pos[new.name] == 2:
+            elif self.cartridge_pos[new.name] == 2:
                 self.goto_safe(powder_2)        
-            elif cartridge_pos[new.name] == 3:
+            elif self.cartridge_pos[new.name] == 3:
                 self.goto_safe(powder_3)
-            elif cartridge_pos[new.name] == 4:
-                self.goto_safe(powder_4)
+            elif self.cartridge_pos[new.name] == 4:
+                self.goto_safe(powder_4)            
             self.close_gripper()
-            self.goto_safe(active_cartridge)
+            self.delay(1)
+            self.goto_safe(active_powder_cartridge)
             self.open_gripper()
             self.cartridge_on_carousel = new
             
-#          self.goto_safe(safe_zone)
+        self.goto_safe(safe_zone)
+        self.move_carousel(0,0)
          
     """
     gets new pipette at specified position {pip_index} from pipette rack. Will throw an error if robot is holding a vial.
@@ -307,13 +318,16 @@ class BatteryRobot(NorthC9):
             self.remove_pipette()      
 
     """
-    Simple function that removes pipette when robot is holdng it
+    Simple function that removes pipette
     """
     def remove_pipette(self):
         self.goto_safe(p_remover_capture_approach)
         self.goto(p_remover_capture)
         self.move_z(400)
         self.holding_pipette = False
+        
+    def stir_vial(self):
+        self.spin_axis(6, 0)
     
     
 

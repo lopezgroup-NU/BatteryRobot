@@ -153,5 +153,4 @@ cython_debug/
 
 .DS_Store
 #Gamry things
-gamry_tests/
-GamrySetup.docx
+GamryUtils

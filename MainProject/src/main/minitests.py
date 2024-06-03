@@ -23,5 +23,6 @@ for i in range(35):
     c9.delay(3)
     c9.move_pump(0, 0)
     c9.delay(3)
+#(45.5, 70)    
 #28 loops with move_pump(0,2000)
     
