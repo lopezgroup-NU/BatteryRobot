@@ -9,8 +9,6 @@ import toolkitpy as tkp
 rob = BatteryRobot('A', network_serial='AU06EZ1P')
 t8 = T8('B', network = rob.network)
 p2 = PowderShaker('C', network = rob.network)
-rob.home_robot(wait=False)
-rob.home_carousel()
 
 #moving the microplate/lid holder DO NOT USE GOTO SAFE WHEN MOVING IF NOT BREAK
 # rob.goto_safe(lidholder_holder)

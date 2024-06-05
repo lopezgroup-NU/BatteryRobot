@@ -21,17 +21,16 @@ class BatteryRobot(NorthC9):
 #     t8 = BatteryRobot('B', network=self.network)
 
     """
-    Initialize 
+    Startup procedures 
     """
-#     def __init__(self):        
-#         self.home_robot() #Robot arm homing
-#         self.home_carousel() #Robot carousel homing
-#         self.home_pump(3)  #Pipette pump homing
-#         self.home_pump(0) #Pump system sensing homing
-#         self.set_pump_valve(3,0) #Set pump system valve at input position
-#         t8 = NorthC9("B", network=c9.network)
-#         for temp_channel in range(8):
-#             t8.disable_channel(temp_channel) #Clears the temp Sensor
+    def __init__(self, address, network_serial):
+        super().__init__(address, network_serial = network_serial)
+        self.home_robot() #Robot arm homing
+        self.home_carousel() #Robot carousel homing
+        self.home_pump(3)  #Pipette pump homing
+        self.home_pump(0) #Pump system sensing homing
+        self.set_pump_valve(3,0) #Set pump system valve at input position
+        
     """
     Some safety precautions to take during robot startup
     """
@@ -40,14 +39,27 @@ class BatteryRobot(NorthC9):
         self.home_carousel()
         
     """
-    populate grid of vials with specific powder AND liquid, one vial by one vial
+    NOT fully complete yet. It would be better to use dispense_powder_and_scale and dispense_liquid_and_scale
+    individually to make solutions for now. 
+
+    populate grid of vials with specific powder AND liquid, one vial by one vial starting from index 0
+    n_vials is total number of vials to populate, and each column must have 4 vials.
+    Each column with vials to populate must have 2 source vials
+    
+    Function takes in protocol of specific powder to fill vials with. As well as number of vials to fill up
+    
+    TODO:
+    1) figure out way to populate columns of 3,2,1
+    2) how to start from specific column
+    3) work with multiple powder protocols
     """
-    def dispense_workflow_auto(self, protocol, n_vials = 1, vials_per_col = 4, powder_only = False):
+    def dispense_workflow_auto(self, protocol, n_vials = 1, powder_only = False):
+        vials_per_col = 4
         self.open_clamp()
         self.open_gripper()
         self.zero_scale()
         
-        pow_masses = [10,25,50,100,250] #number of elements should equal n_vials/vials_per_col
+        pow_masses = [10,25,50,100,250] # for full deck, number of elements should equal n_vials/vials_per_col
         liq_volumes = [2, 1, 0.5, 0.25, 0.1, 0.05, 0.025, 0.01] #number of elements should equal n_vials/vials_per_col
         
         data = {
@@ -99,24 +111,15 @@ class BatteryRobot(NorthC9):
             t_taken = time.time() - start
             data["time/s"].append(t_taken)
             
-            #cap and return to rack
-            self.close_clamp()
-            self.goto_safe(carousel_cap_approach)
-            self.cap()
-            self.holding_vial = True
-            self.open_clamp()                
-            self.goto_safe(rack_dispense_official[dispense_vial_id])
-            self.open_gripper()
-            self.goto_safe(safe_zone)
-            self.holding_vial = False
-            
+            self.cap_and_return_vial_to_rack(dispense_vial_id)
+           
         df = pd.DataFrame(data)
         df.to_csv('res/dispense.csv', index=True, mode='w')
 
     """
     dispense powder into specified vial (dest_id)
     """
-    def dispense_powder_and_scale(self, protocol, dest_id, mass, collect_vial):
+    def dispense_powder_and_scale(self, protocol, dest_id, mass, collect_vial, return_vial):
         if collect_vial:
             self.get_vial_from_rack(dest_id, rack_dispense_official)
             self.goto_safe(vial_carousel)
@@ -143,18 +146,25 @@ class BatteryRobot(NorthC9):
         data["Intended(mg)"] = mass
         data["Real(mg)"] = dispensed
         data["Time Taken(s)"]= t_taken
+        
+        if return_vial:
+            self.cap_and_return_vial_to_rack(dest_id)
+            
         return data
     
     """
-    Dispense {volume}ml of liquid into vial with id {dest_id} form vial with id {source_id}.
-    Destination vials/source vials are from rack_dispense_official and rack_pipette_aspirate respectively (see "Locator.py")
+    Dispense {volume}ml of liquid into vial with id {dest_id} from vials with id {source_id}.
+    Destination vials are from rack_dispense_official while source_vials are from rack_pipette_aspirate
+    respectively (see Locators)
+    
+    TODO:
+    1) Keep track of amount of liquid remaining in source vials to determine pipette height when
+       drawing liquid 
     """
-    #work on how
-    #takes in full half low, if full draw from top, half draw from middle, and low draw from bottom
-    def dispense_liquid_and_scale(self, dest_id, source_id, volume, collect_vial):
-        pip_id = source_id     
+
+    def dispense_liquid_and_scale(self, dest_id, source_id, volume, collect_vial, return_vial):
+        pip_id = 0     
         data = {}
-                
         self.check_remove_pipette()
 
         if collect_vial:
@@ -194,10 +204,32 @@ class BatteryRobot(NorthC9):
         data["Intended(ml)"]= volume
         data["Real(ml)"] = reading
 
+        if return_vial:
+            self.cap_and_return_vial_to_rack(dest_id)
+            
         return data
     
     """
-    Dispenses powder associated with {protocol} and then dispenses solvent based on desired concentration {conc}
+    Simple helper function for when procedures in the carousel have been completed.
+    This function caps the vial, and returns it to its original position.
+    Takes in the vial's position on the dispense section of the main rack and returns it there 
+    """
+    def cap_and_return_vial_to_rack(self, dispense_vial_id):
+        #cap and return to rack
+        self.close_clamp()
+        self.goto_safe(carousel_cap_approach)
+        self.cap()
+        self.holding_vial = True
+        self.open_clamp()                
+        self.goto_safe(rack_dispense_official[dispense_vial_id])
+        self.open_gripper()
+        self.holding_vial = False
+        self.goto_safe(safe_zone)
+    
+    """
+    TODO: 1)Dispenses powder associated with {protocol} and then dispenses solvent based on
+            desired concentration {conc}
+    Function to make a solution with desired concentration. Only for one vial
     """
     def make_solution(self, dest_id, source_id, pow_mass, conc, protocol):
         pass

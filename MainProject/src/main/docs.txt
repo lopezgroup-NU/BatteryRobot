@@ -10,16 +10,18 @@ dispenseworkflowauto //
 get how many loops to move electrolyte // 28 loops of move_pump(0,2000)
 screw capping // rob.cap(revs = 9.5, pitch = 0.8, torque_thresh=1850)
 
-# for the electrolyte pumping,  reverse valves to pump out
-# for i in range(35):
-#     print(i)
-#     c9.set_pump_valve(0,0) #(0,1) to pump out
-#     c9.delay(3)
-#     c9.move_pump(0,2000)
-#     c9.delay(3)
-#     c9.set_pump_valve(0,1) #(0,0) to pump out
-#     c9.delay(3)
-#     c9.move_pump(0, 0)
-#     c9.delay(3)
-#move carousel(45.5, 70) 70 is the max it can safely go down with syringe     
-#28 loops with move_pump(0,2000)
+# June 5th 2024, syringe was moved to different position as it collided with clamps
+# when moving down
+# move carousel(x, 70) 70 is the max it can safely go down with syringe 
+ for the electrolyte pumping,  reverse valves to pump out
+ for i in range(35):
+     print(i)
+     c9.set_pump_valve(0,0) #(0,1) to pump out
+     c9.delay(3)
+     c9.move_pump(0,2000)
+     c9.delay(3)
+     c9.set_pump_valve(0,1) #(0,0) to pump out
+     c9.delay(3)
+     c9.move_pump(0, 0)
+     c9.delay(3)
+28 loops with move_pump(0,2000)
