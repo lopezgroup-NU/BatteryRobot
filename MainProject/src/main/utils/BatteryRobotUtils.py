@@ -8,6 +8,37 @@ from powder_protocols import *
 import pandas as pd
 import time, math
 
+"""
+READ DOCS BEFORE USING FUNCTIONS
+
+Most important thing to know:
+The main rack at the center of the deck is an 6x8 rack called rack_official. 6 rows 8 columns
+In Locators.py, it is split into two: rack_dispense_official and p_aspirate_low. These two are used
+extensively in this program. 
+
+Rack_dispense_official represents the upper 4 rows of the rack. This section of the rack is allocated to
+hold the vials that will be used to make solutions.
+
+p_aspirate_low represents the lower 2 rows. This section is allocated to hold the solvents that will be used
+to make the solutions contained in the vials of rack_dispense_official.
+
+Even though they are part of the same physical 6x8, their indexing as Locators are independent of each other.
+Meaning, rack_dispense_official has indexes from 0-31, where every 4 indexes is one of its columns,
+and p_aspirate_low has indexes from 0-15, where every 2 indexes is one of its columns.
+
+Layout (indexes) of rack_dispense_official:
+(col 8)       (col 1)  
+  28    . . .    0
+  29    . . .    1 
+  30    . . .    2
+  31    . . .    3
+  
+Layout (indexes) of p_aspirate_low:
+(col 8)       (col 1)  
+  14    . . .    0
+  15    . . .    1 
+"""
+
 #child of NorthC9 - has all of North's methods plus methods defined in here
 class BatteryRobot(NorthC9):
     holding_pipette = False
@@ -32,17 +63,11 @@ class BatteryRobot(NorthC9):
         self.set_pump_valve(3,0) #Set pump system valve at input position
         
     """
-    Some safety precautions to take during robot startup
-    """
-    def startup(self):
-        self.home_robot(wait=False)
-        self.home_carousel()
-        
-    """
     NOT fully complete yet. It would be better to use dispense_powder_and_scale and dispense_liquid_and_scale
     individually to make solutions for now. 
 
-    populate grid of vials with specific powder AND liquid, one vial by one vial starting from index 0
+    populate grid of vials with specific powder AND liquid, one vial by one vial starting from index 0.
+    Rack should be filled from right to left
     n_vials is total number of vials to populate, and each column must have 4 vials.
     Each column with vials to populate must have 2 source vials
     
@@ -360,15 +385,3 @@ class BatteryRobot(NorthC9):
         
     def stir_vial(self):
         self.spin_axis(6, 0)
-    
-    
-
-        
-        
-
-        
-
-        
-        
-        
-        
