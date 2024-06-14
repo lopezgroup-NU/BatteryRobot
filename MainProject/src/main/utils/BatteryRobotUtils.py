@@ -12,9 +12,9 @@ import time, math
 READ DOCS BEFORE USING FUNCTIONS
 
 Most important thing to know:
-The main rack at the center of the deck is an 6x8 rack called rack_official. 6 rows 8 columns
-In Locators.py, it is split into two: rack_dispense_official and p_aspirate_low. These two are used
-extensively in this program. 
+The main rack at the center of the deck is a 6x8 rack called rack_official. 6 rows 8 columns
+In Locators.py, this rack is also split into two grid locators: rack_dispense_official and p_aspirate_low. These two are used
+extensively in this program. Though these two are part of the same physical rack, they are referred to as separate grids.
 
 Rack_dispense_official represents the upper 4 rows of the rack. This section of the rack is allocated to
 hold the vials that will be used to make solutions.
