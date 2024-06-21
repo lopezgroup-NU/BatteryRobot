@@ -20,6 +20,9 @@ class PowderShaker(NorthC9):
         #a in %
         return self.amc_pwm(int(f), int(t), int(a), wait=wait)
     
+    """
+    Dispenses powder of mass {mg_target}. Follows powder protocol if provided, else uses default.
+    """
     def cl_pow_dispense(self, robot, mg_target, protocol=None, zero_scale=True, write_file=False):        
 
         start_t = perf_counter()
