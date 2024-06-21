@@ -380,6 +380,9 @@ class BatteryRobot(NorthC9):
         self.goto(p_remover_capture)
         self.move_z(400)
         self.holding_pipette = False
-        
+    
+    """
+    Activate magnetic stirrer for heat plate
+    """
     def stir_vial(self):
         self.spin_axis(6, 0)
