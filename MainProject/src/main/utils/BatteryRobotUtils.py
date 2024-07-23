@@ -12,9 +12,9 @@ import time, math
 READ DOCS BEFORE USING FUNCTIONS
 
 Most important thing to know:
-The main rack at the center of the deck is an 6x8 rack called rack_official. 6 rows 8 columns
-In Locators.py, it is split into two: rack_dispense_official and p_aspirate_low. These two are used
-extensively in this program. 
+The main rack at the center of the deck is a 6x8 rack called rack_official. 6 rows 8 columns
+In Locators.py, this rack is also split into two grid locators: rack_dispense_official and p_aspirate_low. These two are used
+extensively in this program. Though these two are part of the same physical rack, they are referred to as separate grids.
 
 Rack_dispense_official represents the upper 4 rows of the rack. This section of the rack is allocated to
 hold the vials that will be used to make solutions.
@@ -39,7 +39,9 @@ Layout (indexes) of p_aspirate_low:
   15    . . .    1 
 """
 
-#child of NorthC9 - has all of North's methods plus methods defined in here
+"""
+child of NorthC9 - has all of North's methods plus methods defined in here
+"""
 class BatteryRobot(NorthC9):
     holding_pipette = False
     holding_vial = False
@@ -73,7 +75,7 @@ class BatteryRobot(NorthC9):
     
     Function takes in protocol of specific powder to fill vials with. As well as number of vials to fill up
     
-    TODO:
+    Todo:
     1) figure out way to populate columns of 3,2,1
     2) how to start from specific column
     3) work with multiple powder protocols
@@ -132,7 +134,6 @@ class BatteryRobot(NorthC9):
             data["LiqVol/ml (Intended)"].append(pow_data["Intended(ml)"])
             data["LiqVol/ml (Real)"].append(pow_data["Real(ml)"])
             
-            
             t_taken = time.time() - start
             data["time/s"].append(t_taken)
             
@@ -182,7 +183,7 @@ class BatteryRobot(NorthC9):
     Destination vials are from rack_dispense_official while source_vials are from rack_pipette_aspirate
     respectively (see Locators)
     
-    TODO:
+    Todo:
     1) Keep track of amount of liquid remaining in source vials to determine pipette height when
        drawing liquid 
     """
@@ -252,7 +253,7 @@ class BatteryRobot(NorthC9):
         self.goto_safe(safe_zone)
     
     """
-    TODO: 1)Dispenses powder associated with {protocol} and then dispenses solvent based on
+    Todo: 1)Dispenses powder associated with {protocol} and then dispenses solvent based on
             desired concentration {conc}
     Function to make a solution with desired concentration. Only for one vial
     """
@@ -289,7 +290,7 @@ class BatteryRobot(NorthC9):
         self.close_gripper()
         time.sleep(0.5)
         
-        #move up to a safe spot where gripper will not collide with anything
+        #move up to a safe spot 
         self.move_z(400)
         self.holding_vial = True
         
@@ -300,12 +301,10 @@ class BatteryRobot(NorthC9):
     Defined protocols can be found in settings/powder_protocols.py
     """
     def get_new_cartridge(self, new=None):
-        #ensure carousel is properly aligned for gripper to collect and place cartridge
+        #position carousel first
         self.move_carousel(68,77)
         
-        #check which cartridge is on carousel, if any
         if self.cartridge_on_carousel:
-            #put active cartridge back to designated holder
             self.goto_safe(active_powder_cartridge)
             self.close_gripper()
             self.delay(1)
@@ -349,8 +348,7 @@ class BatteryRobot(NorthC9):
     By default, robot takes pipette from index 0 (bottom right corner as shown above)
     """
     def get_pipette(self, pip_index=0):
-        # Checks if robot is currently holding a vial, will throw an error if True.
-        
+        # Checks if robot is currently holding a vial 
         if self.holding_vial:
             raise Exception("Holding vial! Unsafe to perform pipette operations")
         if pip_index > 47:
@@ -382,6 +380,9 @@ class BatteryRobot(NorthC9):
         self.goto(p_remover_capture)
         self.move_z(400)
         self.holding_pipette = False
-        
+    
+    """
+    Activate magnetic stirrer for heat plate
+    """
     def stir_vial(self):
         self.spin_axis(6, 0)
