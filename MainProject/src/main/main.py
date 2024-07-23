@@ -31,3 +31,6 @@ p2 = PowderShaker('C', network = rob.network)
 # # rob.get_vial_from_rack()
 # # add pumps/anything to module before connecting
 # rob.dispense_powder_and_scale()
+# rob.set_output(7, True)
+# rob.set_output(8, True)
+# rob.set_output(9, True)
