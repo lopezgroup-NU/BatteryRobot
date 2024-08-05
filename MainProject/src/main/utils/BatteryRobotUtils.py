@@ -3,48 +3,22 @@ sys.path.append('..')
 
 from north import NorthC9
 from Locator import *
-from utils.PowderShakerUtils import PowderShaker
+from .PowderShakerUtils import PowderShaker
 from powder_protocols import *
+from asp_rack import AspRack
 import pandas as pd
 import time, math
 
 """
 READ DOCS BEFORE USING FUNCTIONS
 
-Most important thing to know:
-The main rack at the center of the deck is a 6x8 rack called rack_official. 6 rows 8 columns
-In Locators.py, this rack is also split into two grid locators: rack_dispense_official and p_aspirate_low. These two are used
-extensively in this program. Though these two are part of the same physical rack, they are referred to as separate grids.
-
-Rack_dispense_official represents the upper 4 rows of the rack. This section of the rack is allocated to
-hold the vials that will be used to make solutions.
-
-p_aspirate_low represents the lower 2 rows. This section is allocated to hold the solvents that will be used
-to make the solutions contained in the vials of rack_dispense_official.
-
-Even though they are part of the same physical 6x8, their indexing as Locators are independent of each other.
-Meaning, rack_dispense_official has indexes from 0-31, where every 4 indexes is one of its columns,
-and p_aspirate_low has indexes from 0-15, where every 2 indexes is one of its columns.
-
-Layout (indexes) of rack_dispense_official:
-(col 8)       (col 1)  
-  28    . . .    0
-  29    . . .    1 
-  30    . . .    2
-  31    . . .    3
-  
-Layout (indexes) of p_aspirate_low:
-(col 8)       (col 1)  
-  14    . . .    0
-  15    . . .    1 
-"""
-
-"""
-child of NorthC9 - has all of North's methods plus methods defined in here
+child of NorthC9 - inherits North's methods plus methods defined in here
 """
 class BatteryRobot(NorthC9):
     holding_pipette = False
     holding_vial = False
+    cap_holder_1_free = True
+    cap_holder_2_free = True
     cartridge_on_carousel = None # protocol of powder (not a boolean)
     cartridge_pos= {
          "LiOAc": 1,
@@ -56,13 +30,20 @@ class BatteryRobot(NorthC9):
     """
     Startup procedures 
     """
-    def __init__(self, address, network_serial):
+    def __init__(self, address, network_serial, home=False):
         super().__init__(address, network_serial = network_serial)
-        self.home_robot() #Robot arm homing
-        self.home_carousel() #Robot carousel homing
-        self.home_pump(3)  #Pipette pump homing
-        self.home_pump(0) #Pump system sensing homing
-        self.set_pump_valve(3,0) #Set pump system valve at input position
+        if home:
+            self.home_robot() #Robot arm homing
+            self.home_carousel() #Robot carousel homing
+            self.home_pump(3)  #Pipette pump homing
+            self.home_pump(0) #Pump system sensing homing
+            self.set_pump_valve(3,0) #Set pump system valve at input position
+            
+    """
+    Creates AspRack object as defined in settings folder. See settings/asp_rack.py for details
+    """
+    def map_asp_rack(self, mapping):
+        self.asp_rack = AspRack(mapping)
         
     """
     NOT fully complete yet. It would be better to use dispense_powder_and_scale and dispense_liquid_and_scale
@@ -102,9 +83,9 @@ class BatteryRobot(NorthC9):
             data["Vial_ID"].append(dispense_vial_id)
             
             # get vial, place in carousel
-            self.get_vial_from_rack(dispense_vial_id, rack_dispense_official)
-            self.goto_safe(vial_carousel)
+            self.move_vial(rack_disp_official[dest_id], vial_carousel)
             self.close_clamp()
+            self.close_gripper()
             self.delay(.7)    
             self.uncap()
             self.holding_vial = False
@@ -141,117 +122,7 @@ class BatteryRobot(NorthC9):
            
         df = pd.DataFrame(data)
         df.to_csv('res/dispense.csv', index=True, mode='w')
-
-    """
-    dispense powder into specified vial (dest_id)
-    """
-    def dispense_powder_and_scale(self, protocol, dest_id, mass, collect_vial, return_vial):
-        if collect_vial:
-            self.get_vial_from_rack(dest_id, rack_dispense_official)
-            self.goto_safe(vial_carousel)
-            self.close_clamp()
-            self.delay(.7)    
-            self.uncap()
-            self.holding_vial = False
-            self.goto_safe(safe_zone)
-            self.open_clamp()
-            
-        p2 = PowderShaker('C', network = self.network)
-        self.check_remove_pipette()
         
-        data = {}
-
-        self.move_carousel(68, 77) # carousel moves 68 degrees, 75 mm down
-        start = time.time()
-        dispensed = p2.cl_pow_dispense(robot = self, mg_target = mass, protocol = protocol)
-        t_taken = time.time() - start
-        self.delay(1)
-        self.move_carousel(0,0)
-
-        data["Vial ID"] = dest_id 
-        data["Intended(mg)"] = mass
-        data["Real(mg)"] = dispensed
-        data["Time Taken(s)"]= t_taken
-        
-        if return_vial:
-            self.cap_and_return_vial_to_rack(dest_id)
-            
-        return data
-    
-    """
-    Dispense {volume}ml of liquid into vial with id {dest_id} from vials with id {source_id}.
-    Destination vials are from rack_dispense_official while source_vials are from rack_pipette_aspirate
-    respectively (see Locators)
-    
-    Todo:
-    1) Keep track of amount of liquid remaining in source vials to determine pipette height when
-       drawing liquid 
-    """
-
-    def dispense_liquid_and_scale(self, dest_id, source_id, volume, collect_vial, return_vial):
-        pip_id = 0     
-        data = {}
-        self.check_remove_pipette()
-
-        if collect_vial:
-            self.get_vial_from_rack(dest_id, rack_dispense_official)
-            self.goto_safe(vial_carousel)
-            self.close_clamp()
-            self.delay(.7)    
-            self.uncap()
-            self.holding_vial = False
-            self.goto_safe(safe_zone)
-            self.open_clamp()
-            
-        self.get_pipette(pip_id)
-        self.open_clamp()
-        self.delay(1)
-        self.zero_scale()
-        
-        remaining = volume
-        
-        for i in range(math.ceil(volume)):
-            self.goto_safe(p_aspirate_low[source_id])
-            self.aspirate_ml(3, min(remaining,1))
-            self.delay(.5)
-            self.goto_safe(carousel_dispense)
-            self.delay(1)
-            self.dispense_ml(3, min(remaining,1))
-            self.delay(.5)
-            remaining -= 1
-            
-        self.goto_safe(safe_zone)
-        reading = str(self.read_steady_scale())
-        self.delay(.5)
-        self.remove_pipette()
-        self.goto_safe(safe_zone)
-
-        data["Vial ID"] = dest_id 
-        data["Intended(ml)"]= volume
-        data["Real(ml)"] = reading
-
-        if return_vial:
-            self.cap_and_return_vial_to_rack(dest_id)
-            
-        return data
-    
-    """
-    Simple helper function for when procedures in the carousel have been completed.
-    This function caps the vial, and returns it to its original position.
-    Takes in the vial's position on the dispense section of the main rack and returns it there 
-    """
-    def cap_and_return_vial_to_rack(self, dispense_vial_id):
-        #cap and return to rack
-        self.close_clamp()
-        self.goto_safe(carousel_cap_approach)
-        self.cap()
-        self.holding_vial = True
-        self.open_clamp()                
-        self.goto_safe(rack_dispense_official[dispense_vial_id])
-        self.open_gripper()
-        self.holding_vial = False
-        self.goto_safe(safe_zone)
-    
     """
     Todo: 1)Dispenses powder associated with {protocol} and then dispenses solvent based on
             desired concentration {conc}
@@ -271,28 +142,169 @@ class BatteryRobot(NorthC9):
 #         self.goto_safe(rack_dispense_official[dispense_vial_id])
 #         self.open_gripper()
 #         self.holding_vial = False
-#         self.goto_safe(safe_zone) 
-                                
+#         self.goto_safe(safe_zone)
+
     """
-    Get vial from {rack_type} at index {vial_id}.
-    Examples of {rack_type} are rack_dispense_official and heatplate_official
-    Indexing for an n x m rack are as follows:
-    
-    (n*m)-3 ... 0
-    (n*m)-2 ... 1
-    (n*m)-1 ... 2
-    
+    dispense powder into specified vial (dest_id)
     """
-    def get_vial_from_rack(self, vial_id, rack_type): #racks/heatplate 
-        print(f"getting vial at index {vial_id}")
-        self.open_gripper()
-        self.goto_safe(rack_type[vial_id])
+    def dispense_powder_and_scale(self, protocol, dest_id, mass):
+        self.check_remove_pipette()
+
+        self.move_vial(rack_disp_official[dest_id], vial_carousel)
+        self.close_clamp()
         self.close_gripper()
-        time.sleep(0.5)
+        self.delay(.7)    
+        self.uncap()
+        self.holding_vial = False
+        self.goto_safe(safe_zone)
+        self.open_clamp()
+            
+        p2 = PowderShaker('C', network = self.network)
+        self.check_remove_pipette()
         
-        #move up to a safe spot 
-        self.move_z(400)
+        data = {}
+
+        self.move_carousel(68, 77) # carousel moves 68 degrees, 75 mm down
+        start = time.time()
+        dispensed = p2.cl_pow_dispense(robot = self, mg_target = mass, protocol = protocol)
+        t_taken = time.time() - start
+        self.delay(1)
+        self.move_carousel(0,0)
+        self.cap_and_return_vial_to_rack(dest_id)
+
+        data["Vial ID"] = dest_id 
+        data["Intended(mg)"] = mass
+        data["Real(mg)"] = dispensed
+        data["Time Taken(s)"]= t_taken
+        
+        return data
+    
+    """
+    Dispense {volume}ml of liquid into vial with id {dest_id} from vials with id {source_id}.
+    Destination vials are from rack_dispense_official while source_vials are from rack_pipette_aspirate
+    respectively (see Locators)
+    
+    Todo:
+    1) Keep track of amount of liquid remaining in source vials to determine pipette height when
+       drawing liquid 
+    """
+
+    def dispense_liquid_and_scale(self, dest_id, source_id, volume):
+        pip_id = 0     
+        data = {}
+        self.check_remove_pipette()
+        cap_holder_id = -1
+        
+        # in development
+        # instead of taking in source_id, take name of liquid in vial as input for source vial
+        # use mappings from self.asp_rack to obtain index
+        # if stored as water1, input should be "water1"
+        # use getattr(self, source)
+        
+        self.goto_safe(rack_asp_official[source_id])
+        self.close_gripper()
+        self.uncap()
+        
+        if self.cap_holder_1_free:
+            self.goto_safe(cap_holder_1_approach)
+            cap_holder_id = 1
+
+        elif self.cap_holder_2_free:
+            self.goto_safe(cap_holder_2_approach)
+            cap_holder_id = 2
+
+        else:
+            raise Exception("Cap holders are taken!")
+        
+        self.cap(torque_thresh = 600)    
+        self.open_gripper()
+        self.move_vial(rack_disp_official[dest_id], vial_carousel)
+        self.close_clamp()
+        self.close_gripper()
+        self.delay(.7)    
+        self.uncap()
+        self.holding_vial = False
+        self.goto_safe(safe_zone)
+        self.open_clamp()     
+        self.get_pipette(pip_id)
+        self.delay(1)
+        self.zero_scale()
+        
+        remaining = volume
+        
+        for i in range(math.ceil(volume)):
+            self.goto_safe(p_asp_low[source_id])
+            self.aspirate_ml(3, min(remaining,1))
+            self.delay(.5)
+            self.goto_safe(carousel_dispense)
+            self.delay(1)
+            self.dispense_ml(3, min(remaining,1))
+            self.delay(.5)
+            remaining -= 1
+            
+        self.goto_safe(safe_zone)
+        reading = str(self.read_steady_scale())
+        self.delay(.5)
+        self.remove_pipette()
+
+        data["Vial ID"] = dest_id 
+        data["Intended(ml)"]= volume
+        data["Real(ml)"] = reading
+
+        self.cap_and_return_vial_to_rack(dest_id)
+        
+        if cap_holder_id == 1:
+            self.goto_safe(cap_holder_1)
+            self.cap_holder_1_free = True
+        else:
+            self.goto_safe(cap_holder_2)
+            self.cap_holder_2_free = True
+            
+        self.close_gripper()
+        self.uncap()
+#         self.goto_safe(rack_asp_official_cap_approach[source])
+        self.cap(torque_thresh = 600)
+        self.open_gripper()
+        self.goto_safe(safe_zone)
+        return data
+    
+    """
+    Simple helper function for when procedures in the carousel have been completed.
+    This function caps the vial, and returns it to its original position.
+    Takes in the vial's position on the dispense section of the main rack and returns it there 
+    """
+    def cap_and_return_vial_to_rack(self, dispense_vial_id):
+        #cap and return to rack
+        self.close_clamp()
+        self.goto_safe(carousel_cap_approach)
+        self.cap(torque_thresh = 600)
         self.holding_vial = True
+        self.open_clamp()                
+        self.goto_safe(rack_disp_official[dispense_vial_id])
+        self.open_gripper()
+        self.holding_vial = False
+        self.move_z(400)
+        
+    """
+    Prepare vial to make solution. Moves vial from main rack to clamps
+    """
+    def prepare_vial(self, dest_id):
+        self.move_vial(rack_disp_official[dest_id], vial_carousel)
+        self.close_clamp()
+        self.close_gripper()
+        self.delay(.7)    
+        self.uncap()
+        self.holding_vial = False
+                             
+    """
+    Move vial between two different locations
+    """
+    def move_vial(self, src_loc, dest_loc):
+        self.goto_safe(src_loc)
+        self.close_gripper()
+        self.delay(0.7)
+        self.goto_safe(dest_loc)
+        self.open_gripper()
         
     """
     If there is a cartridge on carousel (active cartridge), replace with {new}, where {new} is a protocol for a powder
@@ -338,7 +350,58 @@ class BatteryRobot(NorthC9):
             
         self.goto_safe(safe_zone)
         self.move_carousel(0,0)
-         
+        
+    """
+    draw = True by default. when draw is true, syringe draws electrolyte from vial
+    if draw = False, syringe pushes out electrolyte back into vial (basically moves electrolyte in opposite direction)
+    not sure of how many pumps to make yet, so function pumps indefinitely in direction of choosing
+    to stop, press ctrl + C
+
+    after testing:
+    1) about 8 pumps to draw adequately long column of electrolyte
+    2) once drawn, move syringe out of vial, continue pumping air to move electrolyte to electrodes
+    3) about 20 pumps to move column of electrolyte to electrodes
+
+    note: position of electrodes was moved, so further testing must be done to determine
+    optimum number of pumps for step 3
+    
+    4 speed settings: purge (to purge plumbing system), viscous, medium, light. Defaults to medium speed.
+    Set viscous = True if contents to draw is viscous, and so on for other speeds.
+    """
+
+    #viscous (29 speed)
+    def move_electrolyte(self, draw = True, length = 2000, purge = False, viscous = False, light = False):
+        print("Hit Ctrl+C when you want to stop pumping!")
+        v_in = 13 #speed to suck air, default to medium speed
+        v_out = 0 # speed to push out air
+
+        if purge:
+            v_in, v_out = 5, 5
+        elif viscous:
+            v_in, v_out = 28, 0
+        else: # light
+            v_in, v_out = 5, 0
+        i = 0
+        while True:
+            try:
+                i += 1
+                self.set_pump_speed(0, v_in)
+                self.delay(1)
+                self.set_pump_valve(0, int(not draw))
+                self.delay(1)
+                self.move_pump(0,length)
+                self.delay(3)
+                self.set_pump_speed(0, v_out)
+                self.delay(1)
+                self.set_pump_valve(0, int(draw))
+                self.delay(1)
+                self.move_pump(0, 0)
+                self.delay(3)
+            except KeyboardInterrupt:
+                print(i) # print number of pumps
+                break
+            
+   
     """
     gets new pipette at specified position {pip_index} from pipette rack. Will throw an error if robot is holding a vial.
     Pipette rack is indexed as follows:
@@ -361,7 +424,7 @@ class BatteryRobot(NorthC9):
         print(f"getting pipette at index {pip_index}")
         self.goto_safe(pipette_grid[pipette_order[pip_index]])
         self.move_z(400) # must lift up before moving to safe spot
-        self.move_xyz(100,40,300) # safe spot
+        self.goto_safe(safe_zone) # go to safe zone
         self.holding_pipette = True
 
     """
@@ -380,9 +443,11 @@ class BatteryRobot(NorthC9):
         self.goto(p_remover_capture)
         self.move_z(400)
         self.holding_pipette = False
-    
+        self.goto_safe(safe_zone) # go to safe zone
     """
     Activate magnetic stirrer for heat plate
     """
     def stir_vial(self):
         self.spin_axis(6, 0)
+
+    

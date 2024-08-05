@@ -1,3 +1,6 @@
+we edited the bumps code to work with our demands. Most importantly, we changed fitter.py to return
+the things printed by show_err as a dict, and also returned the chisq_str() so we could use it later on 
+
 todo
 
 dispense specific concentration
