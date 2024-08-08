@@ -1,12 +1,7 @@
-we edited the bumps code to work with our demands. Most importantly, we changed fitter.py to return
-the things printed by show_err as a dict, and also returned the chisq_str() so we could use it later on 
-
-
-
+we edited the bumps code to work with our demands.
 
 todo
-cap mappings for cap holders
-fix p asplow mid high stuff 
+bot should switch source vials if needed 
 
 
 dispense specific concentration

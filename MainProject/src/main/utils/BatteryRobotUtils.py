@@ -126,28 +126,6 @@ class BatteryRobot(NorthC9):
            
         df = pd.DataFrame(data)
         df.to_csv('res/dispense.csv', index=True, mode='w')
-        
-
-    def make_solution(self, dest_id, source_id, pow_mass, conc, protocol):
-        """
-        Todo: 1)Dispenses powder associated with {protocol} and then dispenses solvent based on
-                desired concentration {conc}
-        Function to make a solution with desired concentration. Only for one vial
-        """
-        pass
-        # perform calculations using conc
-#         pow_dispensed = self.dispense_powder_and_scale(protocol, dest_id, pow_mass, collect_vial = True,)
-#         volume = conc
-#         self.dispense_liquid_and_scale(dest_id, source_id, volume)
-#         self.close_clamp()
-#         self.goto_safe(vial_carousel_approach)
-#         self.cap()
-#         self.holding_vial = True
-#         self.open_clamp()                
-#         self.goto_safe(rack_dispense_official[dispense_vial_id])
-#         self.open_gripper()
-#         self.holding_vial = False
-#         self.goto_safe(safe_zone)
 
 
     def dispense_powder_and_scale(self, protocol, dest_id, mass, collect = False, ret = True):
@@ -212,7 +190,6 @@ class BatteryRobot(NorthC9):
             
         self.uncap_vial_in_carousel()
         self.get_pipette()
-        self.delay(1)
         self.zero_scale()
         
         remaining = target_vol 
@@ -229,7 +206,6 @@ class BatteryRobot(NorthC9):
             self.aspirate_ml(3, amount)
             self.delay(.5)
             self.goto_safe(carousel_dispense)
-            self.delay(1)
             self.dispense_ml(3, amount)
             self.delay(.5)
             remaining -= 1
@@ -240,7 +216,6 @@ class BatteryRobot(NorthC9):
                     )
         dispensed = self.read_steady_scale()   
         self.goto_safe(safe_zone)
-        self.delay(.5)
         self.remove_pipette()
         
         if ret:
@@ -279,34 +254,31 @@ class BatteryRobot(NorthC9):
         self.delay(1)
            
         dispensed = 0 
-        while dispensed < target_mass:
+        while dispensed < target_mass: # repeat until target mass achieved
             rack = p_asp_high
             
-            if getattr(self.asp_rack, source + "vol") < 4:
+            if getattr(self.asp_rack, source + "vol") <= 4:
                 rack = p_asp_low
-            elif getattr(self.asp_rack, source + "vol") < 6:
+            elif getattr(self.asp_rack, source + "vol") <= 6:
                 rack = p_asp_mid
                 
             self.zero_scale()
             self.goto_safe(rack[getattr(self.asp_rack, source)])
-            amount = min(target_mass - dispensed, 1)
+                  
+            amount = min((target_mass - dispensed)/density , 1) #get smaller value between 1, and remaining volume to dispense
             self.aspirate_ml(3, amount)
             self.goto_safe(carousel_dispense)
-            self.delay(1)
+            self.delay(.5)
             self.dispense_ml(3, amount)
             self.delay(.5)
-            
-            dispensed += self.read_steady_scale()
+            dispensed += self.read_steady_scale() #use scale to determine actual mass dispensed
             self.delay(.5)
             setattr(self.asp_rack,
                     source + "vol",
                     getattr(self.asp_rack, source + "vol") - amount
                     )
-            
-        reading = str(self.read_steady_scale())
+
         self.goto_safe(safe_zone)
-        
-        self.delay(.5)
         self.remove_pipette()
         
         if ret:
@@ -326,109 +298,6 @@ class BatteryRobot(NorthC9):
         data["Real(g)"] = dispensed
         return data
     
-    def move_cap_to_holder(self):
-        """
-        Helper function to move cap to a free cap holder. Assumes gripper is at target vial's cap's location
-        """
-        self.close_gripper()
-        self.uncap()
-        
-        if self.cap_holder_1_free:
-            self.goto_safe(cap_holder_1_approach)
-            self.cap_holder_1_free = False
-            cap_holder_id = 1
-
-        elif self.cap_holder_2_free:
-            self.goto_safe(cap_holder_2_approach)
-            self.cap_holder_2_free = False
-            cap_holder_id = 2
-
-        else:
-            raise Exception("Cap holders are taken!")
-        
-        self.cap(torque_thresh = 600)    
-        self.open_gripper()
-        
-        return cap_holder_id
-    
-    def move_cap_from_holder(self, source, cap_holder_id):
-        """
-        Helper function to move cap from holder back to source vial
-        """
-        if cap_holder_id == 1:
-            self.goto_safe(cap_holder_1)
-            self.cap_holder_1_free = True
-        else:
-            self.goto_safe(cap_holder_2)
-            self.cap_holder_2_free = True
-            
-        self.close_gripper()
-        self.uncap()
-        self.goto_safe(rack_asp_official_approach[getattr(self.asp_rack, source)])
-        self.cap(torque_thresh = 600)
-        self.open_gripper()
-        self.goto_safe(safe_zone)
-        
-    def uncap_vial_in_carousel(self):
-        """
-        Helper to uncap vial in carousel. Assumes gripper is at carousel's vial's cap's location
-        """
-        self.close_clamp()
-        self.close_gripper()
-        self.delay(.7)    
-        self.uncap()
-        self.holding_vial = False
-        self.goto_safe(safe_zone)
-        self.open_clamp()
-    
-    def cap_and_return_vial_to_rack(self, dest_id):
-        """
-        Simple helper function for when procedures in the carousel have been completed.
-        This function caps the vial, and returns it to its original position.
-        Takes in the vial's position on the dispense section of the main rack and returns it there 
-        """
-        #cap and return to rack
-        self.close_clamp()
-        self.goto_safe(vial_carousel_approach)
-        self.cap(torque_thresh = 600)
-        self.holding_vial = True
-        self.open_clamp()                
-        self.goto_safe(rack_disp_official[dest_id])
-        self.open_gripper()
-        self.holding_vial = False
-        self.move_z(400)
-        
-
-    def prepare_vial(self, dest_id):
-        """
-        Prepare vial to make solution. Moves vial from main rack to clamps
-        """
-        self.move_vial(rack_disp_official[dest_id], vial_carousel)
-        self.close_clamp()
-        self.close_gripper()
-        self.delay(.7)    
-        self.uncap()
-        self.holding_vial = False
-                             
-    def calc_liquid_mol(self, mol, gram, molmass):
-        """
-        Calculates how much liquid to dispense to get a certain Molarity
-        """
-
-        liquidAmount = gram/(molmass*mol)
-        return(liquidAmount)
-        
-    def move_vial(self, src_loc, dest_loc):
-        """
-        Move vial between two different locations
-        """
-        self.goto_safe(src_loc)
-        self.close_gripper()
-        self.delay(0.7)
-        self.goto_safe(dest_loc)
-        self.open_gripper()
-        
-
     def get_new_cartridge(self, new=None):
         """
         If there is a cartridge on carousel (active cartridge), replace with {new}, where {new} is a protocol for a powder
@@ -523,6 +392,98 @@ class BatteryRobot(NorthC9):
             except KeyboardInterrupt:
                 print(i) # print number of pumps
                 break
+
+    def move_cap_to_holder(self):
+        """
+        Helper function to move cap to a free cap holder. Assumes gripper is at target vial's cap's location
+        """
+        self.close_gripper()
+        self.delay(.5)
+        self.uncap()
+        
+        if self.cap_holder_1_free:
+            self.goto_safe(cap_holder_1_approach)
+            self.cap_holder_1_free = False
+            cap_holder_id = 1
+
+        elif self.cap_holder_2_free:
+            self.goto_safe(cap_holder_2_approach)
+            self.cap_holder_2_free = False
+            cap_holder_id = 2
+
+        else:
+            raise Exception("Cap holders are taken!")
+        
+        self.cap(torque_thresh = 600)    
+        self.open_gripper()
+        
+        return cap_holder_id
+    
+    def move_cap_from_holder(self, source, cap_holder_id):
+        """
+        Helper function to move cap from holder back to source vial
+        """
+        if cap_holder_id == 1:
+            self.goto_safe(cap_holder_1)
+            self.cap_holder_1_free = True
+        else:
+            self.goto_safe(cap_holder_2)
+            self.cap_holder_2_free = True
+            
+        self.close_gripper()
+        self.delay(.5)
+        self.uncap()
+        self.goto_safe(rack_asp_official_approach[getattr(self.asp_rack, source)])
+        self.cap(torque_thresh = 600)
+        self.open_gripper()
+        self.goto_safe(safe_zone)
+        
+    def uncap_vial_in_carousel(self):
+        """
+        Helper to uncap vial in carousel. Assumes gripper is at carousel's vial's cap's location
+        """
+        self.close_clamp()
+        self.delay(.5)
+        self.close_gripper()    
+        self.uncap()
+        self.holding_vial = False
+        self.goto_safe(safe_zone)
+        self.open_clamp()
+    
+    def cap_and_return_vial_to_rack(self, dest_id):
+        """
+        Simple helper function for when procedures in the carousel have been completed.
+        This function caps the vial, and returns it to its original position.
+        Takes in the vial's position on the dispense section of the main rack and returns it there 
+        """
+        #cap and return to rack
+        self.close_clamp()
+        self.goto_safe(vial_carousel_approach)
+        self.cap(torque_thresh = 600)
+        self.holding_vial = True
+        self.open_clamp()                
+        self.goto_safe(rack_disp_official[dest_id])
+        self.open_gripper()
+        self.holding_vial = False
+        self.move_z(400)
+                             
+    def calc_liquid_mol(self, mol, gram, molmass):
+        """
+        Calculates how much liquid to dispense to get a certain Molarity
+        """
+
+        liquidAmount = gram/(molmass*mol)
+        return(liquidAmount)
+        
+    def move_vial(self, src_loc, dest_loc):
+        """
+        Move vial between two different locations
+        """
+        self.goto_safe(src_loc)
+        self.close_gripper()
+        self.delay(0.7)
+        self.goto_safe(dest_loc)
+        self.open_gripper()
             
     def get_pipette(self):
         """
