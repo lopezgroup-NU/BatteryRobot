@@ -1,7 +1,13 @@
 we edited the bumps code to work with our demands. Most importantly, we changed fitter.py to return
 the things printed by show_err as a dict, and also returned the chisq_str() so we could use it later on 
 
+
+
+
 todo
+cap mappings for cap holders
+fix p asplow mid high stuff 
+
 
 dispense specific concentration
 
@@ -28,3 +34,31 @@ screw capping // rob.cap(revs = 9.5, pitch = 0.8, torque_thresh=1850)
      c9.move_pump(0, 0)
      c9.delay(3)
 28 loops with move_pump(0,2000)
+
+# move cap here and there for testing
+
+# for i in range(15):
+#     
+#     if i == 3 or i == 4 or i == 5 or i == 10 or i == 11 or i == 17:
+#         continue
+#     
+#     rob.goto_safe(rack_asp_official[i])
+#     rob.close_gripper()
+#     rob.uncap()
+#     
+#     if i % 2 == 0:
+#         rob.goto_safe(cap_holder_1_approach)
+#     else:
+#         rob.goto_safe(cap_holder_2_approach)
+#     rob.cap(torque_thresh=600)
+#     rob.open_gripper()
+#     
+#     if i % 2 == 0:
+#         rob.goto_safe(cap_holder_1)
+#     else:
+#         rob.goto_safe(cap_holder_2)
+#     rob.close_gripper()
+#     rob.uncap()
+#     rob.goto_safe(rack_asp_official_approach[i])
+#     rob.cap(torque_thresh=600)
+#     rob.open_gripper()

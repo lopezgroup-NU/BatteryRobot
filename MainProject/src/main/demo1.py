@@ -1,83 +1,37 @@
-import sys
-sys.path.append('\\settings')
-
-from BatteryRobotUtils import BatteryRobot
-from PowderShakerUtils import PowderShaker
+from utils import BatteryRobot,PowderShaker,T8
 from Locator import *
 from powder_protocols import *
+from utils.PStat.geis import *
+from asp_rack import AspRack
 import time
+import toolkitpy as tkp
+from temper_windows import TemperWindows
 
-rob = BatteryRobot('A', network_serial='AU06EZ1P')
-t2 = BatteryRobot('B', network = rob.network)
-p2 = PowderShaker('C', network = rob.network)
-rob.home_pump(3)
-rob.set_pump_valve(3,0)
+rob = BatteryRobot('A', network_serial='AU06EZ1P', home = True)
+t8 = T8('B', network = rob.network)
 
-rob.home_robot()
-rob.home_carousel()
+vial_map = "water1 water2 a b c d e f g h i j k l m n o p q r s t u v"
+vol_map = "7 8 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+rob.map_asp_rack(vial_map, vol_map)
 
-rob.open_clamp()
-rob.open_gripper()
-rob.zero_scale()
-            
-rob.get_vial_from_rack(0, rack_dispense_official)
-rob.goto_safe(vial_carousel)
-rob.close_clamp()
-rob.delay(.7)
-            
-rob.uncap()
-rob.goto_safe(safe_zone)
-rob.open_clamp()
-            
-rob.move_carousel(68, 77) # carousel moves 68 degrees, 75 mm down
-dispensed = p2.cl_pow_dispense(robot = rob, mg_target = 5, protocol = LiOAc)
-rob.delay(1)
-rob.move_carousel(0,0)
-       
-# for i in range(3):
-#     rob.dispense_liquid_and_scale(n_vials = 1)
-volume = 2
-rob.get_pipette(0)
-for i in range(3):
-    rob.delay(.5)
-    rob.goto_safe(rack_pipette_aspirate[0])
-    rob.delay(1)
-    rob.aspirate_ml(3,volume-1)
-    rob.delay(.5)
-    rob.goto_safe(carousel_dispense)
-    rob.delay(1)
-    rob.zero_scale()
-    rob.delay(1)
-    rob.dispense_ml(3,volume-1)
-    rob.delay(.5)
-    rob.goto_safe(rack_pipette_aspirate[1])
-    rob.aspirate_ml(3,volume-1)
-    rob.delay(.5)
-    rob.goto_safe(carousel_dispense)
-    rob.dispense_ml(3,volume-1)
-    rob.delay(.5)
+# 1M
+pow_data = rob.dispense_powder_and_scale(LiOAc, 0, 1, collect = True, ret = False)
+# 
+# 
+rob.dispense_liquid_vol(0, "water1", 3, collect = False, ret = False)
+rob.move_vial(vial_carousel, heatplate_official[0])
+t8.set_temp(0,70)
+t8.enable_channel(0)
+rob.spin_axis(6,800)
 
-rob.remove_pipette()
-rob.close_clamp()
-rob.goto_safe(carousel_cap_approach)
-rob.cap()
-rob.open_clamp()
-rob.goto_safe(heatplate_official[2])
-rob.open_gripper()
-rob.goto_safe(safe_zone)
-print("heating up stuff")
-time.sleep(5)
-rob.get_vial_from_rack(2, heatplate_official)
-rob.goto_safe(vial_carousel)
-rob.close_clamp()
-rob.delay(.7)
-rob.uncap()
-rob.goto_safe(safe_zone)
-rob.move_carousel(315,70)
+# rob.move_vial(heatplate_official[0], vial_carousel)
+# rob.move_electrolyte()
 
 
-
-
-
-
-
+#5M
+# pow_data = rob.dispense_powder_and_scale(LiOAc, 1, 1980, collect = True, ret = False)
+# rob.dispense_liquid_and_scale(1, "water2", 6, collect = False, ret = False)
+# rob.move_vial(vial_carousel, heatplate_official[1])
+# stir, heat
+# rob.move_vial(heatplate_official[1], vial_carousel)
+# rob.move_electrolyte()

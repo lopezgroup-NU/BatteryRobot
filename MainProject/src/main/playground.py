@@ -7,8 +7,8 @@ import time
 import toolkitpy as tkp
 from temper_windows import TemperWindows
 
-rob = BatteryRobot('A', network_serial='AU06EZ1P', home = True)
-
+rob = BatteryRobot('A', network_serial='AU06EZ1P', home = False)
+rob.move_carousel(0,0)
 #temperature sensor 
 temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
 temperature = temper.get_temperature()
@@ -16,7 +16,7 @@ print(temperature)
 
 #rob.move_electrolyte(True)
 
-#needle alignment rob.move_carousel(31,70)
+#needle alignment rob.move_carousel(32,70)
 rob.set_output(6, True)
 rob.set_output(7, True)
 rob.set_output(8, True)

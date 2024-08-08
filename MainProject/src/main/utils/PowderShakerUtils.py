@@ -32,7 +32,7 @@ class PowderShaker(NorthC9):
         ps = protocol.fast_settings
             
         #intialize
-        self.set_opening(0)  # make sure everything starts closed  
+
         prev_mass = 0
         delta_mass = 0
         shake_t = ps.min_shake_t

@@ -299,32 +299,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "vial_carousel": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        503,
-        7627,
-        44074,
-        17400
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "carousel_cap_approach": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -2097,
-        7627,
-        44074,
-        17200
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
     "safe_zone": {
       "type": "Location",
       "tool": 0,
@@ -542,78 +516,6 @@
         0.0
       ]
     },
-    "p_asp_low": {
-      "type": "Grid",
-      "tool": 1,
-      "counts": [
-        -1064,
-        10589,
-        36785,
-        21587
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0.0,
-      "n": [
-        6,
-        6,
-        1
-      ],
-      "pitch": [
-        26,
-        26,
-        0.0
-      ]
-    },
-    "p_asp_mid": {
-      "type": "Grid",
-      "tool": 1,
-      "counts": [
-        -1064,
-        10589,
-        36785,
-        20332
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0.0,
-      "n": [
-        6,
-        6,
-        1
-      ],
-      "pitch": [
-        26,
-        26,
-        0.0
-      ]
-    },
-    "p_asp_high": {
-      "type": "Grid",
-      "tool": 1,
-      "counts": [
-        -1064,
-        10589,
-        36785,
-        19036
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0.0,
-      "n": [
-        6,
-        6,
-        1
-      ],
-      "pitch": [
-        26,
-        26,
-        0.0
-      ]
-    },
     "cap_holder_2": {
       "type": "Location",
       "tool": 0,
@@ -627,19 +529,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "cap_holder_1_approach": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -114,
-        13991,
-        41562,
-        21685
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
     "cap_holder_2_approach": {
       "type": "Location",
       "tool": 0,
@@ -647,7 +536,7 @@
         -96,
         15731,
         42271,
-        21669
+        21676
       ],
       "ik_soln": 0,
       "reference": false,
@@ -678,7 +567,7 @@
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null,
-      "rotation": 0.0,
+      "rotation": 0,
       "n": [
         5,
         6,
@@ -697,7 +586,31 @@
         -63,
         11887,
         38590,
-        21500
+        21676
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        5,
+        6,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "p_asp_low": {
+      "type": "Grid",
+      "tool": 1,
+      "counts": [
+        -7,
+        9273,
+        34348,
+        21416
       ],
       "ik_soln": 0,
       "reference": false,
@@ -713,6 +626,93 @@
         26,
         0.0
       ]
+    },
+    "p_asp_mid": {
+      "type": "Grid",
+      "tool": 1,
+      "counts": [
+        -7,
+        9273,
+        34348,
+        19986
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0.0,
+      "n": [
+        5,
+        6,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "p_asp_high": {
+      "type": "Grid",
+      "tool": 1,
+      "counts": [
+        -7,
+        9273,
+        34348,
+        18830
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0.0,
+      "n": [
+        5,
+        6,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "cap_holder_1_approach": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -112,
+        13982,
+        41592,
+        21676
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "vial_carousel": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        432,
+        7646,
+        44070,
+        17460
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "vial_carousel_approach": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -1482,
+        7629,
+        44080,
+        17097
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
     }
   },
   "sim_inputs": {
