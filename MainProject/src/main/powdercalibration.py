@@ -7,8 +7,6 @@ import time, sys
 rob = BatteryRobot('A', network_serial='AU06EZ1P')
 p2 = PowderShaker('C', network = rob.network)
 
-
-
 with open("dispensingpowdercalibration.txt", "a") as f:
     f.write("\nRecalibrated...\n")
     dispensed = 0

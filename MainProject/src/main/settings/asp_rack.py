@@ -5,7 +5,7 @@ class AspRack():
     mapping solutions to indexes of rack_asp_official 
     """
     
-    def __init__(self, vial_map, vol_map):
+    def __init__(self, vials, vols, indexes):
         """
         Upon initialization, input mapping string to map contents to vials of asp_rack
         
@@ -62,34 +62,18 @@ class AspRack():
         means 10ml of fluids in the vial named water1 and 0ml in water2. 
         """
         
-        vial_map_list = vial_map.split()
-        vol_map_list = vol_map.split()
+        #no duplicates and must be 23 
+        if len(vials) != len(vols) or len(vials != len(indexes)):
+            raise Exception(f"Input mapping strings must have 23 elements! Your's has:{len(vials)}, {len(vols)}")
         
-        #list of vials, according to diagram above
-        index_list = [0, 1, 2, 6, 7, 8, 9, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
-        
-        #no duplicates and must be 24 
-        if len(vial_map_list) != 24 or len(vol_map_list) != 24:
-            raise Exception(f"Input mapping strings must have 24 elements! Your's has:{len(vial_map_list)}, {len(vol_map_list)}")
-        
-        if len(vial_map_list) != len(set(vial_map_list)):
+        if len(vials) != len(set(vials)):
             raise Exception("No duplicates!")
         
-        for i in range(len(index_list)):
-            setattr(self, vial_map_list[i], index_list[i])
-            setattr(self, vial_map_list[i] + "vol", int(vol_map_list[i]))
+        for i in range(len(indexes)):
+            setattr(self, vials[i], indexes[i])
+            setattr(self, vials[i] + "_vol", int(vols[i]))
             
 #demo        
 if __name__ == "__main__":
-    vial_map = "water1 water2 d e f g h i j k water3 l m n o p q r s t u v w x"
-    vol_map = "8 5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
-    rack = AspRack(vial_map, vol_map)
-    
-    #
-    assert rack.water1 == 0
-    assert rack.water2 == 1
-    assert rack.water3 == 15
-    assert rack.water1vol == 8
-    assert rack.dvol == 0
-    
+    pass
     

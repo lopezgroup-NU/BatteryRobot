@@ -212,19 +212,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "carousel_powder": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -525,
-        7737,
-        44200,
-        8666
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
     "p_remover_capture": {
       "type": "Location",
       "tool": 1,
@@ -427,95 +414,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "powder_1": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -4838,
-        11532,
-        43184,
-        20298
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "powder_2": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -4724,
-        8353,
-        38839,
-        20310
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "powder_3": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -4737,
-        5692,
-        34423,
-        20329
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "powder_4": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -4779,
-        3522,
-        29604,
-        20237
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "active_powder_cartridge": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -4521,
-        7675,
-        44131,
-        9317
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "rack_disp_official": {
-      "type": "Grid",
-      "tool": 0,
-      "counts": [
-        81,
-        1215,
-        19034,
-        22476
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0,
-      "n": [
-        8,
-        6,
-        1
-      ],
-      "pitch": [
-        26,
-        26,
-        0.0
-      ]
-    },
     "cap_holder_2": {
       "type": "Location",
       "tool": 0,
@@ -615,7 +513,7 @@
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null,
-      "rotation": 0.0,
+      "rotation": 0,
       "n": [
         5,
         6,
@@ -639,7 +537,7 @@
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null,
-      "rotation": 0.0,
+      "rotation": 0,
       "n": [
         5,
         6,
@@ -663,7 +561,7 @@
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null,
-      "rotation": 0.0,
+      "rotation": 0,
       "n": [
         5,
         6,
@@ -709,6 +607,119 @@
         7629,
         44080,
         17097
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "test": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        -1489,
+        41285,
+        58712,
+        22476
+      ],
+      "ik_soln": 1,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        8,
+        6,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "rack_disp_official": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        2010,
+        1143,
+        19048,
+        22545
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        8,
+        6,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "cartridge_holder": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        1222,
+        5201,
+        33440,
+        20329
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "powder_3": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        1230,
+        7625,
+        37783,
+        20336
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "powder_2": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        1168,
+        10714,
+        42185,
+        20291
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "powder_1": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        1022,
+        15084,
+        47427,
+        20308
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "active_cartridge": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        1479,
+        7652,
+        44155,
+        9310
       ],
       "ik_soln": 0,
       "reference": false,

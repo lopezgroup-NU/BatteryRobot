@@ -1,8 +1,7 @@
 from utils import BatteryRobot,PowderShaker,T8
 from Locator import *
-from powder_protocols import *
+from settings import powder_protocols, AspRack
 from utils.PStat.geis import *
-from asp_rack import AspRack
 import time
 import toolkitpy as tkp
 

@@ -1,15 +1,19 @@
-we edited the bumps code to work with our demands.
-
 todo
 bot should switch source vials if needed 
-
-
+pyautogui on battery cycler
 dispense specific concentration
+setup db and flask gui
 
+figure out how many cycles to get to electrodes // 
+    15 pumps to first electrodes, 17 to second
+    40 for start of liquid column to reach end, then 45 more pumps to pump all contents out
+    fully assuming entire plumbing system is filled
+    60 seconds for each viscous pump
+we edited the bumps code to work with our demands. see dataanalysis.py// 
 adjust height when aspirating (use marked vial) //
 replace cartridges //
 dispenseworkflowauto //
-    csv for dispense workflow auto //
+csv for dispense workflow auto //
     
 get how many loops to move electrolyte // 28 loops of move_pump(0,2000)
 screw capping // rob.cap(revs = 9.5, pitch = 0.8, torque_thresh=1850)
