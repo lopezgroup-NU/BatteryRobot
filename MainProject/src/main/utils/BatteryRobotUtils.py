@@ -27,7 +27,13 @@ class BatteryRobot(NorthC9):
          "alconox": 3
     }
     pip_id = 0
-
+    #maps rack_disp_official indexes to their vial's volume(ml)
+    solution_vols = {
+        0: 8,
+        1: 7,
+        7: 8,
+        8: 8,
+    } 
 
     def __init__(self, address, network_serial, home=False):
         """
@@ -89,6 +95,7 @@ class BatteryRobot(NorthC9):
             for col in df:
                 for el in df[col]:
                     if el != 0:
+                        self.solution_vols[i] = el
                         res.append([i, el])
                     i += 1
             self.water_sources = res
@@ -357,7 +364,7 @@ class BatteryRobot(NorthC9):
         return data
 
     #viscous (29 speed)
-    def move_electrolyte(self, n = None, draw = True, length = 2000, purge = False, viscous = False, light = False):
+    def move_electrolyte(self, n = None, draw = True, length = 2000, extra_slow = False, purge = False, viscous = False, light = False):
         """
         if n is specified, pump will pump n times. Else runs indefinitely.
         
@@ -382,14 +389,16 @@ class BatteryRobot(NorthC9):
 
         if purge:
             v_in, v_out = 30, 5
+        elif extra_slow:
+            v_in, v_out = 40, 5
         elif viscous: # 60 seconds per pump
             v_in, v_out = 30, 0
         elif light:
-            v_in, v_out = 7, 0
+            v_in, v_out = 1, 0
         
-        self.close_clamp()
-        self.delay(.5)
-        self.open_clamp()
+        # self.close_clamp()
+        # self.delay(.5)
+        # self.open_clamp()
 
         def pump_helper():
             self.set_pump_speed(0, v_out)
@@ -406,6 +415,8 @@ class BatteryRobot(NorthC9):
             self.delay(3)
             if viscous or purge:
                 self.delay(60)
+            elif extra_slow:
+                self.delay(420)
             print("pumped")
         
 #         self.move_carousel(32,80) #70 for mid
@@ -428,7 +439,7 @@ class BatteryRobot(NorthC9):
                     print(i) # print number of pumps
                     break
 
-    def draw_to_sensor(self, draw = True, length = 2000, purge = False, viscous = False, light = False):
+    def draw_to_sensor(self, id, draw = True, length = 2000, purge = False, viscous = False, light = False):
         """
         Assume open vial placed between clamps. Draws 4 pumps of electrolyte, and moves it to the first sensor
         """
@@ -440,19 +451,20 @@ class BatteryRobot(NorthC9):
         elif viscous: # 60 seconds per pump
             v_in, v_out = 30, 0
         elif light:
-            v_in, v_out = 7, 0
+            v_in, v_out = 1, 0        
 
         self.close_clamp()
         self.delay(.5)
         self.open_clamp()
-        self.move_carousel(32,85)
-
         if viscous or purge:
             up = 18
         else:
             up = 15
 
         for i in range(1, up):
+            if i <= 4:
+                self.move_carousel(32, self.get_needle_height(id))
+                self.solution_vols[id] -= 0.1
             self.set_pump_speed(0, v_out)
             self.delay(1)
             self.set_pump_valve(0, int(draw))
@@ -469,9 +481,39 @@ class BatteryRobot(NorthC9):
                 self.delay(60)
             if i == 4:
                 self.move_carousel(0,0)
-            print("pumped")
+                self.cap_and_return_vial_to_rack(id)
+            
 
-    def clean_sensors(self, water_location, n_shakes = 10, len_shake=10, slow = False):
+    def shake(self, num_shakes, slow = False, fast = False):
+        """
+        Helper function to shake water to clean sensor. Only works for when length of shake = 1
+        """
+        v = 13 # speed to push out air
+
+        if slow:
+            v = 30     
+        elif fast:
+            v = 0
+        
+        self.delay(2)
+        self.set_pump_speed(0, v)
+        self.delay(2)
+        self.set_pump_valve(0, 0)
+
+        for i in range(num_shakes):
+            print(i)
+            self.move_pump(0, 0)
+            self.delay(1)
+
+            if slow:
+                self.delay(60)
+
+            self.move_pump(0,2000)
+            self.delay(1)
+            if slow:
+                self.delay(60)
+
+    def clean_sensors(self, water_location, col_length = 10, n_shakes = 10, len_shake=10, slow = False, fast = False):
         """
         Draws water and cleans both sensors by moving water back and forth between sensors. Set slow = True to wash slowly. Shakes n_shakes times. 
         Moves forwards/backwards len_shakes each shake
@@ -482,19 +524,21 @@ class BatteryRobot(NorthC9):
         self.uncap_vial_in_carousel()  
         self.move_carousel(32, 85) # carousel moves 32 degrees, 85 mm down
 
-        self.move_electrolyte(n = 10)
+        self.move_electrolyte(n = col_length, slow = True)
         self.move_carousel(0, 0)
         self.cap_and_return_vial_to_rack(water_location)
 
+        self.move_electrolyte(n = 4, slow = True)
+        for _ in range(n_shakes):
+            self.move_electrolyte(n = len_shake, purge = slow, light = fast)
+            self.move_electrolyte(n = len_shake, draw = False, purge = slow, light = fast)
+        
+        # clean second sensor
+        # self.move_electrolyte(n = 4)
+        # for _ in range(n_shakes):
+        #     self.move_electrolyte(n = len_shake, purge = slow, light = fast, extra_light = extra_fast)        
+        #     self.move_electrolyte(n = len_shake, draw = False, purge = slow, light = fast, extra_light = extra_fast)
         self.move_electrolyte(n = 10)
-        for _ in range(n_shakes):
-            self.move_electrolyte(n = len_shake, purge = slow)
-            self.move_electrolyte(n = len_shake, draw = False, purge = slow)
-        self.move_electrolyte(n = 4)
-        for _ in range(n_shakes):
-            self.move_electrolyte(n = len_shake, purge = slow)        
-            self.move_electrolyte(n = len_shake, draw = False, purge = slow)
-        self.move_electrolyte(n = 20)
 
     def purge(self, water_location, speed=30):
         """
@@ -553,6 +597,14 @@ class BatteryRobot(NorthC9):
             self.delay(3)    
 
         self.cap_and_return_vial_to_rack(water_location)
+
+    def get_needle_height(self, id):
+        if self.solution_vols[id] <= 4:
+            return 85
+        elif self.solution_vols[id] <= 6:
+            return 70
+        else:
+            return 60
 
     def get_new_cartridge(self, new):
         """
@@ -627,6 +679,9 @@ class BatteryRobot(NorthC9):
         """
 
         s1_prop, s2_prop, water_prop = self.calc_liquid_molal(s1_conc, s2_conc, target1, target2)
+
+        water_v = water_prop/0.9998 
+
         rack = self.get_pip_height(s1)
         self.goto_safe(rack[self.asp_rack.s1])
         self.delay(0.5)
@@ -638,7 +693,11 @@ class BatteryRobot(NorthC9):
         self.goto_safe(carousel_dispense)
         self.dispense_ml(3, 1)
         s1_mass = self.read_steady_scale()
-        s1_p = s1_mass/0.1
+        s1_p = s1_mass/0.1 #should we use a test vial? or use the same vial that we ran the density tests in later
+        s1_v = s1_prop/s1_p
+
+
+        return s1_v, s2_v, water_v
 
     def calc_liquid_mol(self, mol, gram, molmass):
         """
@@ -751,6 +810,7 @@ class BatteryRobot(NorthC9):
         Takes in the vial's position on the dispense section of the main rack and returns it there 
         """
         #cap and return to rack
+        self.move_carousel(0,0)
         self.close_clamp()
         self.goto_safe(vial_carousel_approach)
         self.cap(torque_thresh = 600)
