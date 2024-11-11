@@ -1,0 +1,4 @@
+Test Name,Combination Reagents,Combination Concentrations(M),GEIS,GEIS Conditions,CV,CV Conditions
+random1,NaCl KBr,0.5 1.5,Y,InitFreq FinalFreq Amplitude,Y,"Point1, Point2, Rate"
+random2,NaI KBr,2 1.5,N,-,Y,"Point1, Point2, Rate"
+random3,NaCl KOH,1.5 1.5,Y,InitFreq FinalFreq Amplitude,N,-

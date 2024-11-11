@@ -1,13 +1,13 @@
 import sys
 sys.path.append('..')
+sys.path.append(r'C:\Users\llf1362\Documents\NorthIDE\Lib\site-packages')
 
 from north import NorthC9
 from Locator import *
 from .PowderShakerUtils import PowderShaker
-from settings import powder_protocols, AspRack
+from config import powder_protocols, SourceRack, PowderProtocol
 import pandas as pd
 import time, pathlib
-
 
 class BatteryRobot(NorthC9):
     """
@@ -16,11 +16,11 @@ class BatteryRobot(NorthC9):
     child of NorthC9 - inherits North's methods plus methods defined in here
     """
     
-    holding_pipette = False
-    holding_vial = False
-    cap_holder_1_free = True
+    holding_pipette = False # is arm holding pipette
+    holding_vial = False # is arm holding cap
+    cap_holder_1_free = True 
     cap_holder_2_free = True
-    cartridge_on_carousel = None # protocol of powder (not a boolean)
+    cartridge_on_carousel: PowderProtocol = None
     cartridge_pos= {
          "LiOAc": 1,
          "default": 2,
@@ -29,11 +29,17 @@ class BatteryRobot(NorthC9):
     pip_id = 0
     #maps rack_disp_official indexes to their vial's volume(ml)
     solution_vols = {
-        0: 8,
-        1: 7,
+        0: 6,
+        1: 8,
+        2: 8,
+        3: 8,
+        4: 8,
+        5: 8,
         7: 8,
         8: 8,
+        9: 8,
     } 
+    saturations = {}
 
     def __init__(self, address, network_serial, home=False):
         """
@@ -46,67 +52,71 @@ class BatteryRobot(NorthC9):
             self.home_pump(3)  #Pipette pump homing
             self.home_pump(0) #Pump system sensing homing
             self.set_pump_valve(3,0) #Set pump system valve at input position
+
+    def run(filepath):
+        """
+        Takes input file path containing test details. Synthesizes and tests each specified formulation.
+        Assume input file contains n tests. Each test is 3 lines - combination, test name, test conditions.
+        Each test i (0 <= i <= n-1) begins at line 3i.
+        """
+        f = open(filepath) 
+        processed = 0
+
+        while True:
+            # first line of test - combination 
+            # synthesis step
+            line = f.readline()
+            if not line: #if empty, means EOF(end of file)
+                break
+            combination = line.split()
             
 
-    def map_asp_rack(self, csv_path):
-        """
-        Creates AspRack object as defined in settings folder. See settings/asp_rack.py for details
-        Maps using the csv given. csv_path should be a path to a csv file that simulates the asp_rack grid and its contents
-        """
-        df = pd.read_csv(csv_path, header=None)
-        df = df.iloc[:, ::-1]
-        vials = []
-        vols = []
-        indexes = []
-        i = 0
-        for col in df:
-            for el in df[col]:
-                if el == 'x' or el == 'e': # x to signify robot cannot reach position. e means vial at index is empty 
-                    i += 1
-                    continue
-            
-                if len(el.split()) != 2:
-                    raise Exception("Each element needs to have 2 items: vial_name and volume")       
+            # second line of test - name
+            line = f.readline()
+            if not line: #if empty, means EOF(end of file)
+                break
+            test_name = line
 
-                vial, vol = el.split()
-                vials.append(vial)
-                vols.append(vol)
-                indexes.append(i)
-                i += 1             
+            # third line of test - conditions 
+            # test step
+            line = f.readline()
+            if not line: #if empty, means EOF(end of file)
+                break
+            test_conditions = line.split(",")
+
+            test_types, test_params = test_conditions[0], test_conditions[1]
+
+            if "geis" in test_types or "GEIS" in test_types:
+                geis = True
+                geis_params = test_params[0]
+
+                if "cv" in test_types or "CV" in test_types:
+                    cv = True
+                    cv_params = test_params[1]
+                else:
+                    cv = False
+            else:
+                geis = False
+                cv = True
+                cv_params = test_params[0]
                 
-        self.asp_rack = AspRack(vials, vols, indexes)
+            params = {}
 
-    def map_water_source(self, locs = None, vols = None, csv_path = None):
-        """
-        Map water sources. Stores a list of water sources. Each source represented by a list - [<index of rack>, <initial volume>] 
-        If df_path is given, maps using the df given. df_path should be a path to a csv file that simulates the placement of water vials on the center rack.
-        CSV contents should be a grid showing the volume of water in each source vial on the grid.
-        e.g. 3 vials each with 8ml water on bottom row is represented as:
-        0 0 0
-        8 8 8
+            if geis:
+                params["InitFreq"] = geis_params[0]
+                params["FinalFreq"] = geis_params[1]
+                params["Amplitude"] = geis_params[2]
+            if cv:
+                params["Point1"] = cv_params[0]
+                params["Point2"] = cv_params[1]
+                params["Rate"] = cv_params[2]
 
-        0 means no water source at given index
-        """
-        if csv_path:
-            df = pd.read_csv(csv_path, header=None)
-            df = df.iloc[:, ::-1]
-            res = []
-            i = 0
-            for col in df:
-                for el in df[col]:
-                    if el != 0:
-                        self.solution_vols[i] = el
-                        res.append([i, el])
-                    i += 1
-            self.water_sources = res
-        else:
-            locs = locs.split()
-            vols = vols.split()
-
-            if len(locs) != len(vols):
-                raise Exception("Length of inputs must be equal!")
+            prompt = input("Rack limit reached. Enter anything to continue, else enter N")
+            if prompt.upper() == "N":
+                break
             
-            self.water_sources = [list(t) for t in zip(locs, vols)]
+            processed += 1
+            #loop again, do next test
         
     def dispense_workflow_auto(self, protocol, n_vials = 1, powder_only = False):
         """
@@ -239,7 +249,7 @@ class BatteryRobot(NorthC9):
            drawing liquid 
         """
         self.check_remove_pipette()
-        self.goto_safe(rack_asp_official[getattr(self.asp_rack, source)])
+        self.goto_safe(rack_source_official[getattr(self.source_rack, source)])
         cap_holder_id = self.move_cap_to_holder()
         
         if collect:
@@ -255,12 +265,12 @@ class BatteryRobot(NorthC9):
         while remaining > 0:
             rack = p_asp_high
             
-            if getattr(self.asp_rack, source + "vol") <= 4:
+            if getattr(self.source_rack, source + "vol") <= 4:
                 rack = p_asp_low
-            elif getattr(self.asp_rack, source + "vol") <= 6:
+            elif getattr(self.source_rack, source + "vol") <= 6:
                 rack = p_asp_mid
             
-            self.goto_safe(rack[getattr(self.asp_rack, source)])
+            self.goto_safe(rack[getattr(self.source_rack, source)])
             amount = min(remaining, 1)
             self.aspirate_ml(3, amount)
             if amount < 1:
@@ -272,9 +282,9 @@ class BatteryRobot(NorthC9):
             self.delay(.5)
             remaining -= 1
             
-            setattr(self.asp_rack,
+            setattr(self.source_rack,
                     source + "vol",
-                    getattr(self.asp_rack, source + "vol") - amount
+                    getattr(self.source_rack, source + "vol") - amount
                     )
         dispensed = self.read_steady_scale()   
         self.goto_safe(safe_zone)
@@ -303,7 +313,7 @@ class BatteryRobot(NorthC9):
         Dispense liquid based on target mass
         """
         self.check_remove_pipette()
-        self.goto_safe(rack_asp_official[getattr(self.asp_rack, source)])
+        self.goto_safe(rack_source_official[getattr(self.source_rack, source)])
         cap_holder_id = self.move_cap_to_holder()
         
         if collect:
@@ -319,13 +329,13 @@ class BatteryRobot(NorthC9):
         while dispensed < target_mass: # repeat until target mass achieved
             rack = p_asp_high
             
-            if getattr(self.asp_rack, source + "vol") <= 4:
+            if getattr(self.source_rack, source + "vol") <= 4:
                 rack = p_asp_low
-            elif getattr(self.asp_rack, source + "vol") <= 6:
+            elif getattr(self.source_rack, source + "vol") <= 6:
                 rack = p_asp_mid
                 
             self.zero_scale()
-            self.goto_safe(rack[getattr(self.asp_rack, source)])
+            self.goto_safe(rack[getattr(self.source_rack, source)])
                   
             amount = min((target_mass - dispensed)/density , 1) #get smaller value between 1, and remaining volume to dispense
             self.aspirate_ml(3, amount)
@@ -338,9 +348,9 @@ class BatteryRobot(NorthC9):
             self.delay(.5)
             dispensed += self.read_steady_scale() #use scale to determine actual mass dispensed
             self.delay(.5)
-            setattr(self.asp_rack,
+            setattr(self.source_rack,
                     source + "vol",
-                    getattr(self.asp_rack, source + "vol") - amount
+                    getattr(self.source_rack, source + "vol") - amount
                     )
 
         self.goto_safe(safe_zone)
@@ -362,7 +372,25 @@ class BatteryRobot(NorthC9):
         data["Intended(g)"]= target_mass
         data["Real(g)"] = dispensed
         return data
-
+    
+    def reset_pump(self):
+        self.set_pump_speed(0, 15)        
+        self.set_pump_valve(0, 0)
+        self.move_pump(0, 0)
+    
+    def pump_helper(self, length = 1300, v_in = 13, v_out= 0, draw=True):
+        """
+        Helper function to be used when pumping liquids from carousel.
+        
+        """
+        self.set_pump_speed(0, v_out)
+        self.set_pump_valve(0, int(not draw))
+        self.move_pump(0, 0)
+        self.set_pump_speed(0, v_in)
+        self.set_pump_valve(0, int(draw))
+        self.move_pump(0,length)
+        print("pumped")
+    
     #viscous (29 speed)
     def move_electrolyte(self, n = None, draw = True, length = 2000, extra_slow = False, purge = False, viscous = False, light = False):
         """
@@ -392,40 +420,16 @@ class BatteryRobot(NorthC9):
         elif extra_slow:
             v_in, v_out = 40, 5
         elif viscous: # 60 seconds per pump
-            v_in, v_out = 30, 0
+            v_in, v_out = 35, 0
         elif light:
             v_in, v_out = 1, 0
-        
-        # self.close_clamp()
-        # self.delay(.5)
-        # self.open_clamp()
 
-        def pump_helper():
-            self.set_pump_speed(0, v_out)
-            self.delay(1)
-            self.set_pump_valve(0, int(draw))
-            self.delay(1)
-            self.move_pump(0, 0)
-            self.delay(1)
-            self.set_pump_speed(0, v_in)
-            self.delay(3)
-            self.set_pump_valve(0, int(not draw))
-            self.delay(1)
-            self.move_pump(0,length)
-            self.delay(3)
-            if viscous or purge:
-                self.delay(60)
-            elif extra_slow:
-                self.delay(420)
-            print("pumped")
+        self.reset_pump()
         
-#         self.move_carousel(32,80) #70 for mid
+#         self.move_carousel(33,80) #70 for mid
         if n:
-            c = 0
             for i in range(n):
-                c += 1
-                pump_helper()
-            print(c)
+                self.pump_helper(length = length, v_in = v_in, v_out = v_out, draw = draw)
 
         else:
             i = 0
@@ -433,178 +437,123 @@ class BatteryRobot(NorthC9):
             while True:
                 try:
                     i += 1
-                    pump_helper()
-                    print(i)
+                    self.pump_helper(length = length, v_in = v_in, v_out = v_out, draw = draw)
                 except KeyboardInterrupt:
                     print(i) # print number of pumps
                     break
 
-    def draw_to_sensor(self, id, draw = True, length = 2000, purge = False, viscous = False, light = False):
+        self.reset_pump()
+
+    def draw_to_sensor(self, id, length = 1300, purge = False, viscous = False, light = False, special = False):
         """
-        Assume open vial placed between clamps. Draws 4 pumps of electrolyte, and moves it to the first sensor
+        Assume open vial placed between clamps. Draws 5 pumps of electrolyte, and moves it to the first sensor
         """
-        v_in = 13 #speed to suck air, default to medium speed
+        v_in = 20 #speed to draw, default to medium speed
         v_out = 0 # speed to push out air
 
         if purge:
-            v_in, v_out = 30, 5
+            v_in, v_out = 35, 5
         elif viscous: # 60 seconds per pump
-            v_in, v_out = 30, 0
+            v_in, v_out = 35, 0
         elif light:
             v_in, v_out = 1, 0        
 
         self.close_clamp()
         self.delay(.5)
-        self.open_clamp()
-        if viscous or purge:
-            up = 18
+        self.reset_pump()
+        current_height = self.get_needle_height(id)
+        self.move_carousel(33, current_height)
+        
+        self.pump_helper(length = length, v_in = v_in, v_out = v_out)
+        self.solution_vols[id] -= 0.4 * length/1250 #  length 1250 roughly equal to 0.4ml
+        
+        self.move_carousel(0,0)
+        if special:
+            self.open_clamp()
+            self.move_vial(vial_carousel, rack_disp_official[id])
         else:
-            up = 15
-
-        for i in range(1, up):
-            if i <= 4:
-                self.move_carousel(32, self.get_needle_height(id))
-                self.solution_vols[id] -= 0.1
-            self.set_pump_speed(0, v_out)
-            self.delay(1)
-            self.set_pump_valve(0, int(draw))
-            self.delay(1)
-            self.move_pump(0, 0)
-            self.delay(1)
-            self.set_pump_speed(0, v_in)
-            self.delay(3)
-            self.set_pump_valve(0, int(not draw))
-            self.delay(1)
-            self.move_pump(0,length)
-            self.delay(3)
-            if viscous or purge:
-                self.delay(60)
-            if i == 4:
-                self.move_carousel(0,0)
-                self.cap_and_return_vial_to_rack(id)
-            
-
-    def shake(self, num_shakes, slow = False, fast = False):
-        """
-        Helper function to shake water to clean sensor. Only works for when length of shake = 1
-        """
-        v = 13 # speed to push out air
-
-        if slow:
-            v = 30     
-        elif fast:
-            v = 0
+            self.cap_and_return_vial_to_rack(id)
+                
+        for _ in range(2):
+            self.pump_helper(length = length, v_in = v_in, v_out = v_out)
         
-        self.delay(2)
-        self.set_pump_speed(0, v)
-        self.delay(2)
-        self.set_pump_valve(0, 0)
+        self.pump_helper(length = 200, v_in = v_in, v_out = v_out)
+        self.reset_pump()
 
-        for i in range(num_shakes):
-            print(i)
-            self.move_pump(0, 0)
-            self.delay(1)
-
-            if slow:
-                self.delay(60)
-
-            self.move_pump(0,2000)
-            self.delay(1)
-            if slow:
-                self.delay(60)
-
-    def clean_sensors(self, water_location, col_length = 10, n_shakes = 10, len_shake=10, slow = False, fast = False):
-        """
-        Draws water and cleans both sensors by moving water back and forth between sensors. Set slow = True to wash slowly. Shakes n_shakes times. 
-        Moves forwards/backwards len_shakes each shake
-        """
-        self.move_carousel(0, 0)
-        self.move_vial(rack_disp_official[water_location], vial_carousel)
-
-        self.uncap_vial_in_carousel()  
-        self.move_carousel(32, 85) # carousel moves 32 degrees, 85 mm down
-
-        self.move_electrolyte(n = col_length, slow = True)
-        self.move_carousel(0, 0)
-        self.cap_and_return_vial_to_rack(water_location)
-
-        self.move_electrolyte(n = 4, slow = True)
-        for _ in range(n_shakes):
-            self.move_electrolyte(n = len_shake, purge = slow, light = fast)
-            self.move_electrolyte(n = len_shake, draw = False, purge = slow, light = fast)
-        
-        # clean second sensor
-        # self.move_electrolyte(n = 4)
-        # for _ in range(n_shakes):
-        #     self.move_electrolyte(n = len_shake, purge = slow, light = fast, extra_light = extra_fast)        
-        #     self.move_electrolyte(n = len_shake, draw = False, purge = slow, light = fast, extra_light = extra_fast)
-        self.move_electrolyte(n = 10)
-
-    def purge(self, water_location, speed=30):
+    def purge(self, water_location, speed=30, rack = rack_disp_new, n_pumps = 6, length = 3000):
         """
         Purge plumbing system
+        Full vial needs total length 18000
+        If all the way to brim, length 20000
         """
         self.move_carousel(0, 0)
-        self.move_vial(rack_disp_official[water_location], vial_carousel)
+        self.move_vial(rack[water_location], vial_carousel)
 
         self.uncap_vial_in_carousel()  
-        self.move_carousel(32, 85) # carousel moves 32 degrees, 85 mm down
+        self.move_carousel(33, 85) # carousel moves 33 degrees, 85 mm down
         
-        for _ in range(42):
-            self.set_pump_speed(0, 5)
-            self.delay(3)
-            self.set_pump_valve(0, 1)
-            self.delay(2)
-            self.move_pump(0, 0)
-            self.delay(2)
-            self.set_pump_speed(0, speed)
-            self.delay(3)
-            self.set_pump_valve(0, 0)
-            self.delay(2)
-            self.move_pump(0,2000)
-            self.delay(2)
-            if speed > 25:
-                self.delay(59)
-        
+        for _ in range(n_pumps):
+            self.pump_helper(length = length, v_in = speed, v_out = 5)
+
         self.move_carousel(0, 0)
+        self.cap_and_return_vial_to_rack(water_location, rack)
         
-        for _ in range(20):
-            self.set_pump_speed(0, 0)
-            self.delay(3)
-            self.set_pump_valve(0, 1)
-            self.delay(3)
-            self.move_pump(0, 0)
-            self.delay(3)
-            self.set_pump_speed(0, 15)
-            self.delay(3)
-            self.set_pump_valve(0, 0)
-            self.delay(3)
-            self.move_pump(0,2000)
-            self.delay(3)
+        for _ in range(n_pumps):
+            self.pump_helper(length = length, v_in = 15, v_out = 5)
 
-        for _ in range(20):
-            self.set_pump_speed(0, 0)
-            self.delay(3)
-            self.set_pump_valve(0, 1)
-            self.delay(3)
-            self.move_pump(0, 0)
-            self.delay(3)
-            self.set_pump_speed(0, 5)
-            self.delay(3)
-            self.set_pump_valve(0, 0)
-            self.delay(3)
-            self.move_pump(0,2000)    
-            self.delay(3)    
+    def old_school_purge(self, water_location, speed=30, rack = rack_disp_official, n_pumps = 6, length = 3000):
+            """
+            Purge plumbing system
+            """
+            self.move_carousel(0, 0)
+            self.move_vial(rack[water_location], vial_carousel)
+            self.close_clamp()
+            self.goto_safe(safe_zone)
+            self.move_carousel(33, 85) # carousel moves 33 degrees, 85 mm down
+            for _ in range(n_pumps):
+                self.pump_helper(length = length, v_in = speed, v_out = 5)
 
-        self.cap_and_return_vial_to_rack(water_location)
+            self.move_carousel(0, 0)
+            self.open_clamp()
+            self.move_vial(vial_carousel, rack[water_location])
+
+            for _ in range(n_pumps):
+                self.pump_helper(length = length, v_in = speed, v_out = 5)
+
+            self.reset_pump()
+
+    def purge_hot(self, water_location, speed = 30, n_pumps = 6):
+        """
+        Purge plumbing system with hot water
+        """
+        self.move_carousel(0, 0)
+        self.move_vial(heatplate_official[water_location], vial_carousel)
+        
+        self.uncap_vial_in_carousel()  
+        self.move_carousel(33, 85) # carousel moves 33 degrees, 85 mm down
+        
+        for _ in range(2):
+            self.pump_helper(length = 2000, v_in = 15, v_out = 5)
+        
+        for _ in range(n_pumps - 2):
+            self.pump_helper(length = 2000, v_in = speed, v_out = 5)
+            
+        self.move_carousel(0, 0)
+        self.cap_and_return_vial_to_rack(water_location, heatplate_official)
+        
+        for _ in range(n_pumps):
+            self.pump_helper(length = 2000, v_in = 15, v_out = 5)
+        
 
     def get_needle_height(self, id):
-        if self.solution_vols[id] <= 4:
+        if self.solution_vols[id] <= 5:
             return 85
         elif self.solution_vols[id] <= 6:
+            return 75
+        elif self.solution_vols[id] <= 7:
             return 70
         else:
-            return 60
+            return 65
 
     def get_new_cartridge(self, new):
         """
@@ -655,10 +604,10 @@ class BatteryRobot(NorthC9):
     def get_pip_height(self, vial):
         """
         Return appropriate pipette height given target solution to draw from. Make sure solution name is identical
-        to one in asp_rack.csv
+        to one in source_rack.csv
         """
         try:
-            vol = getattr(self.asp_rack, vial + "_vol")
+            vol = getattr(self.source_rack, vial + "_vol")
             if vol <= 2:
                 return "Unreachable volume"
             elif vol <= 4:
@@ -671,7 +620,23 @@ class BatteryRobot(NorthC9):
         except:
             print("No vial with this name!")
 
+    def make_mixture(self, dest, args):
+        """
+        Takes arbitrary number of params depending on which components form the mixture
+        Assume args is list of 2-tuples e.g. [(name1, conc1, sat1),(name2, conc2, sat2)] 
+        """
+        self.move_vial(rack_disp_official[dest], vial_carousel)
+        self.move_cap_to_holder()
 
+        first_component = args[0]
+        second_component = args[1]
+
+        vols = self.calc_vol(args)
+
+        
+        for chemical, conc in args:
+            self.goto_safe(rack_source_official[self.source_rack[chemical]])
+    
     def calc_vol(self, s1, s2, s1_conc, s2_conc, target1, target2, target_vol = 8):
         """
         Uses small volume to find density of each input. 
@@ -683,7 +648,8 @@ class BatteryRobot(NorthC9):
         water_v = water_prop/0.9998 
 
         rack = self.get_pip_height(s1)
-        self.goto_safe(rack[self.asp_rack.s1])
+        self.zero_scale()
+        self.goto_safe(rack[self.source_rack[s1]])
         self.delay(0.5)
         self.aspirate_ml(3, 0.1)
         self.delay(0.5)
@@ -696,6 +662,20 @@ class BatteryRobot(NorthC9):
         s1_p = s1_mass/0.1 #should we use a test vial? or use the same vial that we ran the density tests in later
         s1_v = s1_prop/s1_p
 
+        rack = self.get_pip_height(s2)
+        self.zero_scale()
+        self.goto_safe(rack[self.source_rack[s2]])
+        self.delay(0.5)
+        self.aspirate_ml(3, 0.1)
+        self.delay(0.5)
+        self.move_z(200)
+        self.aspirate_ml(3, 0.9)
+        self.delay(0.5)
+        self.goto_safe(carousel_dispense)
+        self.dispense_ml(3, 1)
+        s2_mass = self.read_steady_scale()
+        s2_p = s2_mass/0.1 #should we use a test vial? or use the same vial that we ran the density tests in later
+        s2_v = s2_prop/s2_p
 
         return s1_v, s2_v, water_v
 
@@ -786,7 +766,7 @@ class BatteryRobot(NorthC9):
         self.close_gripper()
         self.delay(.5)
         self.uncap()
-        self.goto_safe(rack_asp_official_approach[getattr(self.asp_rack, source)])
+        self.goto_safe(rack_source_official_approach[getattr(self.source_rack, source)])
         self.cap(torque_thresh = 600)
         self.open_gripper()
         self.goto_safe(safe_zone)
@@ -827,9 +807,12 @@ class BatteryRobot(NorthC9):
         """
         self.goto_safe(src_loc)
         self.close_gripper()
-        self.delay(0.7)
+        self.delay(1.5)
         self.goto_safe(dest_loc)
+        self.close_clamp()
         self.open_gripper()
+        self.delay(0.5)
+        self.open_clamp()
             
     def get_pipette(self):
         """
@@ -884,3 +867,63 @@ class BatteryRobot(NorthC9):
         self.pip_id += 1
         if self.pip_id >= 48:
             self.pip_id = 0
+
+    def map_source_rack(self, csv_path):
+        """
+        Creates SourceRack object as defined in settings folder. See settings/source_rack.py for details
+        Maps using the csv given. csv_path should be a path to a csv file that simulates the source_rack grid and its contents
+        """
+        df = pd.read_csv(csv_path, header=None)
+        df = df.iloc[:, ::-1]
+        vials = []
+        vols = []
+        indexes = []
+        i = 0
+        for col in df:
+            for el in df[col]:
+                if el == 'x' or el == 'e': # x to signify robot cannot reach position. e means vial at index is empty 
+                    i += 1
+                    continue
+            
+                if len(el.split()) != 2:
+                    raise Exception("Each element needs to have 2 items: vial_name and volume")       
+
+                vial, vol = el.split()
+                vials.append(vial)
+                vols.append(vol)
+                indexes.append(i)
+                i += 1             
+                
+        self.source_rack = SourceRack(vials, vols, indexes)
+
+    def map_water_source(self, locs = None, vols = None, csv_path = None):
+        """
+        Map water sources. Stores a list of water sources. Each source represented by a list - [<index of rack>, <initial volume>] 
+        If df_path is given, maps using the df given. df_path should be a path to a csv file that simulates the placement of water vials on the center rack.
+        CSV contents should be a grid showing the volume of water in each source vial on the grid.
+        e.g. 3 vials each with 8ml water on bottom row is represented as:
+        0 0 0
+        8 8 8
+
+        0 means no water source at given index
+        """
+        if csv_path:
+            df = pd.read_csv(csv_path, header=None)
+            df = df.iloc[:, ::-1]
+            res = []
+            i = 0
+            for col in df:
+                for el in df[col]:
+                    if el != 0:
+                        self.solution_vols[i] = el
+                        res.append([i, el])
+                    i += 1
+            self.water_sources = res
+        else:
+            locs = locs.split()
+            vols = vols.split()
+
+            if len(locs) != len(vols):
+                raise Exception("Length of inputs must be equal!")
+            
+            self.water_sources = [list(t) for t in zip(locs, vols)]

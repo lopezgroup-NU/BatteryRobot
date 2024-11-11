@@ -144,7 +144,7 @@
         0,
         0
       ],
-      "volume": 0.1,
+      "volume": 1.0,
       "address": 0
     }
   },
@@ -453,54 +453,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "rack_asp_official": {
-      "type": "Grid",
-      "tool": 0,
-      "counts": [
-        -63,
-        11887,
-        38590,
-        22300
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0,
-      "n": [
-        5,
-        6,
-        1
-      ],
-      "pitch": [
-        26,
-        26,
-        0.0
-      ]
-    },
-    "rack_asp_official_approach": {
-      "type": "Grid",
-      "tool": 0,
-      "counts": [
-        -63,
-        11887,
-        38590,
-        21676
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0,
-      "n": [
-        5,
-        6,
-        1
-      ],
-      "pitch": [
-        26,
-        26,
-        0.0
-      ]
-    },
     "p_asp_low": {
       "type": "Grid",
       "tool": 1,
@@ -724,6 +676,78 @@
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null
+    },
+    "rack_disp_new": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        2013,
+        1075,
+        19048,
+        22545
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        8,
+        6,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "rack_source_official": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        -63,
+        11887,
+        38590,
+        22300
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        5,
+        6,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "rack_source_official_approach": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        -63,
+        11887,
+        38590,
+        21676
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        5,
+        6,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
     }
   },
   "sim_inputs": {
