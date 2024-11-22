@@ -588,30 +588,6 @@
         0.0
       ]
     },
-    "rack_disp_official": {
-      "type": "Grid",
-      "tool": 0,
-      "counts": [
-        2010,
-        1143,
-        19048,
-        22545
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0,
-      "n": [
-        8,
-        6,
-        1
-      ],
-      "pitch": [
-        26,
-        26,
-        0.0
-      ]
-    },
     "cartridge_holder": {
       "type": "Location",
       "tool": 0,
@@ -677,30 +653,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "rack_disp_new": {
-      "type": "Grid",
-      "tool": 0,
-      "counts": [
-        2013,
-        1075,
-        19048,
-        22545
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0,
-      "n": [
-        8,
-        6,
-        1
-      ],
-      "pitch": [
-        26,
-        26,
-        0.0
-      ]
-    },
     "rack_source_official": {
       "type": "Grid",
       "tool": 0,
@@ -740,6 +692,30 @@
       "rotation": 0,
       "n": [
         5,
+        6,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "rack_disp_official": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        2013,
+        1075,
+        19048,
+        22545
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        8,
         6,
         1
       ],

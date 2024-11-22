@@ -2,12 +2,15 @@ import sys
 sys.path.append('..')
 sys.path.append(r'C:\Users\llf1362\Documents\NorthIDE\Lib\site-packages')
 
-from north import NorthC9
-from Locator import *
-from .PowderShakerUtils import PowderShaker
-from config import powder_protocols, SourceRack, PowderProtocol
+import asyncio
 import pandas as pd
 import time, pathlib
+from Locator import *
+from north import NorthC9
+from molmass import Formula
+from .PowderShakerUtils import PowderShaker
+from config import powder_protocols, SourceRack, HeatRack, DispRack, PowderProtocol
+import heapq
 
 class BatteryRobot(NorthC9):
     """
@@ -38,8 +41,10 @@ class BatteryRobot(NorthC9):
         7: 8,
         8: 8,
         9: 8,
+        15: 8,
     } 
-    saturations = {}
+    #stores index:volume_remaining for each water source for purging. index in relation to disp_rack
+    purge_sources = {}
 
     def __init__(self, address, network_serial, home=False):
         """
@@ -49,153 +54,115 @@ class BatteryRobot(NorthC9):
         if home:
             self.home_robot() #Robot arm homing
             self.home_carousel() #Robot carousel homing
+            self.reset_pump()
             self.home_pump(3)  #Pipette pump homing
             self.home_pump(0) #Pump system sensing homing
             self.set_pump_valve(3,0) #Set pump system valve at input position
 
-    def run(filepath):
+    def assemble(self, deck_file, experiment_file):
         """
-        Takes input file path containing test details. Synthesizes and tests each specified formulation.
-        Assume input file contains n tests. Each test is 3 lines - combination, test name, test conditions.
-        Each test i (0 <= i <= n-1) begins at line 3i.
-        """
-        f = open(filepath) 
-        processed = 0
+        Break up experiments into batches given deck file and experiment file
+        Optimize for number of deck resets 
+        Outputs different run files, and one file for tests that cannot be synthesized
 
-        while True:
-            # first line of test - combination 
-            # synthesis step
-            line = f.readline()
-            if not line: #if empty, means EOF(end of file)
-                break
-            combination = line.split()
+        Implement in the future to increase autonomy
+        """
+        pass
+
+    def run(self, run_file):
+        """
+        Takes input file path to a csv containing test details. Synthesizes and tests each specified formulation.
+        """
+        if not self.deck_initialized:
+            raise Exception("Initialize deck first! Use initialize_deck()")
+        
+
+        heating_tasks = ()
+        heapq.heapify(heating_tasks)
+
+        df = pd.read_csv(run_file)  
+        for experiment in df.itertuples():
+
+            #main experiment body that i escape from when a vial is done heating
+            #solids
+            has_solids = pd.notna(experiment.Solids)
+            has_liquids = pd.notna(experiment.Sources)
+            collect = True
+
+            target_pos = experiment.Target_vial
+            target_index = self.disp_rack.grid_to_index(target_pos)
+
+            if has_solids: 
+                solid_list = experiment.Solids.split()
+                mass_list = experiment.Weights_g.split()
+                mass_list = [float(mass) for mass in mass_list]
+
+                if len(solid_list) != len(mass_list):
+                    raise Exception(f"Experiment {experiment.Experiment}: Length mismatch in solid list and mass list ")
+
+                for i, solid in enumerate(solid_list):
+                    mass = mass_list[i]
+                    ret = True if ((i == len(solid_list) - 1) and (not has_liquids)) else False
+                    self.dispense_powder_and_scale(solid, target_index, mass, collect, ret)
+                    collect = False
             
+            #liquids
+            if has_liquids:
+                source_list = experiment.Sources.split()
+                vol_list = experiment.Volume_mL.split()
+                vol_list = [float(vol) for vol in vol_list]
 
-            # second line of test - name
-            line = f.readline()
-            if not line: #if empty, means EOF(end of file)
-                break
-            test_name = line
+                if len(solid_list) != len(vol_list):
+                    raise Exception(f"Experiment {experiment.Experiment}: Length mismatch in source list and vol list ")
 
-            # third line of test - conditions 
-            # test step
-            line = f.readline()
-            if not line: #if empty, means EOF(end of file)
-                break
-            test_conditions = line.split(",")
+                for i, source_pos in enumerate(source_list):
+                    vol = vol_list[i]
+                    ret = True if (i == len(source_list) - 1) else False
+                    source_index = self.source_rack.grid_to_index(source_pos)
+                    self.dispense_liquid_vol(target_index, source_index, vol, collect, ret)
+                    collect = False
 
-            test_types, test_params = test_conditions[0], test_conditions[1]
+                    #update source rack contents 
+                    source_vial_name = getattr(self.source_rack, source_pos)
+                    current_vol = getattr(self.source_rack, source_vial_name + "_vol")
+                    setattr(self.source_rack, source_vial_name + "_vol", current_vol - vol)
+                    
+                    #update disp rack contents 
+                    disp_vial_name = getattr(self.disp_rack, target_pos)
+                    current_vol = getattr(self.disp_rack, disp_vial_name + "_vol")
+                    setattr(self.source_rack, disp_vial_name + "_vol", current_vol + vol)
 
-            if "geis" in test_types or "GEIS" in test_types:
-                geis = True
-                geis_params = test_params[0]
+            
+            #heat and wait for them
+            heatplate_pos = experiment.Heat
+            heatplate_index = HeatRack.grid_to_index(heatplate_pos)
+            heat_time = float(experiment.Time_h) * 3600 # convert to seconds
+            self.move_vial(rack_disp_official[target_index],heatplate_official[heatplate_index])
 
-                if "cv" in test_types or "CV" in test_types:
-                    cv = True
-                    cv_params = test_params[1]
+            #store in binary heap as tuple - binary heap autosorts everytime you insert
+            heapq.heappush(heating_tasks, (time.time()+heat_time, heatplate_index, target_index))
+
+            vials_to_remove = True
+            while heating_tasks and vials_to_remove:
+                soonest = heating_tasks[0]
+                time_done = soonest[0]
+                if time_done <= time.time():
+                    heated_vial = heapq.heappop(heating_tasks)
+                    heatplate_index, target_index = heated_vial[1], heated_vial[2]
+                    self.move_vial(heatplate_official[heatplate_index], rack_disp_official[target_index])
                 else:
-                    cv = False
-            else:
-                geis = False
-                cv = True
-                cv_params = test_params[0]
-                
-            params = {}
+                    vials_to_remove = False
 
-            if geis:
-                params["InitFreq"] = geis_params[0]
-                params["FinalFreq"] = geis_params[1]
-                params["Amplitude"] = geis_params[2]
-            if cv:
-                params["Point1"] = cv_params[0]
-                params["Point2"] = cv_params[1]
-                params["Rate"] = cv_params[2]
-
-            prompt = input("Rack limit reached. Enter anything to continue, else enter N")
-            if prompt.upper() == "N":
-                break
-            
-            processed += 1
-            #loop again, do next test
-        
-    def dispense_workflow_auto(self, protocol, n_vials = 1, powder_only = False):
-        """
-        NOT fully complete yet. It would be better to use dispense_powder_and_scale and dispense_liquid_and_scale
-        individually to make solutions for now. 
-
-        populate grid of vials with specific powder AND liquid, one vial by one vial starting from index 0.
-        Rack should be filled from right to left
-        n_vials is total number of vials to populate, and each column must have 4 vials.
-        Each column with vials to populate must have 2 source vials
-        
-        Function takes in protocol of specific powder to fill vials with. As well as number of vials to fill up
-        
-        Todo:
-        1) figure out way to populate columns of 3,2,1
-        2) how to start from specific column
-        3) work with multiple powder protocols
-        """
-        vials_per_col = 4
-        self.open_clamp()
-        self.open_gripper()
-        self.zero_scale()
-        
-        pow_masses = [10,25,50,100,250] # for full deck, number of elements should equal n_vials/vials_per_col
-        liq_volumes = [2, 1, 0.5, 0.25, 0.1, 0.05, 0.025, 0.01] #number of elements should equal n_vials/vials_per_col
-        
-        data = {
-            "Vial_ID": [],
-            "time/s":[],
-            "PowMass/mg (Intended)":[],
-            "PowMass/mg (Real)":[],     
-            "LiqVol/ml (Intended)":[],
-            "LiqVol/ml (Real)":[]
-            }
-        
-        for dispense_vial_id in range(n_vials):
-            data["Vial_ID"].append(dispense_vial_id)
-            
-            # get vial, place in carousel
-            self.move_vial(rack_disp_official[dispense_vial_id], vial_carousel)
-            self.close_clamp()
-            self.close_gripper()
-            self.delay(.7)    
-            self.uncap()
-            self.holding_vial = False
-            self.goto_safe(safe_zone)
-            self.open_clamp()
-            
-            start = time.time()
-            
-            #dispensing powder 
-            col = dispense_vial_id // vials_per_col
-            mass = pow_masses[col]
-            pow_data = self.dispense_powder_and_scale(protocol, dispense_vial_id, mass, False)
-            
-            data["PowMass/mg (Intended)"].append(pow_data["Intended(mg)"])
-            data["PowMass/mg (Real)"].append(pow_data["Real(mg)"])
-            
-            #dispensing liquid
-            vol = liq_volumes[col]
-            source_vial_id = 0
-            
-            if dispense_vial_id % 2 == 0:
-                source_vial_id = 0 + col * 2
-            else:
-                source_vial_id = 1 + col * 2
-                
-            liq_data = self.dispense_liquid_vol(dispense_vial_id, source_vial_id, vol, False)
-            data["LiqVol/ml (Intended)"].append(pow_data["Intended(ml)"])
-            data["LiqVol/ml (Real)"].append(pow_data["Real(ml)"])
-            
-            t_taken = time.time() - start
-            data["time/s"].append(t_taken)
-            
-            self.cap_and_return_vial_to_rack(dispense_vial_id)
-           
-        df = pd.DataFrame(data)
-        df.to_csv('res/dispense.csv', index=True, mode='w')
-
+        print("Some vials still heating. Check every 60 seconds to see if any are done")
+        while heating_tasks:
+            soonest = heating_tasks[0]
+            time_done = soonest[0]
+            if time_done <= time.time():
+                heated_vial = heapq.heappop(heating_tasks)
+                heatplate_index, target_index = heated_vial[1], heated_vial[2]
+                self.move_vial(heatplate_official[heatplate_index], rack_disp_official[target_index])
+            time.sleep(60)
+        print("Done running!")
 
     def dispense_powder_and_scale(self, protocol, dest_id, mass, collect = False, ret = True):
         """
@@ -206,6 +173,7 @@ class BatteryRobot(NorthC9):
         if collect:
             self.move_vial(rack_disp_official[dest_id], vial_carousel)
         else:
+            #assumes already holding vial
             self.goto_safe(vial_carousel)
             
         self.uncap_vial_in_carousel()  
@@ -265,9 +233,9 @@ class BatteryRobot(NorthC9):
         while remaining > 0:
             rack = p_asp_high
             
-            if getattr(self.source_rack, source + "vol") <= 4:
+            if getattr(self.source_rack, source + "_vol") <= 4:
                 rack = p_asp_low
-            elif getattr(self.source_rack, source + "vol") <= 6:
+            elif getattr(self.source_rack, source + "_vol") <= 6:
                 rack = p_asp_mid
             
             self.goto_safe(rack[getattr(self.source_rack, source)])
@@ -283,8 +251,8 @@ class BatteryRobot(NorthC9):
             remaining -= 1
             
             setattr(self.source_rack,
-                    source + "vol",
-                    getattr(self.source_rack, source + "vol") - amount
+                    source + "_vol",
+                    getattr(self.source_rack, source + "_vol") - amount
                     )
         dispensed = self.read_steady_scale()   
         self.goto_safe(safe_zone)
@@ -444,9 +412,11 @@ class BatteryRobot(NorthC9):
 
         self.reset_pump()
 
-    def draw_to_sensor(self, id, length = 1300, purge = False, viscous = False, light = False, special = False):
+    def draw_to_sensor(self, id, second_sensor = False, length = 1300,  purge = False, viscous = False, light = False, special = False):
         """
-        Assume open vial placed between clamps. Draws 5 pumps of electrolyte, and moves it to the first sensor
+        Assume open vial placed between clamps. Draws 5 pumps of electrolyte, and moves it to by default the first sensor.
+        Set second_sensor = True if you want to draw directly to the second sensor. Otherwise draw to sensor 1 first then use 
+        draw_sensor1to2 to draw it
         """
         v_in = 20 #speed to draw, default to medium speed
         v_out = 0 # speed to push out air
@@ -477,10 +447,32 @@ class BatteryRobot(NorthC9):
         for _ in range(2):
             self.pump_helper(length = length, v_in = v_in, v_out = v_out)
         
-        self.pump_helper(length = 200, v_in = v_in, v_out = v_out)
+        if second_sensor: 
+            length = 1200 
+        else: 
+            length = 200 
+
+        self.pump_helper(length = length , v_in = v_in, v_out = v_out)
         self.reset_pump()
 
-    def purge(self, water_location, speed=30, rack = rack_disp_new, n_pumps = 6, length = 3000):
+    def draw_sensor1to2(self, purge = False, viscous = False, light = False):
+        """
+        When column of electrolyte is already at first sensor, moves column to second sensor
+        """
+        v_in = 20 #speed to draw, default to medium speed
+        v_out = 0 # speed to push out air
+
+        if purge:
+            v_in, v_out = 35, 5
+        elif viscous: # 60 seconds per pump
+            v_in, v_out = 35, 0
+        elif light:
+            v_in, v_out = 1, 0   
+
+        self.pump_helper(length = 1000 , v_in = v_in, v_out = v_out)
+        self.reset_pump()
+
+    def purge(self, water_location, speed=30, rack = rack_disp_official, n_pumps = 6, length = 3000):
         """
         Purge plumbing system
         Full vial needs total length 18000
@@ -632,7 +624,6 @@ class BatteryRobot(NorthC9):
         second_component = args[1]
 
         vols = self.calc_vol(args)
-
         
         for chemical, conc in args:
             self.goto_safe(rack_source_official[self.source_rack[chemical]])
@@ -715,6 +706,21 @@ class BatteryRobot(NorthC9):
             water = (Rs * second)/target2-1
             total = (Rf+Rs+water)
             return Rf/total,Rs/total, water/total
+
+    def gram_to_mol(self, solutes: list, solvent_vol: float):
+        """
+        Given mass of solutes in grams and solvent volume, return concentration of each solute 
+        solutes is a list of tuples - [(solute1, mass1), (solute2, mass2)] - where soluteX is 
+        the chemical formula of the solute
+        """
+        mols = []
+
+        for solute, mass in solutes:
+            mol_mass = Formula(solute).mass
+            mol = mass/mol_mass
+            mols.append((solute, mol/solvent_vol))
+
+        return mols
 
     def next_water_source(self, required_amount):
         """
@@ -868,33 +874,81 @@ class BatteryRobot(NorthC9):
         if self.pip_id >= 48:
             self.pip_id = 0
 
-    def map_source_rack(self, csv_path):
+    def initialize_deck(self, disp_rack_path, source_rack_path, heat_rack_path):
         """
-        Creates SourceRack object as defined in settings folder. See settings/source_rack.py for details
-        Maps using the csv given. csv_path should be a path to a csv file that simulates the source_rack grid and its contents
+        Initialize deck by mapping rack contents
+        """
+        self.map_disp_rack(disp_rack_path)
+        self.map_source_rack(source_rack_path)
+        self.map_heat_rack(heat_rack_path)
+        self.deck_initialized = True
+
+    def map_disp_rack(self, csv_path):
+        """
+        Creates DispRack object as defined in config folder. See config/disp_rack.py for details
+        Maps using the csv given. csv_path should be a path to a csv file that simulates the disp_rack grid and its contents
         """
         df = pd.read_csv(csv_path, header=None)
+        self.disp_rack_df = df
+
         df = df.iloc[:, ::-1]
         vials = []
         vols = []
-        indexes = []
-        i = 0
+        concs = []
+        for col in df:
+            for el in df[col]:
+                if el == 'x' or el == 'e' or el == 'n': # x to signify robot cannot reach position. e means vial at index is empty, n means no vial at given index. 
+                    vials.append(el)
+                    vials.append(0)
+                    vials.append(0)
+            
+                else: 
+                    if len(el.split()) != 3:
+                        raise Exception("Each element needs to have 3 items: vial_name, volume, and concentration")       
+
+                    vial, vol, conc = el.split()
+                    vials.append(vial)
+                    vols.append(vol)
+                    concs.append(conc)
+
+        self.disp_rack = DispRack()
+
+    def map_source_rack(self, csv_path):
+        """
+        Creates SourceRack object as defined in config folder. See config/source_rack.py for details
+        Maps using the csv given. csv_path should be a path to a csv file that simulates the source_rack grid and its contents
+        """
+        df = pd.read_csv(csv_path, header=None)
+        self.source_rack_df = df
+        df = df.iloc[:, ::-1]
+        vials = []
+        vols = []
+        concs = []
         for col in df:
             for el in df[col]:
                 if el == 'x' or el == 'e': # x to signify robot cannot reach position. e means vial at index is empty 
-                    i += 1
-                    continue
-            
-                if len(el.split()) != 2:
-                    raise Exception("Each element needs to have 2 items: vial_name and volume")       
+                    vials.append(el)
+                    vials.append(0)
+                    vials.append(0)
+                else:
+                    if len(el.split()) != 3:
+                        raise Exception("SourceRack: Each element needs to have 3 items - vial_name, volume, and concentration")       
 
-                vial, vol = el.split()
-                vials.append(vial)
-                vols.append(vol)
-                indexes.append(i)
-                i += 1             
+                    vial, vol, conc = el.split()
+                    vials.append(vial)
+                    vols.append(float(vol))
+                    concs.append(float(conc))
                 
-        self.source_rack = SourceRack(vials, vols, indexes)
+        self.source_rack = SourceRack(vials, vols, concs)
+
+    def map_heat_rack(self, csv_path):
+        """
+        Creates DispRack object as defined in config folder. See config/disp_rack.py for details
+        Maps using the csv given. csv_path should be a path to a csv file that simulates the disp_rack grid and its contents
+        """
+        df = pd.read_csv(csv_path, header=None)
+        self.heat_rack_df = df
+        self.heat_rack = HeatRack()
 
     def map_water_source(self, locs = None, vols = None, csv_path = None):
         """
