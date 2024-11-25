@@ -12,7 +12,7 @@ from utils.PStat.geis import *
 from utils.PStat.cv import *
 from temper_windows import TemperWindows
 import numpy as np
-rob = BatteryRobot('A', network_serial='AU06EZ1P', home = True)
+rob = BatteryRobot('A', network_serial='AU06EZ1P', home = False)
 t8 = T8('B', network = rob.network) # heat water vial 
 
 # rob.move_carousel(0,0)
@@ -65,7 +65,7 @@ def draw_test3(index, test_name, special=False, slow = True):
     else:
         rob.uncap_vial_in_carousel()
     rob.draw_to_sensor(index,second_sensor = True, viscous = slow, special=special)
-    run_cv2(test_name,[[0, 2, -2, 0], [0.005, 0.005, 0.005], [0.005, 0.005, 0.005], 1, 0.1])
+    run_cv2(test_name,[[0, 2, -2, 0], [0.005, 0.005, 0.005], [0.05, 0.05, 0.05], 1, 0.1])
 
     
 def test_three_times(index,test_name, special, slow = True):
@@ -134,15 +134,15 @@ def CV_tests():
     rob.set_output(6, True) #means 3 electrode
     rob.set_output(7, True)
     rob.set_output(8, True)
-    test_three_times3(index= 0, test_name = "Test1_", special=True, slow = True)
+    test_three_times3(index= 0, test_name = "Test1_range7_", special=True, slow = True)
     rob.purge(waters[12], n_pumps=7, speed = 22)
     rob.purge(waters[11], n_pumps=7, speed = 22)
     rob.purge(waters[10], n_pumps=7, speed = 22)
-    test_three_times3(index= 1, test_name = "Test2_", special=True, slow = True)
+    test_three_times3(index= 1, test_name = "Test2_range7_", special=True, slow = True)
     rob.purge(waters[9], n_pumps=7, speed = 22)
     rob.purge(waters[8], n_pumps=7, speed = 22)
     rob.purge(waters[7], n_pumps=7, speed = 22)
-    test_three_times3(index= 0, test_name = "Test3_", special=True, slow = True)
+    test_three_times3(index= 0, test_name = "Test3_range7_", special=True, slow = True)
     rob.set_output(6, False) 
     rob.set_output(7, False)
     rob.set_output(8, False)

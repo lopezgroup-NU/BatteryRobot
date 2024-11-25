@@ -26,7 +26,7 @@ class DispRack():
 
     """
     
-    def __init__(self, vials, vols, concs):
+    def __init__(self, vials, vols, concs, csv_path):
         #no duplicates
         if len(vials) != len(set(vials)):
             raise Exception("No duplicates!")
@@ -44,6 +44,8 @@ class DispRack():
 
                 #map grid to vial name. convert index to grid, then match to vial name 
                 setattr(self, self.index_to_grid(i), vials[i])
+
+        self.csv_path = csv_path
 
     def index_to_grid(self, index):
         """

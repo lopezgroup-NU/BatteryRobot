@@ -19,8 +19,8 @@ class HeatRack():
     11 8 5 2
     """
     
-    def __init__(self):
-        pass
+    def __init__(self, csv_path):
+        self.csv_path = csv_path
 
     def index_to_grid(self, index):
         """

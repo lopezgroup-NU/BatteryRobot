@@ -911,7 +911,7 @@ class BatteryRobot(NorthC9):
                     vols.append(vol)
                     concs.append(conc)
 
-        self.disp_rack = DispRack()
+        self.disp_rack = DispRack(vials, vols, concs, csv_path)
 
     def map_source_rack(self, csv_path):
         """
