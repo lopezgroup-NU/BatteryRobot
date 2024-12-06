@@ -1,10 +1,13 @@
+import pandas as pd
+from utils.ExceptionUtils import *
+
 class SourceRack():
     """
     mapping solutions to indexes of rack_source_official 
 
     Input mapping strings to map contents to vials of asp_rack
     
-    vial indexing is as follows. The entire rack is a 6x5 grid. However, some slots contain no vials,
+    vial indexing is as follows. The entire rack is a 6x5 pos. However, some slots contain no vials,
     as the robot arm cannot reach them. Rows are labelled 1-6, Columns are labelled A-E (right to left)
     
     SourceRack slots:               SourceRack (v means vial, x means no vial):
@@ -53,47 +56,79 @@ class SourceRack():
     concs = "0.5 0.1" 
     
     means 10ml of fluids in the vial named KCl1 at 0.5M, and 5ml of fluids in the vial named KCl2 at 0.1M. 
-
     """
     
-    def __init__(self, vials, vols, concs, csv_path):        
-        #no duplicates 
-        if len(vials) != len(set(vials)):
-            raise Exception("No duplicate names!")
-        
-        for i in range(len(vials)):
-            #map vial name to index
-            if vials[i] != "e" or vials[i] != "x":
-                setattr(self, vials[i], i)
-
-                #map vial volumes
-                setattr(self, vials[i] + "_vol", int(vols[i]))
-
-                #map vial concentrations
-                setattr(self, vials[i] + "_conc", int(concs[i]))
-
-                #map grid to vial name. convert index to grid, then match to vial name 
-                setattr(self, self.index_to_grid(i), vials[i])
-
-        self.csv_path = csv_path
+    rack_max_index = 29
+    name = "SourceRack"
     
-    def index_to_grid(self, index):
+    def __init__(self, csv_path):
+        #no duplicates
+        df = pd.read_csv(csv_path, header=None)
+        self.source_rack_df = df
+        self.csv_path_updated = csv_path + "_updated" #when rack state is updated, store df here
+
+        self.invalid_index = set()
+        vials = set()
+
+        i = 0 #track index
+        df = df.iloc[:, ::-1]
+        for col in df:
+            for el in df[col]:
+                if i > self.rack_max_index:
+                    raise InitializationError(f"{self.name}: Too many indexes, fix rack csv file.")
+
+                if el == 'x': # x to signify robot cannot reach position. n means no vial at given index. 
+                    self.invalid_index.add(i)
+                elif el == 'e':
+                    pass
+                else: 
+                    if len(el.split()) != 3:
+                        raise InitializationError(f"{self.name}: Each vial with contents must have 3 items: vial_name, volume, and concentration")       
+
+                    vial, vol, conc = el.split()
+
+                    if vial in vials:
+                        raise InitializationError(f"{self.name}: No duplicate vial names!")
+
+                    #map vial to index
+                    setattr(self, vial + "_id", i)
+
+                    #map vial volumes
+                    setattr(self, vial + "_vol", float(vol))
+
+                    #map vial concentrations
+                    setattr(self, vial + "_conc", float(conc))
+
+                    try:
+                        #map pos to vial name. convert index to pos, then match to vial name 
+                        setattr(self, self.index_to_pos(i), vial)
+
+                        #map vial name to pos position
+                        setattr(self, vial + "_pos", self.index_to_pos(i))
+
+                    except Exception as e:
+                        raise InitializationError(f"{self.name}: Error when mapping. Ensure csv is formatted correctly. {e}")
+
+                    vials.add(vial)
+
+                i += 1
+    
+    def index_to_pos(self, index):
         """
-        Given index (0 to 29) returns grid position (A1 - E6)
+        Given index (0 to 29) returns position (A1 - E6)
         """
-        if index < 0 or index > 29:
-            raise Exception("SourceRack: Enter valid grid index!")
+        if index < 0 or index > 29 or index in self.invalid_index:
+            raise ContinuableRuntimeError(f"{self.name}: Enter valid grid index!")
         
         cols = ["A", "B", "C", "D", "E"]
         return cols[index//6] + str(index % 6 + 1)
     
-    def grid_to_index(self, coordinate):
+    def pos_to_index(self, coordinate):
         """
-        Given grid position (A1 - E6) return index (0 to 29)
+        Given position (A1 - E6) return index (0 to 29)
         """
         if coordinate[0] not in ["A", "B", "C", "D", "E"] or coordinate[1] not in ["1", "2", "3", "4", "5", "6"]:
-            print("Enter valid coordinates!")
-            return -1 
+            raise ContinuableRuntimeError(f"{self.name}: Enter valid position!")
 
         mapping = {
             "A": 0,
@@ -102,8 +137,13 @@ class SourceRack():
             "D": 3,
             "E": 4
         }
-        return mapping[coordinate[0]] * 6 + int(coordinate[1])
-        
+
+        index = mapping[coordinate[0]] * 6 + int(coordinate[1]) - 1
+
+        if index in self.invalid_index:
+            raise ContinuableRuntimeError(f"{self.name}: Enter valid position!")
+        else:
+            return index 
 #demo        
 if __name__ == "__main__":
     pass

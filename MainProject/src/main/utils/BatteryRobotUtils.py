@@ -11,6 +11,9 @@ from molmass import Formula
 from .PowderShakerUtils import PowderShaker
 from config import powder_protocols, SourceRack, HeatRack, DispRack, PowderProtocol
 import heapq
+from .ExceptionUtils import *
+from utils.PStat.geis import *
+from utils.PStat.cv import *
 
 class BatteryRobot(NorthC9):
     """
@@ -32,7 +35,7 @@ class BatteryRobot(NorthC9):
     pip_id = 0
     #maps rack_disp_official indexes to their vial's volume(ml)
     solution_vols = {
-        0: 6,
+        0: 7,
         1: 8,
         2: 8,
         3: 8,
@@ -43,8 +46,12 @@ class BatteryRobot(NorthC9):
         9: 8,
         15: 8,
     } 
+
+
+
     #stores index:volume_remaining for each water source for purging. index in relation to disp_rack
     purge_sources = {}
+    deck_initialized = False
 
     def __init__(self, address, network_serial, home=False):
         """
@@ -69,100 +76,211 @@ class BatteryRobot(NorthC9):
         """
         pass
 
-    def run(self, run_file):
+    def run_formulation(self, run_file):
         """
-        Takes input file path to a csv containing test details. Synthesizes and tests each specified formulation.
+        Takes input file path to a csv containing test details. Synthesizes each specified formulation.
         """
         if not self.deck_initialized:
             raise Exception("Initialize deck first! Use initialize_deck()")
         
-
-        heating_tasks = ()
+        heating_tasks = []
         heapq.heapify(heating_tasks)
 
         df = pd.read_csv(run_file)  
         for experiment in df.itertuples():
+            try:
+                #main experiment body that i escape from when a vial is done heating
+                #solids
+                has_solids = pd.notna(experiment.Solids)
+                has_liquids = pd.notna(experiment.Sources)
+                collect = True
 
-            #main experiment body that i escape from when a vial is done heating
-            #solids
-            has_solids = pd.notna(experiment.Solids)
-            has_liquids = pd.notna(experiment.Sources)
-            collect = True
+                target_pos = experiment.Target_vial
+                target_index = self.disp_rack.pos_to_index(target_pos)
 
-            target_pos = experiment.Target_vial
-            target_index = self.disp_rack.grid_to_index(target_pos)
+                if has_solids: 
+                    solid_list = experiment.Solids.split()
+                    mass_list = experiment.Weights_g.split()
+                    mass_list = [float(mass) for mass in mass_list]
 
-            if has_solids: 
-                solid_list = experiment.Solids.split()
-                mass_list = experiment.Weights_g.split()
-                mass_list = [float(mass) for mass in mass_list]
+                    if len(solid_list) != len(mass_list):
+                        raise ContinuableRuntimeError(f"Experiment {experiment.Experiment}: Length mismatch in solid list and mass list ")
 
-                if len(solid_list) != len(mass_list):
-                    raise Exception(f"Experiment {experiment.Experiment}: Length mismatch in solid list and mass list ")
+                    for i, solid in enumerate(solid_list):
+                        mass = mass_list[i]
+                        ret = True if ((i == len(solid_list) - 1) and (not has_liquids)) else False
+                        self.dispense_powder_and_scale(solid, target_index, mass, collect, ret)
+                        collect = False
+                
+                #liquids
+                if has_liquids:
+                    source_list = experiment.Sources.split()
+                    vol_list = experiment.Volume_mL.split()
+                    vol_list = [float(vol) for vol in vol_list]
 
-                for i, solid in enumerate(solid_list):
-                    mass = mass_list[i]
-                    ret = True if ((i == len(solid_list) - 1) and (not has_liquids)) else False
-                    self.dispense_powder_and_scale(solid, target_index, mass, collect, ret)
-                    collect = False
+                    if len(source_list) != len(vol_list):
+                        raise ContinuableRuntimeError(f"Experiment {experiment.Experiment}: Length mismatch in source list and vol list ")
+
+                    for i, source_pos in enumerate(source_list):
+                        vol = vol_list[i]
+                        ret = True if (i == len(source_list) - 1) else False
+                        source_index = self.source_rack.pos_to_index(source_pos)
+                        self.dispense_liquid_vol(target_index, source_index, vol, collect, ret) #updates source rack contents
+                        collect = False
+
+                        #update disp rack contents 
+                        disp_vial_name = getattr(self.disp_rack, target_pos)
+                        current_vol = getattr(self.disp_rack, disp_vial_name + "_vol")
+                        setattr(self.source_rack, disp_vial_name + "_vol", current_vol + vol)
+
+                #heat and wait for them
+                heatplate_pos = experiment.Heat
+                heatplate_index = self.heat_rack.pos_to_index(heatplate_pos)
+                heat_time = float(experiment.Time_h) * 3600 # convert to seconds
+                self.move_vial(rack_disp_official[target_index], heatplate_official[heatplate_index])
+                #store in binary heap as tuple - binary heap autosorts everytime you insert
+                heapq.heappush(heating_tasks, (time.time()+heat_time, heatplate_index, target_index))
             
-            #liquids
-            if has_liquids:
-                source_list = experiment.Sources.split()
-                vol_list = experiment.Volume_mL.split()
-                vol_list = [float(vol) for vol in vol_list]
-
-                if len(solid_list) != len(vol_list):
-                    raise Exception(f"Experiment {experiment.Experiment}: Length mismatch in source list and vol list ")
-
-                for i, source_pos in enumerate(source_list):
-                    vol = vol_list[i]
-                    ret = True if (i == len(source_list) - 1) else False
-                    source_index = self.source_rack.grid_to_index(source_pos)
-                    self.dispense_liquid_vol(target_index, source_index, vol, collect, ret)
-                    collect = False
-
-                    #update source rack contents 
-                    source_vial_name = getattr(self.source_rack, source_pos)
-                    current_vol = getattr(self.source_rack, source_vial_name + "_vol")
-                    setattr(self.source_rack, source_vial_name + "_vol", current_vol - vol)
-                    
-                    #update disp rack contents 
-                    disp_vial_name = getattr(self.disp_rack, target_pos)
-                    current_vol = getattr(self.disp_rack, disp_vial_name + "_vol")
-                    setattr(self.source_rack, disp_vial_name + "_vol", current_vol + vol)
-
-            
-            #heat and wait for them
-            heatplate_pos = experiment.Heat
-            heatplate_index = HeatRack.grid_to_index(heatplate_pos)
-            heat_time = float(experiment.Time_h) * 3600 # convert to seconds
-            self.move_vial(rack_disp_official[target_index],heatplate_official[heatplate_index])
-
-            #store in binary heap as tuple - binary heap autosorts everytime you insert
-            heapq.heappush(heating_tasks, (time.time()+heat_time, heatplate_index, target_index))
-
+            except ContinuableRuntimeError as e:
+                response = input(f"{e}. Unable to synthesize current experiment. Continue with others? Yes/No")
+                if response.upper() == "YES":
+                    continue
+                elif response.upper() == "NO":
+                    break
+                
             vials_to_remove = True
             while heating_tasks and vials_to_remove:
-                soonest = heating_tasks[0]
-                time_done = soonest[0]
-                if time_done <= time.time():
-                    heated_vial = heapq.heappop(heating_tasks)
-                    heatplate_index, target_index = heated_vial[1], heated_vial[2]
-                    self.move_vial(heatplate_official[heatplate_index], rack_disp_official[target_index])
+                if heating_tasks:
+                    soonest = heating_tasks[0]
+                    time_done = soonest[0]
+                    if time_done <= time.time():
+                        heated_vial = heapq.heappop(heating_tasks)
+                        heatplate_index, target_index = heated_vial[1], heated_vial[2]
+                        self.move_vial(heatplate_official[heatplate_index], rack_disp_official[target_index])
+                    else:
+                        vials_to_remove = False
                 else:
                     vials_to_remove = False
 
-        print("Some vials still heating. Check every 60 seconds to see if any are done")
         while heating_tasks:
-            soonest = heating_tasks[0]
+            print("Some vials still heating. Check every 60 seconds to see if any are done")
+            soonest = heating_tasks[0] #next vial to be done heating
             time_done = soonest[0]
             if time_done <= time.time():
                 heated_vial = heapq.heappop(heating_tasks)
                 heatplate_index, target_index = heated_vial[1], heated_vial[2]
                 self.move_vial(heatplate_official[heatplate_index], rack_disp_official[target_index])
-            time.sleep(60)
+            else: # if soonest vial isn't ready yet, wait 60 seconds
+                time.sleep(60)
         print("Done running!")
+
+    def run_test(self, run_file):
+        '''Runs the testing files'''
+        df = pd.read_csv(run_file)  
+
+        #way to control purge for now
+        waters = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'] 
+        full = [1,1,1,1,1,1,1,1,1,1,1,1]
+
+        for test in df.itertuples():
+            try:
+                index = self.disp_rack.pos_to_index(test.Reagent)
+                GEIS = True if test.GEIS else False
+                CV = True if test.CV else False
+                CE = True if test.CE else False
+                output_file_name = test.Test_Name
+
+                if GEIS and CV:
+
+                    print(test)
+                    if len(test.GEIS_Conditions.split()) != 3:
+                        raise ContinuableRuntimeError("GEIS_CONDITIONS must have 3 parameters!")
+                    if len(test.CV_Conditions.split()) != 3:
+                        raise ContinuableRuntimeError("CV_CONDITIONS must have 3 parameters!")
+                    
+                    init_freq, final_freq, amp = [float(i) for i in test.GEIS_Conditions.split()]
+                    point1, point2, rate = [float(i) for i in test.CV_Conditions.split()]
+
+                    geis_parameter_list = {
+                        "initial_freq": init_freq,
+                        "final_freq": final_freq,
+                        "ac_current": amp           #AC current amplitude
+                    }
+
+                    for i in range(3):
+                        self.move_vial(rack_disp_official[index], vial_carousel)
+                        self.goto_safe(safe_zone)
+                        self.draw_to_sensor(index, viscous = True, special = True)
+                        self.set_output(6, False) 
+                        self.set_output(7, False)
+                        self.set_output(8, False)
+                        run_geis(output_file_name=output_file_name + f"_geis{i}", parameter_list= geis_parameter_list)
+                        self.draw_sensor1to2(index, viscous = True)
+                        self.set_output(6, True) 
+                        self.set_output(7, True)
+                        self.set_output(8, True)
+                        run_cv2(output_file_name=output_file_name + f"_cv{i}", values = [[0, point1, point2, 0],[rate, rate, rate], [0.05, 0.05, 0.05], 1, 0.1] )
+                        self.set_output(6, False) 
+                        self.set_output(7, False)
+                        self.set_output(8, False)      
+
+                #find a way to log the CV results in the summaries
+
+                elif GEIS:
+                    self.move_vial(rack_disp_official[index], vial_carousel)
+                    if len(test.GEIS_Conditions.split()) != 3:
+                        raise ContinuableRuntimeError("GEIS_CONDITIONS must have 3 parameters!")
+                    init_freq, final_freq, amp = [float(i) for i in test.GEIS_Conditions.split()]
+
+                    geis_parameter_list = {
+                        "initial_freq": init_freq,
+                        "final_freq": final_freq,
+                        "ac_current": amp
+                    }
+                    self.set_output(6, False) 
+                    self.set_output(7, False)
+                    self.set_output(8, False)
+                    self.draw_to_sensor(index, viscous = True, special = True)
+                    run_geis(output_file_name=output_file_name + "_geis", parameter_list= geis_parameter_list)
+
+                elif CV:
+                    self.move_vial(rack_disp_official[index], vial_carousel)
+                    if len(test.CV_CONDITIONS.split()) != 3:
+                        raise ContinuableRuntimeError("CV_CONDITIONS must have 3 parameters!")
+                    
+                    # pass point1, pooint2, rate to run_cv2 (cuz idk what theyre supposed to be)
+                    point1, point2, rate = [float(i) for i in test.CV_Conditions.split()]
+                    self.draw_to_sensor(index, second_sensor=True)
+                    self.set_output(6, True) 
+                    self.set_output(7, True)
+                    self.set_output(8, True)
+                    run_cv2(output_file_name=output_file_name + "_cv", values = [[0, point1, point2, 0],[rate, rate, rate], [0.05, 0.05, 0.05], 1, 0.1] )
+                    self.set_output(6, False) 
+                    self.set_output(7, False)
+                    self.set_output(8, False)
+                    
+
+            except ContinuableRuntimeError as e:
+                response = input(f"{e}. Unable to run current test. Continue with others? Yes/No")
+                if response.upper() == "YES":
+                    continue
+                elif response.upper() == "NO":
+                    break
+                    
+            for index in range(len(full)):
+                if full[index:index+3] == [1,1,1]:  
+                    cleaning = waters[index:index+3]  
+                    for i in range(index, index + 3):
+                        full[i] = 0
+                    break
+
+            index1 = self.disp_rack.pos_to_index(cleaning[0])
+            index2 = self.disp_rack.pos_to_index(cleaning[1])
+            index3 = self.disp_rack.pos_to_index(cleaning[2])
+            self.purge(index1, n_pumps=7, speed = 22)
+            self.purge(index2, n_pumps=7, speed = 22)
+            self.purge(index3, n_pumps=7, speed = 22)
+
 
     def dispense_powder_and_scale(self, protocol, dest_id, mass, collect = False, ret = True):
         """
@@ -206,7 +324,7 @@ class BatteryRobot(NorthC9):
         data["Time Taken(s)"]= t_taken
         return data
     
-    def dispense_liquid_vol(self, dest_id, source, target_vol, collect = False, ret = True):
+    def dispense_liquid_vol(self, dest_id, source_id, target_vol, collect = False, ret = True):
         """
         Dispense {target_vol}ml of liquid into vial with id {dest_id} from vials with id {source_id}.
         Destination vials are from rack_dispense_official while source_vials are from rack_pipette_aspirate
@@ -217,7 +335,7 @@ class BatteryRobot(NorthC9):
            drawing liquid 
         """
         self.check_remove_pipette()
-        self.goto_safe(rack_source_official[getattr(self.source_rack, source)])
+        self.goto_safe(rack_source_official[source_id])
         cap_holder_id = self.move_cap_to_holder()
         
         if collect:
@@ -228,19 +346,21 @@ class BatteryRobot(NorthC9):
         self.uncap_vial_in_carousel()
         self.get_pipette()
         self.zero_scale()
-        
+       
         remaining = target_vol 
+    
+        source_name = getattr(self.source_rack, self.source_rack.index_to_pos(source_id))
         while remaining > 0:
             rack = p_asp_high
-            
-            if getattr(self.source_rack, source + "_vol") <= 4:
+            curr_vol = getattr(self.source_rack, source_name + "_vol")
+            if curr_vol <= 4:
                 rack = p_asp_low
-            elif getattr(self.source_rack, source + "_vol") <= 6:
+            elif curr_vol <= 6:
                 rack = p_asp_mid
             
-            self.goto_safe(rack[getattr(self.source_rack, source)])
+            self.goto_safe(rack[source_id])
             amount = min(remaining, 1)
-            self.aspirate_ml(3, amount)
+            self.aspirate_ml(3, amount) 
             if amount < 1:
                 self.move_z(200)
                 self.aspirate_ml(3, 1 - amount)
@@ -249,11 +369,8 @@ class BatteryRobot(NorthC9):
             self.dispense_ml(3, 1)
             self.delay(.5)
             remaining -= 1
-            
-            setattr(self.source_rack,
-                    source + "_vol",
-                    getattr(self.source_rack, source + "_vol") - amount
-                    )
+            setattr(self.source_rack, source_name + "_vol", curr_vol - amount)
+
         dispensed = self.read_steady_scale()   
         self.goto_safe(safe_zone)
         self.remove_pipette()
@@ -267,7 +384,7 @@ class BatteryRobot(NorthC9):
             self.open_gripper()
             self.open_clamp()
         
-        self.move_cap_from_holder(source, cap_holder_id)
+        self.move_cap_from_holder(source_id, cap_holder_id)
         
         data = {}
         data["Vial ID"] = dest_id 
@@ -281,7 +398,7 @@ class BatteryRobot(NorthC9):
         Dispense liquid based on target mass
         """
         self.check_remove_pipette()
-        self.goto_safe(rack_source_official[getattr(self.source_rack, source)])
+        self.goto_safe(rack_source_official[getattr(self.source_rack, str(source))])
         cap_holder_id = self.move_cap_to_holder()
         
         if collect:
@@ -753,12 +870,12 @@ class BatteryRobot(NorthC9):
         else:
             raise Exception("Cap holders are taken!")
         
-        self.cap(torque_thresh = 600)    
+        self.cap(torque_thresh = 550)    
         self.open_gripper()
         
         return cap_holder_id
     
-    def move_cap_from_holder(self, source, cap_holder_id):
+    def move_cap_from_holder(self, source_id, cap_holder_id):
         """
         Helper function to move cap from holder back to source vial
         """
@@ -772,7 +889,7 @@ class BatteryRobot(NorthC9):
         self.close_gripper()
         self.delay(.5)
         self.uncap()
-        self.goto_safe(rack_source_official_approach[getattr(self.source_rack, source)])
+        self.goto_safe(rack_source_official_approach[source_id])
         self.cap(torque_thresh = 600)
         self.open_gripper()
         self.goto_safe(safe_zone)
@@ -792,8 +909,8 @@ class BatteryRobot(NorthC9):
     def cap_and_return_vial_to_rack(self, dest_id, rack = rack_disp_official):
         """
         Simple helper function for when procedures in the carousel have been completed.
-        This function caps the vial, and returns it to its original position.
-        Takes in the vial's position on the dispense section of the main rack and returns it there 
+        This function takes in the vial's index and a given rack, caps the vial, and moves it 
+        to the specified rack's index.
         """
         #cap and return to rack
         self.move_carousel(0,0)
@@ -845,7 +962,6 @@ class BatteryRobot(NorthC9):
         self.goto_safe(safe_zone) # go to safe zone
         self.holding_pipette = True
 
-
     def check_remove_pipette(self):
         """
         If robot is holding pipette, remove it
@@ -853,7 +969,6 @@ class BatteryRobot(NorthC9):
         if self.holding_pipette:
             print("Rob is holding pipette! Removing pipette...")
             self.remove_pipette()      
-
 
     def remove_pipette(self):
         """
@@ -878,77 +993,15 @@ class BatteryRobot(NorthC9):
         """
         Initialize deck by mapping rack contents
         """
-        self.map_disp_rack(disp_rack_path)
-        self.map_source_rack(source_rack_path)
-        self.map_heat_rack(heat_rack_path)
-        self.deck_initialized = True
+        try:
+            self.disp_rack = DispRack(disp_rack_path)
+            self.source_rack = SourceRack(source_rack_path)
+            self.heat_rack = HeatRack(heat_rack_path)
+            self.deck_initialized = True
+        except InitializationError as e:
+            print(e)
+            print("Fix the rack csvs and try again.")
 
-    def map_disp_rack(self, csv_path):
-        """
-        Creates DispRack object as defined in config folder. See config/disp_rack.py for details
-        Maps using the csv given. csv_path should be a path to a csv file that simulates the disp_rack grid and its contents
-        """
-        df = pd.read_csv(csv_path, header=None)
-        self.disp_rack_df = df
-
-        df = df.iloc[:, ::-1]
-        vials = []
-        vols = []
-        concs = []
-        for col in df:
-            for el in df[col]:
-                if el == 'x' or el == 'e' or el == 'n': # x to signify robot cannot reach position. e means vial at index is empty, n means no vial at given index. 
-                    vials.append(el)
-                    vials.append(0)
-                    vials.append(0)
-            
-                else: 
-                    if len(el.split()) != 3:
-                        raise Exception("Each element needs to have 3 items: vial_name, volume, and concentration")       
-
-                    vial, vol, conc = el.split()
-                    vials.append(vial)
-                    vols.append(vol)
-                    concs.append(conc)
-
-        self.disp_rack = DispRack(vials, vols, concs, csv_path)
-
-    def map_source_rack(self, csv_path):
-        """
-        Creates SourceRack object as defined in config folder. See config/source_rack.py for details
-        Maps using the csv given. csv_path should be a path to a csv file that simulates the source_rack grid and its contents
-        """
-        df = pd.read_csv(csv_path, header=None)
-        self.source_rack_df = df
-        df = df.iloc[:, ::-1]
-        vials = []
-        vols = []
-        concs = []
-        for col in df:
-            for el in df[col]:
-                if el == 'x' or el == 'e': # x to signify robot cannot reach position. e means vial at index is empty 
-                    vials.append(el)
-                    vials.append(0)
-                    vials.append(0)
-                else:
-                    if len(el.split()) != 3:
-                        raise Exception("SourceRack: Each element needs to have 3 items - vial_name, volume, and concentration")       
-
-                    vial, vol, conc = el.split()
-                    vials.append(vial)
-                    vols.append(float(vol))
-                    concs.append(float(conc))
-                
-        self.source_rack = SourceRack(vials, vols, concs)
-
-    def map_heat_rack(self, csv_path):
-        """
-        Creates DispRack object as defined in config folder. See config/disp_rack.py for details
-        Maps using the csv given. csv_path should be a path to a csv file that simulates the disp_rack grid and its contents
-        """
-        df = pd.read_csv(csv_path, header=None)
-        self.heat_rack_df = df
-        self.heat_rack = HeatRack()
 
     def map_water_source(self, locs = None, vols = None, csv_path = None):
         """

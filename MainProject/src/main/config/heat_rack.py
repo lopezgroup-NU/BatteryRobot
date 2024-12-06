@@ -1,3 +1,6 @@
+import pandas as pd
+from utils.ExceptionUtils import *
+
 class HeatRack():
     """
     mapping solutions to indexes of heatplate_official
@@ -18,33 +21,36 @@ class HeatRack():
     10 7 4 1
     11 8 5 2
     """
+    rack_max_index = 11
+    name = "HeatRack"
     
     def __init__(self, csv_path):
-        self.csv_path = csv_path
+        df = pd.read_csv(csv_path, header=None)
+        self.heat_rack_df = df
+        self.csv_path_updated = csv_path + "_updated" #when rack state is updated, store df here
 
-    def index_to_grid(self, index):
+    def index_to_pos(self, index):
         """
-        Given index (0 to 11) returns grid position (A1 - D3)
+        Given index (0 to 11) returns position (A1 - D3)
         """
         if index < 0 or index > 11:
-            print("Enter valid index!")
-            return 
+            raise ContinuableRuntimeError(f"{self.name}: Enter valid grid index!")
 
-        cols = ["D", "C", "B", "A"]
+
+        cols = ["A", "B", "C", "D"]
         return cols[index//3] + str(index % 3 + 1)
     
-    def grid_to_index(self, coordinate):
+    def pos_to_index(self, coordinate):
         """
-        Given grid position (A1 - D3) return index (0 to 11)
+        Given position (A1 - D3) return index (0 to 11)
         """
-        if coordinate[0] not in ["D", "C", "B", "A"] or coordinate[1] not in ["1", "2", "3"]:
-            print("Enter valid coordinates!")
-            return -1 
+        if coordinate[0] not in ["A", "B", "C", "D"] or coordinate[1] not in ["1", "2", "3"]:
+            raise ContinuableRuntimeError(f"{self.name}: Enter valid position!")
 
         mapping = {
-            "D": 0,
-            "C": 1,
-            "B": 2,
-            "A": 3,
+            "A": 0,
+            "B": 1,
+            "C": 2,
+            "D": 3,
         }
         return mapping[coordinate[0]] * 3 + int(coordinate[1]) - 1

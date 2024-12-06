@@ -20,7 +20,7 @@ t8 = T8('B', network = rob.network) # heat water vial
 temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
 temperature = temper.get_temperature()
 print(temperature)
-
+rob.initialize_deck('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/config/disp_rack.csv', 'C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/config/source_rack.csv', 'C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/config/heat_rack.csv' )
 #rob.move_electrolyte(True)
 
 #needle alignment rob.move_carousel(33,80) #70 for mid
@@ -134,15 +134,15 @@ def CV_tests():
     rob.set_output(6, True) #means 3 electrode
     rob.set_output(7, True)
     rob.set_output(8, True)
-    test_three_times3(index= 0, test_name = "Test1_range7_", special=True, slow = True)
+    test_three_times3(index= 0, test_name = "Test1_range8_", special=True, slow = True)
     rob.purge(waters[12], n_pumps=7, speed = 22)
     rob.purge(waters[11], n_pumps=7, speed = 22)
     rob.purge(waters[10], n_pumps=7, speed = 22)
-    test_three_times3(index= 1, test_name = "Test2_range7_", special=True, slow = True)
+    test_three_times3(index= 1, test_name = "Test2_range8_", special=True, slow = True)
     rob.purge(waters[9], n_pumps=7, speed = 22)
     rob.purge(waters[8], n_pumps=7, speed = 22)
     rob.purge(waters[7], n_pumps=7, speed = 22)
-    test_three_times3(index= 0, test_name = "Test3_range7_", special=True, slow = True)
+    test_three_times3(index= 0, test_name = "Test3_range8_", special=True, slow = True)        
     rob.set_output(6, False) 
     rob.set_output(7, False)
     rob.set_output(8, False)

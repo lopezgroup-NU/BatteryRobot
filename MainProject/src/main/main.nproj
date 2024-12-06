@@ -427,19 +427,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "cap_holder_2_approach": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -96,
-        15731,
-        42271,
-        21676
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
     "cap_holder_1": {
       "type": "Location",
       "tool": 0,
@@ -524,19 +511,6 @@
         26,
         0.0
       ]
-    },
-    "cap_holder_1_approach": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -112,
-        13982,
-        41592,
-        21676
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
     },
     "vial_carousel": {
       "type": "Location",
@@ -677,30 +651,6 @@
         0.0
       ]
     },
-    "rack_source_official_approach": {
-      "type": "Grid",
-      "tool": 0,
-      "counts": [
-        -63,
-        11887,
-        38590,
-        21676
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0,
-      "n": [
-        5,
-        6,
-        1
-      ],
-      "pitch": [
-        26,
-        26,
-        0.0
-      ]
-    },
     "rack_disp_official": {
       "type": "Grid",
       "tool": 0,
@@ -724,6 +674,56 @@
         26,
         0.0
       ]
+    },
+    "cap_holder_2_approach": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -143,
+        15593,
+        42122,
+        21608
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "rack_source_official_approach": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        -63,
+        11887,
+        38590,
+        21776
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0.0,
+      "n": [
+        5,
+        6,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "cap_holder_1_approach": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -162,
+        13803,
+        41336,
+        21700
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
     }
   },
   "sim_inputs": {

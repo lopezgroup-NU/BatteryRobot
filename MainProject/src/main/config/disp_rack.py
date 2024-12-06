@@ -1,3 +1,5 @@
+import pandas as pd
+from utils.ExceptionUtils import *
 class DispRack():
     """
     mapping solutions to indexes of rack_disp_official 
@@ -25,45 +27,77 @@ class DispRack():
     47 41 35 29 23 17 11 5 
 
     """
-    
-    def __init__(self, vials, vols, concs, csv_path):
+    rack_max_index = 47
+    name = "DispRack"
+
+    def __init__(self, csv_path):
         #no duplicates
-        if len(vials) != len(set(vials)):
-            raise Exception("No duplicates!")
-        
-        for i in range(len(vials)):
-            #map vial name to index
-            if vials[i] != "n" or vials[i] != "x":
-                setattr(self, vials[i], i)
+        df = pd.read_csv(csv_path, header=None)
+        self.disp_rack_df = df
+        self.csv_path_updated = csv_path + "_updated" #when rack state is updated, store df here
 
-                #map vial volumes
-                setattr(self, vials[i] + "_vol", int(vols[i]))
+        self.invalid_index = set()
+        vials = set()
 
-                #map vial concentrations
-                setattr(self, vials[i] + "_conc", int(concs[i]))
+        i = 0 #track index
+        df = df.iloc[:, ::-1]
+        for col in df:
+            for el in df[col]:
+                if i > self.rack_max_index:
+                    raise InitializationError(f"{self.name}: Too many indexes, fix rack csv file.")
 
-                #map grid to vial name. convert index to grid, then match to vial name 
-                setattr(self, self.index_to_grid(i), vials[i])
+                if el == 'x': # x means robot cannot reach position. 
+                    self.invalid_index.add(i)
+                elif el == 'e' or el == 'n': # n means no vial at given index. 
+                    pass
+                else: 
+                    if len(el.split()) != 3:
+                        raise InitializationError(f"{self.name}: Each vial with contents must have 3 items: vial_name, volume, and concentration")       
 
-        self.csv_path = csv_path
+                    vial, vol, conc = el.split()
 
-    def index_to_grid(self, index):
+                    if vial in vials:
+                        raise InitializationError(f"{self.name}: No duplicate vial names!")
+
+                    #map vial to index
+                    setattr(self, vial + "_id", i)
+
+                    #map vial volumes
+                    setattr(self, vial + "_vol", float(vol))
+
+                    #map vial concentrations
+                    setattr(self, vial + "_conc", float(conc))
+
+                    try:
+                        #map grid to vial name. convert index to grid, then match to vial name 
+                        setattr(self, self.index_to_pos(i), vial)
+
+                        #map vial name to grid position
+                        setattr(self, vial + "_pos", self.index_to_pos(i))
+
+                    except Exception as e:
+                        raise InitializationError(f"{self.name}: Error when mapping. Ensure csv is formatted correctly. {e}")
+
+                    vials.add(vial)
+
+                i += 1
+
+    def index_to_pos(self, index):
         """
         Given index (0 to 47) returns grid position (A1 - H6)
         """
         if index < 0 or index > 47:
-            raise Exception("DispRack: Enter valid grid index!")
+            raise ContinuableRuntimeError(f"{self.name}: Enter valid grid index!")
 
         cols = ["A", "B", "C", "D", "E", "F", "G", "H"]
         return cols[index//6] + str(index % 6 + 1)
     
-    def grid_to_index(self, coordinate):
+    def pos_to_index(self, coordinate):
         """
         Given grid position (A1 - H6) return index (0 to 47)
         """
         if coordinate[0] not in ["A", "B", "C", "D", "E", "F", "G", "H"] or coordinate[1] not in ["1", "2", "3", "4", "5", "6", "7", "8"]:
-            print("Enter valid coordinates!")
-            return -1 
+            raise ContinuableRuntimeError(f"{self.name}: Enter valid grid position!")
 
         mapping = {
             "A": 0,
@@ -76,3 +110,17 @@ class DispRack():
             "H": 7,
         }
         return mapping[coordinate[0]] * 6 + int(coordinate[1]) - 1
+    
+    def get_vial_name_by_pos(self, pos):
+        if hasattr(self, pos):
+            return getattr()
+
+
+    def set_vial_name_by_pos(self, pos):
+        pass
+
+    def get_vial_by_name(self, name):
+        pass
+
+    def set_vial_by_name(self, name):
+        pass

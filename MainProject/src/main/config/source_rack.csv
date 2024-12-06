@@ -1,6 +1,6 @@
-e,e,e,e,NaCl 8 0.5
-e,e,e,e,KCl 8 1
-e,e,e,e,e
+e,e,H204 8 0,H201 8 0,LiNO3 8 0.5
+e,e,H205 8 0,H202 4 0,LiNO32 5 1
+e,e,H206 8 0,H203 8 0,e
 e,e,e,e,x
 e,e,e,x,x
 e,x,x,x,x

@@ -1,4 +1,4 @@
-Reagents,Concentrations (M),GEIS,GEIS Conditions,CV,CV Conditions,CE
-NaCl KBr,0.5 1.5,TRUE,InitFreq FinalFreq Amp,TRUE,Point1 Point2 Rate,TRUE
-NaI KBr,2 1.5,FALSE,-,TRUE,Point1 Point2 Rate,TRUE
-NaCl KOH,1.5 1.5,TRUE,InitFreq FinalFreq Amp,FALSE,-,TRUE
+Reagent,Test_Name,GEIS,GEIS_Conditions,CV,CV_Conditions,CE
+A1,first,TRUE,InitFreq FinalFreq Amp,TRUE,Point1 Point2 Rate,FALSE
+A2,second,FALSE,-,TRUE,Point1 Point2 Rate,FALSE
+A3,third,TRUE,InitFreq FinalFreq Amp,FALSE,-,FALSE
