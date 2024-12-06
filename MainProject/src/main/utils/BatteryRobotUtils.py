@@ -129,6 +129,7 @@ class BatteryRobot(NorthC9):
                         collect = False
 
                         #update disp rack contents 
+                        #change this to allow for empty parts in disp_rack
                         disp_vial_name = getattr(self.disp_rack, target_pos)
                         current_vol = getattr(self.disp_rack, disp_vial_name + "_vol")
                         setattr(self.source_rack, disp_vial_name + "_vol", current_vol + vol)
@@ -142,7 +143,7 @@ class BatteryRobot(NorthC9):
                 heapq.heappush(heating_tasks, (time.time()+heat_time, heatplate_index, target_index))
             
             except ContinuableRuntimeError as e:
-                response = input(f"{e}. Unable to synthesize current experiment. Continue with others? Yes/No")
+                response = input(f"{e}. \nUnable to synthesize current experiment. Continue with others? Yes/No")
                 if response.upper() == "YES":
                     continue
                 elif response.upper() == "NO":
@@ -609,6 +610,24 @@ class BatteryRobot(NorthC9):
         
         for _ in range(n_pumps):
             self.pump_helper(length = length, v_in = 15, v_out = 5)
+
+    def purge_auto(self, desired_vol = 4):
+        """
+        Loop through purge_sources in disp_rack and find suitable purge vial with adequate water
+        Run purge
+        """
+        purge_vial_found = False
+        for i, purge_vial in enumerate(self.disp_rack.purge_sources):
+            vol, id, _ = purge_vial
+            if vol >= desired_vol:
+                purge_vial_found = True
+                self.disp_rack.purge_sources[i][0] -= desired_vol
+                break 
+
+        if not purge_vial_found:
+            raise CriticalRuntimeError("Error: No more water left to purge!")
+        
+        self.purge(id)
 
     def old_school_purge(self, water_location, speed=30, rack = rack_disp_official, n_pumps = 6, length = 3000):
             """

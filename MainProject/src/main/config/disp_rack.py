@@ -2,7 +2,7 @@ import pandas as pd
 from utils.ExceptionUtils import *
 class DispRack():
     """
-    mapping solutions to indexes of rack_disp_official 
+    mapping solutions to indexes of rack_disp_official.
 
     vial indexing is as follows. The entire rack is a 6x8 grid. 
     
@@ -26,9 +26,17 @@ class DispRack():
     46 40 34 28 22 16 10 4 
     47 41 35 29 23 17 11 5 
 
+    Naming conventions:
+
+    - <vial_name> <vial_vol> <vial_concentration> for non-empty vial
+    - 'purge' if vial is to be used for purging (robot assumes vial is full (8ml))
+    - 'e' for empty vial
+    - 'n' for no vial
+
     """
-    rack_max_index = 47
     name = "DispRack"
+    rack_max_index = 47
+    purge_sources = []
 
     def __init__(self, csv_path):
         #no duplicates
@@ -50,6 +58,9 @@ class DispRack():
                     self.invalid_index.add(i)
                 elif el == 'e' or el == 'n': # n means no vial at given index. 
                     pass
+                elif el == "purge":
+                    #store each purge source as array [volume, index, pos]
+                    self.purge_sources.append([8, i, self.index_to_pos(i)])
                 else: 
                     if len(el.split()) != 3:
                         raise InitializationError(f"{self.name}: Each vial with contents must have 3 items: vial_name, volume, and concentration")       
