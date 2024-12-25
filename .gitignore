@@ -153,6 +153,5 @@ cython_debug/
 
 .DS_Store
 #Gamry things
-PStat
-GamrySetup.docx
 res
+tests
