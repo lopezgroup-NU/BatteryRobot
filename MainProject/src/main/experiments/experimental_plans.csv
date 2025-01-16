@@ -1,4 +1,0 @@
-Reagent,Test_Name,GEIS,GEIS_Conditions,CV,CV_Conditions,CE
-A1,first,TRUE,InitFreq FinalFreq Amp,TRUE,Point1 Point2 Rate,FALSE
-A2,second,FALSE,-,TRUE,Point1 Point2 Rate,FALSE
-A3,third,TRUE,InitFreq FinalFreq Amp,FALSE,-,FALSE

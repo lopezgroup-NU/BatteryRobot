@@ -2,6 +2,7 @@ import sys
 sys.path.append('..')
 sys.path.append(r'C:\Users\llf1362\Documents\NorthIDE\Lib\site-packages')
 
+import os
 import asyncio
 import pandas as pd
 import time, pathlib
@@ -35,19 +36,18 @@ class BatteryRobot(NorthC9):
     pip_id = 0
     #maps rack_disp_official indexes to their vial's volume(ml)
     solution_vols = {
-        0: 7,
-        1: 8,
-        2: 8,
-        3: 8,
-        4: 8,
-        5: 8,
-        7: 8,
-        8: 8,
-        9: 8,
-        15: 8,
+        0: 6,
+        1: 6,
+        2: 4,
+        3: 6,
+        4: 6,
+        5: 6,
+        7: 6,
+        8: 6,
+        9: 6,
+        10: 6,
+        11: 6,
     } 
-
-
 
     #stores index:volume_remaining for each water source for purging. index in relation to disp_rack
     purge_sources = {}
@@ -86,7 +86,15 @@ class BatteryRobot(NorthC9):
         heating_tasks = []
         heapq.heapify(heating_tasks)
 
-        df = pd.read_csv(run_file)  
+        df = pd.read_csv(run_file)
+
+        #start spinner
+        self.spin_axis(6,1200)
+
+        log_file = open("experiments/formulation.log", "a")
+        log_file.write("*" * 50 + "\n")
+        log_file.write(f"Making formulations: {self.curr_time()} \n")
+
         for experiment in df.itertuples():
             try:
                 #main experiment body that i escape from when a vial is done heating
@@ -97,6 +105,7 @@ class BatteryRobot(NorthC9):
 
                 target_pos = experiment.Target_vial
                 target_index = self.disp_rack.pos_to_index(target_pos)
+                log_file.write(f"   Beginning formulation for vial at position {target_pos} at: {self.curr_time()} \n")
 
                 if has_solids: 
                     solid_list = experiment.Solids.split()
@@ -114,8 +123,8 @@ class BatteryRobot(NorthC9):
                 
                 #liquids
                 if has_liquids:
-                    source_list = experiment.Sources.split()
-                    vol_list = experiment.Volume_mL.split()
+                    source_list = str(experiment.Sources).split()
+                    vol_list = str(experiment.Volume_mL).split()
                     vol_list = [float(vol) for vol in vol_list]
 
                     if len(source_list) != len(vol_list):
@@ -158,6 +167,7 @@ class BatteryRobot(NorthC9):
                         heated_vial = heapq.heappop(heating_tasks)
                         heatplate_index, target_index = heated_vial[1], heated_vial[2]
                         self.move_vial(heatplate_official[heatplate_index], rack_disp_official[target_index])
+                        log_file.write(f"Finished making formulation for vial at position {self.disp_rack.index_to_pos(target_index)}:  {self.curr_time()} \n")
                     else:
                         vials_to_remove = False
                 else:
@@ -171,8 +181,17 @@ class BatteryRobot(NorthC9):
                 heated_vial = heapq.heappop(heating_tasks)
                 heatplate_index, target_index = heated_vial[1], heated_vial[2]
                 self.move_vial(heatplate_official[heatplate_index], rack_disp_official[target_index])
+                log_file.write(f"Finished making formulation for vial at position {self.disp_rack.index_to_pos(target_index)}:  {self.curr_time()} \n")
+
             else: # if soonest vial isn't ready yet, wait 60 seconds
                 time.sleep(60)
+
+        log_file.write(f"Finished all formulations: {self.curr_time()} \n")
+        log_file.write("*" * 50 + "\n")
+        log_file.close()
+
+        #turn off spinner
+        self.spin_axis(6,0)
         print("Done running!")
 
     def run_test(self, run_file):
@@ -180,12 +199,18 @@ class BatteryRobot(NorthC9):
         df = pd.read_csv(run_file)  
 
         #way to control purge for now
-        waters = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'] 
-        full = [1,1,1,1,1,1,1,1,1,1,1,1]
+        water_start = 15
+
+        log_file = open("experiments/experiments.log", "a")
+        log_file.write("*" * 50 + "\n")
+        log_file.write(f"Running tests: {self.curr_time()} \n")
 
         for test in df.itertuples():
             try:
-                index = self.disp_rack.pos_to_index(test.Reagent)
+                target_pos = test.Reagent
+                log_file.write(f"   Beginning tests for position {target_pos} at: {self.curr_time()} \n")
+
+                target_index = self.disp_rack.pos_to_index(test.Reagent)
                 GEIS = True if test.GEIS else False
                 CV = True if test.CV else False
                 CE = True if test.CE else False
@@ -209,14 +234,14 @@ class BatteryRobot(NorthC9):
                     }
 
                     for i in range(3):
-                        self.move_vial(rack_disp_official[index], vial_carousel)
+                        self.move_vial(rack_disp_official[target_index], vial_carousel)
                         self.goto_safe(safe_zone)
-                        self.draw_to_sensor(index, viscous = True, special = True)
+                        self.draw_to_sensor(target_index, viscous = True, special = True)
                         self.set_output(6, False) 
                         self.set_output(7, False)
                         self.set_output(8, False)
                         run_geis(output_file_name=output_file_name + f"_geis{i}", parameter_list= geis_parameter_list)
-                        self.draw_sensor1to2(index, viscous = True)
+                        self.draw_sensor1to2(target_index, viscous = True)
                         self.set_output(6, True) 
                         self.set_output(7, True)
                         self.set_output(8, True)
@@ -228,7 +253,7 @@ class BatteryRobot(NorthC9):
                 #find a way to log the CV results in the summaries
 
                 elif GEIS:
-                    self.move_vial(rack_disp_official[index], vial_carousel)
+                    self.move_vial(rack_disp_official[target_index], vial_carousel)
                     if len(test.GEIS_Conditions.split()) != 3:
                         raise ContinuableRuntimeError("GEIS_CONDITIONS must have 3 parameters!")
                     init_freq, final_freq, amp = [float(i) for i in test.GEIS_Conditions.split()]
@@ -241,17 +266,17 @@ class BatteryRobot(NorthC9):
                     self.set_output(6, False) 
                     self.set_output(7, False)
                     self.set_output(8, False)
-                    self.draw_to_sensor(index, viscous = True, special = True)
+                    self.draw_to_sensor(target_index, viscous = True, special = True)
                     run_geis(output_file_name=output_file_name + "_geis", parameter_list= geis_parameter_list)
 
                 elif CV:
-                    self.move_vial(rack_disp_official[index], vial_carousel)
+                    self.move_vial(rack_disp_official[target_index], vial_carousel)
                     if len(test.CV_CONDITIONS.split()) != 3:
                         raise ContinuableRuntimeError("CV_CONDITIONS must have 3 parameters!")
                     
                     # pass point1, pooint2, rate to run_cv2 (cuz idk what theyre supposed to be)
                     point1, point2, rate = [float(i) for i in test.CV_Conditions.split()]
-                    self.draw_to_sensor(index, second_sensor=True)
+                    self.draw_to_sensor(target_index, second_sensor=True)
                     self.set_output(6, True) 
                     self.set_output(7, True)
                     self.set_output(8, True)
@@ -259,7 +284,12 @@ class BatteryRobot(NorthC9):
                     self.set_output(6, False) 
                     self.set_output(7, False)
                     self.set_output(8, False)
-                    
+
+                log_file.write(f"   Finished tests for position {target_pos} at: {self.curr_time()} \n")
+            
+                for _ in range(3):
+                    self.purge(water_start, n_pumps=7, speed = 22)
+                    water_start += 1
 
             except ContinuableRuntimeError as e:
                 response = input(f"{e}. Unable to run current test. Continue with others? Yes/No")
@@ -267,21 +297,10 @@ class BatteryRobot(NorthC9):
                     continue
                 elif response.upper() == "NO":
                     break
-                    
-            for index in range(len(full)):
-                if full[index:index+3] == [1,1,1]:  
-                    cleaning = waters[index:index+3]  
-                    for i in range(index, index + 3):
-                        full[i] = 0
-                    break
 
-            index1 = self.disp_rack.pos_to_index(cleaning[0])
-            index2 = self.disp_rack.pos_to_index(cleaning[1])
-            index3 = self.disp_rack.pos_to_index(cleaning[2])
-            self.purge(index1, n_pumps=7, speed = 22)
-            self.purge(index2, n_pumps=7, speed = 22)
-            self.purge(index3, n_pumps=7, speed = 22)
-
+        log_file.write(f"Finished all formulations: {self.curr_time()} \n")
+        log_file.write("*" * 50 + "\n")
+        log_file.close()
 
     def dispense_powder_and_scale(self, protocol, dest_id, mass, collect = False, ret = True):
         """
@@ -312,7 +331,7 @@ class BatteryRobot(NorthC9):
         else:
             self.close_clamp()
             self.goto_safe(vial_carousel_approach)
-            self.cap(torque_thresh = 600)
+            self.cap(torque_thresh = 500)
             self.open_gripper()
             self.open_clamp()
             self.goto_safe(safe_zone)
@@ -354,6 +373,7 @@ class BatteryRobot(NorthC9):
         while remaining > 0:
             rack = p_asp_high
             curr_vol = getattr(self.source_rack, source_name + "_vol")
+            print(curr_vol)
             if curr_vol <= 4:
                 rack = p_asp_low
             elif curr_vol <= 6:
@@ -361,15 +381,16 @@ class BatteryRobot(NorthC9):
             
             self.goto_safe(rack[source_id])
             amount = min(remaining, 1)
-            self.aspirate_ml(3, amount) 
             if amount < 1:
                 self.move_z(200)
                 self.aspirate_ml(3, 1 - amount)
+                self.goto_safe(rack[source_id])
+            self.aspirate_ml(3, amount) 
             self.delay(.5)
             self.goto_safe(carousel_dispense)
-            self.dispense_ml(3, 1)
+            self.move_pump(3,0)
             self.delay(.5)
-            remaining -= 1
+            remaining -= amount
             setattr(self.source_rack, source_name + "_vol", curr_vol - amount)
 
         dispensed = self.read_steady_scale()   
@@ -381,7 +402,7 @@ class BatteryRobot(NorthC9):
         else:
             self.close_clamp()
             self.goto_safe(vial_carousel_approach)
-            self.cap(torque_thresh = 600)
+            self.cap(torque_thresh = 500)
             self.open_gripper()
             self.open_clamp()
         
@@ -447,7 +468,7 @@ class BatteryRobot(NorthC9):
         else:
             self.close_clamp()
             self.goto_safe(vial_carousel_approach)
-            self.cap(torque_thresh = 600)
+            self.cap(torque_thresh = 500)
             self.open_gripper()
             self.open_clamp()
         
@@ -891,6 +912,7 @@ class BatteryRobot(NorthC9):
         
         self.cap(torque_thresh = 550)    
         self.open_gripper()
+        self.delay(.5)
         
         return cap_holder_id
     
@@ -909,7 +931,7 @@ class BatteryRobot(NorthC9):
         self.delay(.5)
         self.uncap()
         self.goto_safe(rack_source_official_approach[source_id])
-        self.cap(torque_thresh = 600)
+        self.cap(torque_thresh = 500)
         self.open_gripper()
         self.goto_safe(safe_zone)
         
@@ -935,7 +957,7 @@ class BatteryRobot(NorthC9):
         self.move_carousel(0,0)
         self.close_clamp()
         self.goto_safe(vial_carousel_approach)
-        self.cap(torque_thresh = 600)
+        self.cap(torque_thresh = 500)
         self.holding_vial = True
         self.open_clamp()                
         self.goto_safe(rack[dest_id])
@@ -998,6 +1020,10 @@ class BatteryRobot(NorthC9):
         self.move_z(400)
         self.holding_pipette = False
         self.goto_safe(safe_zone) # go to safe zone
+
+    def curr_time(self):    
+        s = time.localtime(time.time())
+        return time.strftime("%Y-%m-%d %H:%M:%S", s)
         
 
     def increment_pip_id(self):

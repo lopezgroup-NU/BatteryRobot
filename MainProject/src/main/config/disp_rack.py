@@ -58,11 +58,12 @@ class DispRack():
                     self.invalid_index.add(i)
                 elif el == 'e' or el == 'n': # n means no vial at given index. 
                     pass
-                elif el == "purge":
+                elif el.strip() == "purge":
                     #store each purge source as array [volume, index, pos]
                     self.purge_sources.append([8, i, self.index_to_pos(i)])
                 else: 
                     if len(el.split()) != 3:
+                        print(el)
                         raise InitializationError(f"{self.name}: Each vial with contents must have 3 items: vial_name, volume, and concentration")       
 
                     vial, vol, conc = el.split()
@@ -121,11 +122,14 @@ class DispRack():
             "H": 7,
         }
         return mapping[coordinate[0]] * 6 + int(coordinate[1]) - 1
-    
+
+    def to_csv(self):
+        #loop through all attributes
+        self.disp_rack_df.to_csv("disp_rack_updated.csv")
+
     def get_vial_name_by_pos(self, pos):
         if hasattr(self, pos):
             return getattr()
-
 
     def set_vial_name_by_pos(self, pos):
         pass

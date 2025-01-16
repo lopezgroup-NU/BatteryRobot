@@ -1,3 +1,0 @@
-Reagent,Test_Name,GEIS,GEIS_Conditions,CV,CV_Conditions,CE
-A1,first,TRUE,250000 1 0.00001,TRUE,2 -2 0.05,FALSE
-A2,second,FALSE,,TRUE,2 -2 0.05,FALSE

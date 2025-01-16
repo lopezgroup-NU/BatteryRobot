@@ -308,7 +308,6 @@ class CV(Experiment):
         elif self.PSTATMODE == tkp.GSTATMODE:
             self.last_value = data['im'][-1]
         return data
-    
         
     def initialize_pstat(self,pstat):
         """This function changes the configuration of your pstat
@@ -347,7 +346,7 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
     np.savetxt("res/cv/" + output_file_name + ".csv", data, delimiter = ',', header = 'Point,time,Vf,Vu,Im,Ach,vsig,temp,Cycle,ie_range,overload,stop_test', fmt = '%s') 
 
 
-    df_file = "res/" + output_file_name+ ".csv"
+    df_file = "res/cv/" + output_file_name+ ".csv"
     s_df_file = "res/cv_test_summaries.csv"
     df = pd.read_csv(df_file, index_col='# Point')
     s_df = pd.read_csv(s_df_file)
@@ -375,7 +374,7 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
 
     vf_diff = vf_max-vf_min
 
-    new_row = pd.DataFrame([["2M_cv0", vf_max, vf_min, vf_diff, temperature, curr_time]], columns=['test name', 'vf_max', 'vf_min', 'vf_diff', 'temp', 'time'])
+    new_row = pd.DataFrame([[output_file_name, vf_max, vf_min, vf_diff, temperature, curr_time]], columns=['test name', 'vf_max', 'vf_min', 'vf_diff', 'temp', 'time'])
     s_df = pd.concat([s_df, new_row], ignore_index=True)
     s_df.to_csv(s_df_file, index=False)   
 
