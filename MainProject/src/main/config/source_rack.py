@@ -90,9 +90,6 @@ class SourceRack():
                     if vial in vials:
                         raise InitializationError(f"{self.name}: No duplicate vial names!")
 
-                    #map vial to index
-                    setattr(self, vial + "_id", i)
-
                     #map vial volumes
                     setattr(self, vial + "_vol", float(vol))
 
@@ -181,3 +178,56 @@ class SourceRack():
                     raise ContinuableRuntimeError(f"{self.name}: New concentration and entry needed!")
 
             self.source_rack_df.to_csv(self.path + "_updated.csv")
+
+    def get_vial_by_pos(self, pos):
+        """
+        Given pos, return vial information (name, vol, conc)
+        """
+        if not hasattr(self, pos):
+            raise ValueError(f"{self.name}: No vial information found at position {pos}")
+        
+        name = getattr(self, pos)
+        vol = getattr(self, name + "_vol")
+        conc = getattr(self, name + "_conc")
+
+        return name, vol, conc
+
+
+    def set_vial_by_pos(self, pos, vol, name = None, conc = None):
+        """
+        Given pos, update vial information (vol, conc)
+        Vol should always change if name and conc are None.
+        """
+        # update existing entry
+        if not name:
+            name = getattr(self, pos)
+            setattr(self, name + "_vol", vol)
+            self.update_csv(pos, vol)
+
+        # if new name, new entry
+        else:
+            if not conc:
+                raise ValueError(f"{self.name}: Concentration information needed!")
+            #delete all prior information related to current pos
+            self.del_vial_by_pos(pos)
+            setattr(self, name + "_vol", vol)
+            setattr(self, name + "_conc", conc)
+            setattr(self, name + "_pos", pos)
+            setattr(self, pos, name)
+            self.update_csv(pos, vol, name, conc)
+
+
+    def del_vial_by_pos(self, pos):
+        """
+        Given pos, delete vial and all associated information (vol, conc)
+        """
+        if not hasattr(self, pos):
+            raise ValueError(f"{self.name}: No vial to delete at position {pos}")
+
+        name = getattr(self, pos)
+        delattr(self, name + "_vol")
+        delattr(self, name + "_conc")
+        delattr(self, name + "_pos")
+        delattr(self, pos)
+        self.update_csv(pos, "e")
+

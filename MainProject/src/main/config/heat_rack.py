@@ -1,5 +1,6 @@
 import pandas as pd
 from utils.ExceptionUtils import *
+from pathlib import Path
 
 class HeatRack():
     """
@@ -27,7 +28,8 @@ class HeatRack():
     def __init__(self, csv_path):
         df = pd.read_csv(csv_path, header=None)
         self.heat_rack_df = df
-        self.csv_path_updated = csv_path + "_updated" #when rack state is updated, store df here
+        self.path = Path(csv_path).stem
+
 
     def index_to_pos(self, index):
         """

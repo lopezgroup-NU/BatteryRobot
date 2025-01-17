@@ -71,9 +71,6 @@ class DispRack():
                     if vial in vials:
                         raise InitializationError(f"{self.name}: No duplicate vial names!")
 
-                    #map vial to index
-                    setattr(self, vial + "_id", i)
-
                     #map vial volumes
                     setattr(self, vial + "_vol", float(vol))
 
@@ -123,10 +120,10 @@ class DispRack():
         }
         return mapping[pos[0]] * 6 + int(pos[1]) - 1
 
-    def update_csv(self, pos, new_vol, new_entry = None, new_conc = None):
+    def update_csv(self, pos, new_vol, new_name = None, new_conc = None):
         """
         update dataframe. update vial at position pos with new_vol. New_vol is required
-        If changing entry, e.g. new solution, new_entry should contain name of new solution, and new_conc
+        If changing entry, e.g. new solution, new_name should contain name of new solution, and new_conc
         should be it's corresponding concentration
         """
 
@@ -145,46 +142,78 @@ class DispRack():
         col = mapping[pos[0]]
         row = int(pos[1]) - 1
 
-        if new_entry or new_conc:
-            if not new_entry or not new_conc:
-                raise ContinuableRuntimeError(f"{self.name}: New concentration needed for new entry!")
-            self.disp_rack_df.loc[row, col] = f"{new_entry} {new_vol} {new_conc}"
+        if new_name == "e":
+            self.disp_rack_df.loc[row, col] = "e"
         else:
-            prev = self.disp_rack_df.loc[row, col].split()
-
-            # assume prior entry present
-            if len(prev) == 3:
-                new = f"{prev[0]} {new_vol} {prev[2]}"
-                self.disp_rack_df.loc[row, col] = new
-
-            # if reach here, error. must have new_entry and new_conc
+            if new_name or new_conc:
+                if not new_name or not new_conc:
+                    raise ContinuableRuntimeError(f"{self.name}: New concentration needed for new name!")
+                self.disp_rack_df.loc[row, col] = f"{new_name} {new_vol} {new_conc}"
             else:
-                raise ContinuableRuntimeError(f"{self.name}: New concentration and entry needed!")
+                prev = self.disp_rack_df.loc[row, col].split()
+
+                # assume prior entry present
+                if len(prev) == 3:
+                    new = f"{prev[0]} {new_vol} {prev[2]}"
+                    self.disp_rack_df.loc[row, col] = new
+
+                # if reach here, error. must have new_name and new_conc
+                else:
+                    raise ContinuableRuntimeError(f"{self.name}: New concentration and name needed!")
 
         self.disp_rack_df.to_csv(self.path + "_updated.csv")
     
-    # TODO
-    def get_vial_by_name(self, name):
+    def get_vial_by_pos(self, pos):
         """
-        Given name, return vial information (vol, conc)
+        Given pos, return vial information (name, vol, conc)
         """
-        pass
+        if not hasattr(self, pos):
+            raise ValueError(f"{self.name}: No vial information found at position {pos}")
+        
+        name = getattr(self, pos)
+        vol = getattr(self, name + "_vol")
+        conc = getattr(self, name + "_conc")
 
-    def set_vial_by_name(self, name, vol, conc):
-        """
-        Given name, update vial information (vol, conc)
-        """
-        pass
+        return name, vol, conc
 
-    def del_vial_by_name(self, name):
-        """
-        Given name, delete vial information (vol, conc)
-        """
-        pass
 
-    def get_vial_name_by_pos(self, pos):
+    def set_vial_by_pos(self, pos, vol, name = None, conc = None):
         """
-        Given name, return name
+        Given pos, update vial information (vol, conc)
+        Vol should always change if name and conc are None.
         """
-        if hasattr(self, pos):
-            return getattr()
+        # update existing entry
+        if not name:
+            name = getattr(self, pos)
+            setattr(self, name + "_vol", vol)
+            self.update_csv(pos, vol)
+
+        # if new name, new entry
+        else:
+            if not conc:
+                raise ValueError(f"{self.name}: Concentration information needed!")
+            #delete all prior information related to current pos
+            self.del_vial_by_pos(pos)
+            setattr(self, name + "_vol", vol)
+            setattr(self, name + "_conc", conc)
+            setattr(self, name + "_pos", pos)
+            setattr(self, pos, name)
+            self.update_csv(pos, vol, name, conc)
+
+
+    def del_vial_by_pos(self, pos):
+        """
+        Given pos, delete vial and all associated information (vol, conc)
+        """
+        if not hasattr(self, pos):
+            raise ValueError(f"{self.name}: No vial to delete at position {pos}")
+
+        name = getattr(self, pos)
+        delattr(self, name + "_vol")
+        delattr(self, name + "_conc")
+        delattr(self, name + "_pos")
+        delattr(self, pos)
+        self.update_csv(pos, "e")
+
+
+
