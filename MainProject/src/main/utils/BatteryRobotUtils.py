@@ -38,7 +38,7 @@ class BatteryRobot(NorthC9):
     solution_vols = {
         0: 6,
         1: 6,
-        2: 4,
+        2: 3,
         3: 6,
         4: 6,
         5: 6,
@@ -142,6 +142,7 @@ class BatteryRobot(NorthC9):
                         disp_vial_name = getattr(self.disp_rack, target_pos)
                         current_vol = getattr(self.disp_rack, disp_vial_name + "_vol")
                         setattr(self.source_rack, disp_vial_name + "_vol", current_vol + vol)
+                        self.disp_rack.update_csv(target_pos, current_vol + vol)
 
                 #heat and wait for them
                 heatplate_pos = experiment.Heat
@@ -167,7 +168,7 @@ class BatteryRobot(NorthC9):
                         heated_vial = heapq.heappop(heating_tasks)
                         heatplate_index, target_index = heated_vial[1], heated_vial[2]
                         self.move_vial(heatplate_official[heatplate_index], rack_disp_official[target_index])
-                        log_file.write(f"Finished making formulation for vial at position {self.disp_rack.index_to_pos(target_index)}:  {self.curr_time()} \n")
+                        log_file.write(f"   Finished making formulation for vial at position {self.disp_rack.index_to_pos(target_index)}:  {self.curr_time()} \n")
                     else:
                         vials_to_remove = False
                 else:
@@ -181,7 +182,7 @@ class BatteryRobot(NorthC9):
                 heated_vial = heapq.heappop(heating_tasks)
                 heatplate_index, target_index = heated_vial[1], heated_vial[2]
                 self.move_vial(heatplate_official[heatplate_index], rack_disp_official[target_index])
-                log_file.write(f"Finished making formulation for vial at position {self.disp_rack.index_to_pos(target_index)}:  {self.curr_time()} \n")
+                log_file.write(f"   Finished making formulation for vial at position {self.disp_rack.index_to_pos(target_index)}:  {self.curr_time()} \n")
 
             else: # if soonest vial isn't ready yet, wait 60 seconds
                 time.sleep(60)
@@ -199,7 +200,7 @@ class BatteryRobot(NorthC9):
         df = pd.read_csv(run_file)  
 
         #way to control purge for now
-        water_start = 15
+        water_start = 33
 
         log_file = open("experiments/experiments.log", "a")
         log_file.write("*" * 50 + "\n")
@@ -217,8 +218,6 @@ class BatteryRobot(NorthC9):
                 output_file_name = test.Test_Name
 
                 if GEIS and CV:
-
-                    print(test)
                     if len(test.GEIS_Conditions.split()) != 3:
                         raise ContinuableRuntimeError("GEIS_CONDITIONS must have 3 parameters!")
                     if len(test.CV_Conditions.split()) != 3:
@@ -373,7 +372,6 @@ class BatteryRobot(NorthC9):
         while remaining > 0:
             rack = p_asp_high
             curr_vol = getattr(self.source_rack, source_name + "_vol")
-            print(curr_vol)
             if curr_vol <= 4:
                 rack = p_asp_low
             elif curr_vol <= 6:
@@ -392,6 +390,7 @@ class BatteryRobot(NorthC9):
             self.delay(.5)
             remaining -= amount
             setattr(self.source_rack, source_name + "_vol", curr_vol - amount)
+            self.source_rack.update_csv(self.source_rack.index_to_pos(source_id), curr_vol - amount)
 
         dispensed = self.read_steady_scale()   
         self.goto_safe(safe_zone)

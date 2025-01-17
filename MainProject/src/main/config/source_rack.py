@@ -1,5 +1,6 @@
 import pandas as pd
 from utils.ExceptionUtils import *
+from pathlib import Path
 
 class SourceRack():
     """
@@ -65,8 +66,7 @@ class SourceRack():
         #no duplicates
         df = pd.read_csv(csv_path, header=None)
         self.source_rack_df = df
-        self.csv_path_updated = csv_path + "_updated" #when rack state is updated, store df here
-
+        self.path = Path(csv_path).stem
         self.invalid_index = set()
         vials = set()
 
@@ -123,11 +123,11 @@ class SourceRack():
         cols = ["A", "B", "C", "D", "E"]
         return cols[index//6] + str(index % 6 + 1)
     
-    def pos_to_index(self, coordinate):
+    def pos_to_index(self, pos):
         """
         Given position (A1 - E6) return index (0 to 29)
         """
-        if coordinate[0] not in ["A", "B", "C", "D", "E"] or coordinate[1] not in ["1", "2", "3", "4", "5", "6"]:
+        if pos[0] not in ["A", "B", "C", "D", "E"] or pos[1] not in ["1", "2", "3", "4", "5", "6"]:
             raise ContinuableRuntimeError(f"{self.name}: Enter valid position!")
 
         mapping = {
@@ -138,13 +138,46 @@ class SourceRack():
             "E": 4
         }
 
-        index = mapping[coordinate[0]] * 6 + int(coordinate[1]) - 1
+        index = mapping[pos[0]] * 6 + int(pos[1]) - 1
 
         if index in self.invalid_index:
             raise ContinuableRuntimeError(f"{self.name}: Enter valid position!")
         else:
             return index 
-#demo        
-if __name__ == "__main__":
-    pass
-    
+        
+    def update_csv(self, pos, new_vol, new_entry = None, new_conc = None):
+            """
+            update dataframe. update vial at position pos with new_vol. New_vol is required
+            If changing entry, e.g. new solution, new_entry should contain name of new solution, and new_conc
+            should be it's corresponding concentration
+            """
+
+            # mapping reversed because pd dataframe is reversed
+            mapping = {
+                "A": 4,
+                "B": 3,
+                "C": 2,
+                "D": 1,
+                "E": 0,
+            }
+
+            col = mapping[pos[0]]
+            row = int(pos[1]) - 1
+
+            if new_entry or new_conc:
+                if not new_entry or not new_conc:
+                    raise ContinuableRuntimeError(f"{self.name}: New concentration needed for new entry!")
+                self.source_rack_df.loc[row, col] = f"{new_entry} {new_vol} {new_conc}"
+            else:
+                prev = self.source_rack_df.loc[row, col].split()
+
+                # assume prior entry present
+                if len(prev) == 3:
+                    new = f"{prev[0]} {new_vol} {prev[2]}"
+                    self.source_rack_df.loc[row, col] = new
+
+                # if reach here, error. must have new_entry and new_conc
+                else:
+                    raise ContinuableRuntimeError(f"{self.name}: New concentration and entry needed!")
+
+            self.source_rack_df.to_csv(self.path + "_updated.csv")

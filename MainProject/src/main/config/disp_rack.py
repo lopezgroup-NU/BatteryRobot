@@ -1,5 +1,6 @@
 import pandas as pd
 from utils.ExceptionUtils import *
+from pathlib import Path
 class DispRack():
     """
     mapping solutions to indexes of rack_disp_official.
@@ -41,9 +42,8 @@ class DispRack():
     def __init__(self, csv_path):
         #no duplicates
         df = pd.read_csv(csv_path, header=None)
+        self.path = Path(csv_path).stem
         self.disp_rack_df = df
-        self.csv_path_updated = csv_path + "_updated" #when rack state is updated, store df here
-
         self.invalid_index = set()
         vials = set()
 
@@ -104,11 +104,11 @@ class DispRack():
         cols = ["A", "B", "C", "D", "E", "F", "G", "H"]
         return cols[index//6] + str(index % 6 + 1)
     
-    def pos_to_index(self, coordinate):
+    def pos_to_index(self, pos):
         """
         Given grid position (A1 - H6) return index (0 to 47)
         """
-        if coordinate[0] not in ["A", "B", "C", "D", "E", "F", "G", "H"] or coordinate[1] not in ["1", "2", "3", "4", "5", "6", "7", "8"]:
+        if pos[0] not in ["A", "B", "C", "D", "E", "F", "G", "H"] or pos[1] not in ["1", "2", "3", "4", "5", "6", "7", "8"]:
             raise ContinuableRuntimeError(f"{self.name}: Enter valid grid position!")
 
         mapping = {
@@ -121,21 +121,70 @@ class DispRack():
             "G": 6,
             "H": 7,
         }
-        return mapping[coordinate[0]] * 6 + int(coordinate[1]) - 1
+        return mapping[pos[0]] * 6 + int(pos[1]) - 1
 
-    def to_csv(self):
-        #loop through all attributes
-        self.disp_rack_df.to_csv("disp_rack_updated.csv")
+    def update_csv(self, pos, new_vol, new_entry = None, new_conc = None):
+        """
+        update dataframe. update vial at position pos with new_vol. New_vol is required
+        If changing entry, e.g. new solution, new_entry should contain name of new solution, and new_conc
+        should be it's corresponding concentration
+        """
+
+        # mapping reversed because pd dataframe is reversed
+        mapping = {
+            "A": 7,
+            "B": 6,
+            "C": 5,
+            "D": 4,
+            "E": 3,
+            "F": 2,
+            "G": 1,
+            "H": 0,
+        }
+
+        col = mapping[pos[0]]
+        row = int(pos[1]) - 1
+
+        if new_entry or new_conc:
+            if not new_entry or not new_conc:
+                raise ContinuableRuntimeError(f"{self.name}: New concentration needed for new entry!")
+            self.disp_rack_df.loc[row, col] = f"{new_entry} {new_vol} {new_conc}"
+        else:
+            prev = self.disp_rack_df.loc[row, col].split()
+
+            # assume prior entry present
+            if len(prev) == 3:
+                new = f"{prev[0]} {new_vol} {prev[2]}"
+                self.disp_rack_df.loc[row, col] = new
+
+            # if reach here, error. must have new_entry and new_conc
+            else:
+                raise ContinuableRuntimeError(f"{self.name}: New concentration and entry needed!")
+
+        self.disp_rack_df.to_csv(self.path + "_updated.csv")
+    
+    # TODO
+    def get_vial_by_name(self, name):
+        """
+        Given name, return vial information (vol, conc)
+        """
+        pass
+
+    def set_vial_by_name(self, name, vol, conc):
+        """
+        Given name, update vial information (vol, conc)
+        """
+        pass
+
+    def del_vial_by_name(self, name):
+        """
+        Given name, delete vial information (vol, conc)
+        """
+        pass
 
     def get_vial_name_by_pos(self, pos):
+        """
+        Given name, return name
+        """
         if hasattr(self, pos):
             return getattr()
-
-    def set_vial_name_by_pos(self, pos):
-        pass
-
-    def get_vial_by_name(self, name):
-        pass
-
-    def set_vial_by_name(self, name):
-        pass

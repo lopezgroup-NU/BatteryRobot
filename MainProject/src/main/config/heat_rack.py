@@ -40,11 +40,11 @@ class HeatRack():
         cols = ["A", "B", "C", "D"]
         return cols[index//3] + str(index % 3 + 1)
     
-    def pos_to_index(self, coordinate):
+    def pos_to_index(self, pos):
         """
         Given position (A1 - D3) return index (0 to 11)
         """
-        if coordinate[0] not in ["A", "B", "C", "D"] or coordinate[1] not in ["1", "2", "3"]:
+        if pos[0] not in ["A", "B", "C", "D"] or pos[1] not in ["1", "2", "3"]:
             raise ContinuableRuntimeError(f"{self.name}: Enter valid position!")
 
         mapping = {
@@ -53,4 +53,4 @@ class HeatRack():
             "C": 2,
             "D": 3,
         }
-        return mapping[coordinate[0]] * 3 + int(coordinate[1]) - 1
+        return mapping[pos[0]] * 3 + int(pos[1]) - 1
