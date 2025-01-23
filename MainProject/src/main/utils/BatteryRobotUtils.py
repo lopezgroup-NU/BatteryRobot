@@ -2,10 +2,8 @@ import sys
 sys.path.append('..')
 sys.path.append(r'C:\Users\llf1362\Documents\NorthIDE\Lib\site-packages')
 
-import os
-import asyncio
 import pandas as pd
-import time, pathlib
+import time
 from Locator import *
 from north import NorthC9
 from molmass import Formula
@@ -15,6 +13,7 @@ import heapq
 from .ExceptionUtils import *
 from utils.PStat.geis import *
 from utils.PStat.cv import *
+from utils.PStat.ocv import *
 
 class BatteryRobot(NorthC9):
     """
@@ -36,15 +35,15 @@ class BatteryRobot(NorthC9):
     pip_id = 0
     #maps rack_disp_official indexes to their vial's volume(ml)
     solution_vols = {
-        0: 6,
-        1: 6,
-        2: 3,
-        3: 6,
-        4: 6,
-        5: 6,
-        7: 6,
-        8: 6,
-        9: 6,
+        0: 4,
+        1: 4,
+        2: 4,
+        3: 4,
+        4: 4,
+        5: 4,
+        7: 4,
+        8: 4,
+        9: 4,
         10: 6,
         11: 6,
     } 
@@ -142,6 +141,8 @@ class BatteryRobot(NorthC9):
                         disp_vial_name = getattr(self.disp_rack, target_pos)
                         current_vol = getattr(self.disp_rack, disp_vial_name + "_vol")
                         setattr(self.source_rack, disp_vial_name + "_vol", current_vol + vol)
+
+                        #comment if crash   
                         self.disp_rack.update_csv(target_pos, current_vol + vol)
 
                 #heat and wait for them
@@ -200,7 +201,7 @@ class BatteryRobot(NorthC9):
         df = pd.read_csv(run_file)  
 
         #way to control purge for now
-        water_start = 33
+        water_start = 36
 
         log_file = open("experiments/experiments.log", "a")
         log_file.write("*" * 50 + "\n")
@@ -244,7 +245,8 @@ class BatteryRobot(NorthC9):
                         self.set_output(6, True) 
                         self.set_output(7, True)
                         self.set_output(8, True)
-                        run_cv2(output_file_name=output_file_name + f"_cv{i}", values = [[0, point1, point2, 0],[rate, rate, rate], [0.05, 0.05, 0.05], 1, 0.1] )
+                        ocv = RunOCV_lastV()
+                        run_cv2(output_file_name=output_file_name + f"_cv{i}", values = [[ocv, point1, point2, 0],[rate, rate, rate], [0.05, 0.05, 0.05], 2, 0.1] )
                         self.set_output(6, False) 
                         self.set_output(7, False)
                         self.set_output(8, False)      
@@ -279,7 +281,8 @@ class BatteryRobot(NorthC9):
                     self.set_output(6, True) 
                     self.set_output(7, True)
                     self.set_output(8, True)
-                    run_cv2(output_file_name=output_file_name + "_cv", values = [[0, point1, point2, 0],[rate, rate, rate], [0.05, 0.05, 0.05], 1, 0.1] )
+                    ocv = RunOCV_lastV()
+                    run_cv2(output_file_name=output_file_name + "_cv", values = [[ocv, point1, point2, 0],[rate, rate, rate], [0.05, 0.05, 0.05], 2, 0.1] )
                     self.set_output(6, False) 
                     self.set_output(7, False)
                     self.set_output(8, False)
@@ -390,6 +393,8 @@ class BatteryRobot(NorthC9):
             self.delay(.5)
             remaining -= amount
             setattr(self.source_rack, source_name + "_vol", curr_vol - amount)
+
+            #comment if crash
             self.source_rack.update_csv(self.source_rack.index_to_pos(source_id), curr_vol - amount)
 
         dispensed = self.read_steady_scale()   
@@ -484,7 +489,7 @@ class BatteryRobot(NorthC9):
         self.set_pump_valve(0, 0)
         self.move_pump(0, 0)
     
-    def pump_helper(self, length = 1300, v_in = 13, v_out= 0, draw=True):
+    def pump_helper(self, length = 1300, v_in = 13, v_out = 0, draw = True):
         """
         Helper function to be used when pumping liquids from carousel.
         
@@ -648,49 +653,6 @@ class BatteryRobot(NorthC9):
             raise CriticalRuntimeError("Error: No more water left to purge!")
         
         self.purge(id)
-
-    def old_school_purge(self, water_location, speed=30, rack = rack_disp_official, n_pumps = 6, length = 3000):
-            """
-            Purge plumbing system
-            """
-            self.move_carousel(0, 0)
-            self.move_vial(rack[water_location], vial_carousel)
-            self.close_clamp()
-            self.goto_safe(safe_zone)
-            self.move_carousel(33, 85) # carousel moves 33 degrees, 85 mm down
-            for _ in range(n_pumps):
-                self.pump_helper(length = length, v_in = speed, v_out = 5)
-
-            self.move_carousel(0, 0)
-            self.open_clamp()
-            self.move_vial(vial_carousel, rack[water_location])
-
-            for _ in range(n_pumps):
-                self.pump_helper(length = length, v_in = speed, v_out = 5)
-
-            self.reset_pump()
-
-    def purge_hot(self, water_location, speed = 30, n_pumps = 6):
-        """
-        Purge plumbing system with hot water
-        """
-        self.move_carousel(0, 0)
-        self.move_vial(heatplate_official[water_location], vial_carousel)
-        
-        self.uncap_vial_in_carousel()  
-        self.move_carousel(33, 85) # carousel moves 33 degrees, 85 mm down
-        
-        for _ in range(2):
-            self.pump_helper(length = 2000, v_in = 15, v_out = 5)
-        
-        for _ in range(n_pumps - 2):
-            self.pump_helper(length = 2000, v_in = speed, v_out = 5)
-            
-        self.move_carousel(0, 0)
-        self.cap_and_return_vial_to_rack(water_location, heatplate_official)
-        
-        for _ in range(n_pumps):
-            self.pump_helper(length = 2000, v_in = 15, v_out = 5)
         
 
     def get_needle_height(self, id):
@@ -909,7 +871,7 @@ class BatteryRobot(NorthC9):
         else:
             raise Exception("Cap holders are taken!")
         
-        self.cap(torque_thresh = 550)    
+        self.cap(revs=4.8, torque_thresh = 400)    
         self.open_gripper()
         self.delay(.5)
         
@@ -928,7 +890,7 @@ class BatteryRobot(NorthC9):
             
         self.close_gripper()
         self.delay(.5)
-        self.uncap()
+        self.uncap(revs=3.5)
         self.goto_safe(rack_source_official_approach[source_id])
         self.cap(torque_thresh = 500)
         self.open_gripper()

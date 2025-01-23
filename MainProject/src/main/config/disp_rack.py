@@ -42,8 +42,9 @@ class DispRack():
     def __init__(self, csv_path):
         #no duplicates
         df = pd.read_csv(csv_path, header=None)
-        self.path = Path(csv_path).stem
-        self.disp_rack_df = df
+        self.path = Path(csv_path)
+        self.update_path = self.path.with_name(self.path.stem + "_updated.csv")
+        self.df = df
         self.invalid_index = set()
         vials = set()
 
@@ -143,25 +144,26 @@ class DispRack():
         row = int(pos[1]) - 1
 
         if new_name == "e":
-            self.disp_rack_df.loc[row, col] = "e"
+            self.df.loc[row, col] = "e"
         else:
             if new_name or new_conc:
                 if not new_name or not new_conc:
                     raise ContinuableRuntimeError(f"{self.name}: New concentration needed for new name!")
-                self.disp_rack_df.loc[row, col] = f"{new_name} {new_vol} {new_conc}"
+                self.df.loc[row, col] = f"{new_name} {new_vol} {new_conc}"
             else:
-                prev = self.disp_rack_df.loc[row, col].split()
+                prev = self.df.loc[row, col].split()
 
                 # assume prior entry present
                 if len(prev) == 3:
                     new = f"{prev[0]} {new_vol} {prev[2]}"
-                    self.disp_rack_df.loc[row, col] = new
+                    self.df.loc[row, col] = new
 
                 # if reach here, error. must have new_name and new_conc
                 else:
                     raise ContinuableRuntimeError(f"{self.name}: New concentration and name needed!")
 
-        self.disp_rack_df.to_csv(self.path + "_updated.csv")
+        self.df.to_csv(self.update_path)
+
     
     def get_vial_by_pos(self, pos):
         """

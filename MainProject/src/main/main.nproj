@@ -338,30 +338,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "heatplate_official": {
-      "type": "Grid",
-      "tool": 0,
-      "counts": [
-        -2399,
-        35478,
-        26015,
-        14771
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0,
-      "n": [
-        4,
-        3,
-        1
-      ],
-      "pitch": [
-        32,
-        28,
-        0.0
-      ]
-    },
     "lidholder_holder": {
       "type": "Location",
       "tool": 0,
@@ -409,32 +385,6 @@
         15995,
         30517,
         22998
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "cap_holder_2": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -95,
-        15731,
-        42271,
-        22469
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "cap_holder_1": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -2089,
-        13972,
-        41589,
-        22301
       ],
       "ik_soln": 0,
       "reference": false,
@@ -538,30 +488,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "test": {
-      "type": "Grid",
-      "tool": 0,
-      "counts": [
-        -1489,
-        41285,
-        58712,
-        22476
-      ],
-      "ik_soln": 1,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0,
-      "n": [
-        8,
-        6,
-        1
-      ],
-      "pitch": [
-        26,
-        26,
-        0.0
-      ]
-    },
     "cartridge_holder": {
       "type": "Location",
       "tool": 0,
@@ -627,30 +553,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "rack_source_official": {
-      "type": "Grid",
-      "tool": 0,
-      "counts": [
-        -63,
-        11887,
-        38590,
-        22300
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0,
-      "n": [
-        5,
-        6,
-        1
-      ],
-      "pitch": [
-        26,
-        26,
-        0.0
-      ]
-    },
     "rack_disp_official": {
       "type": "Grid",
       "tool": 0,
@@ -675,32 +577,56 @@
         0.0
       ]
     },
-    "cap_holder_2_approach": {
+    "cap_holder_1_approach": {
       "type": "Location",
       "tool": 0,
       "counts": [
-        -143,
-        15593,
-        42122,
-        21608
+        -162,
+        13803,
+        41336,
+        21700
       ],
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null
     },
-    "rack_source_official_approach": {
+    "heatplate_official": {
       "type": "Grid",
       "tool": 0,
       "counts": [
-        -63,
-        11887,
-        38590,
-        21776
+        -436,
+        35438,
+        25981,
+        14733
       ],
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null,
       "rotation": 0,
+      "n": [
+        4,
+        3,
+        1
+      ],
+      "pitch": [
+        32,
+        28,
+        0.0
+      ]
+    },
+    "rack_source_official": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        -1988,
+        11872,
+        38673,
+        22509
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0.0,
       "n": [
         5,
         6,
@@ -712,14 +638,64 @@
         0.0
       ]
     },
-    "cap_holder_1_approach": {
+    "rack_source_official_approach": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        -3987,
+        11872,
+        38673,
+        22009
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0.0,
+      "n": [
+        5,
+        6,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "cap_holder_1": {
       "type": "Location",
       "tool": 0,
       "counts": [
-        -162,
-        13803,
-        41336,
-        21700
+        -2071,
+        13885,
+        41478,
+        22500
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "cap_holder_2": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -2189,
+        15753,
+        42299,
+        22547
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "cap_holder_2_approach": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -189,
+        15753,
+        42299,
+        21623
       ],
       "ik_soln": 0,
       "reference": false,

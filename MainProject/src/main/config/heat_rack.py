@@ -28,8 +28,7 @@ class HeatRack():
     def __init__(self, csv_path):
         df = pd.read_csv(csv_path, header=None)
         self.heat_rack_df = df
-        self.path = Path(csv_path).stem
-
+        self.path = Path(csv_path).with_suffix("")
 
     def index_to_pos(self, index):
         """
