@@ -171,15 +171,17 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}):
     R1_nofit = df_no_negatives['zreal'].loc[min_index]  # Use .loc to get the value at that index
 
 
-    bumps = DataAnalyzer("res/geis/"+ output_file_name + ".csv")
-    obj = bumps.run(output_file_name)
-    print(obj)
-    R1 = obj["R1"]
-    if "(" in R1:
-        open_paren = R1.index("(")
-        close_paren = R1.index(")")
-        R1 = R1[:open_paren] + R1[close_paren+1:]  
-    R1 = float(R1)
+    #bumps = DataAnalyzer("res/geis/"+ output_file_name + ".csv")
+    #obj = bumps.run(output_file_name)
+    #print(obj)
+    #R1 = obj["R1"]
+    #if "(" in R1:
+    #    open_paren = R1.index("(")
+    #    close_paren = R1.index(")")
+    #    R1 = R1[:open_paren] + R1[close_paren+1:]  
+    #R1 = float(R1)
+    
+    R1 = 10
     temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
     temperature = temper.get_temperature()[1]
     s = time.localtime(time.time())

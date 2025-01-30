@@ -35,12 +35,15 @@ class DispRack():
     - 'n' for no vial
 
     """
-    name = "DispRack"
-    rack_max_index = 47
-    purge_sources = []
+
 
     def __init__(self, csv_path):
         #no duplicates
+        self.name = "DispRack"
+        self.rack_max_index = 47
+        self.purge_sources = {}
+        self.solution_vols = {}
+
         df = pd.read_csv(csv_path, header=None)
         self.path = Path(csv_path)
         self.update_path = self.path.with_name(self.path.stem + "_updated.csv")
@@ -61,7 +64,7 @@ class DispRack():
                     pass
                 elif el.strip() == "purge":
                     #store each purge source as array [volume, index, pos]
-                    self.purge_sources.append([8, i, self.index_to_pos(i)])
+                    self.purge_sources[self.index_to_pos(i)] = 8
                 else: 
                     if len(el.split()) != 3:
                         print(el)
@@ -143,6 +146,7 @@ class DispRack():
         col = mapping[pos[0]]
         row = int(pos[1]) - 1
 
+        # set entry to e i.e. empty
         if new_name == "e":
             self.df.loc[row, col] = "e"
         else:
@@ -217,5 +221,22 @@ class DispRack():
         delattr(self, pos)
         self.update_csv(pos, "e")
 
+    def get_sol_vols(self):
+        """
+        Using dataframe, get volumes of solutions
+        Return as dictionary of pos: volume
+        Solutions defined as any non empty, non purge vial slot.
+        """
+        self.sol_vols = {}
 
+        for i in range(7, -1, -1):
+            for j in range(6):
+                entry = self.df.loc[j,i].split()
+                if len(entry) == 3:
+                    vol = float(entry[1])
+                    idx = (7 - i) * 6 + j
+                    pos = self.index_to_pos(idx)
+                    self.sol_vols[pos] = vol
+
+        return self.sol_vols
 

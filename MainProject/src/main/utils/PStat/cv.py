@@ -178,6 +178,18 @@ class CV(Experiment):
             pstat.set_stability(tkp.STABILITY_FAST)
             pstat.set_vch_range(10.0)
         return  
+    
+def find_peaks_and_zero_crossings(data):
+    # Find the index of the first occurrence of zero in 'Vf'
+    zero_index = 0
+    # Find the positive peak (maximum after the first zero crossing)
+    positive_peak_index = np.argmax(data['Im'][zero_index:]) + zero_index
+    # Find where the voltage crosses 0 after the positive peak
+    # We are looking for the first zero-crossing point after the positive peak
+    zero_cross_index = np.argmax(np.diff(np.sign(data['Vf'][positive_peak_index:])) != 0) + positive_peak_index
+    # Find the negative peak (minimum after the 0V crossing)
+    negative_peak_index = np.argmin(data['Im'][zero_cross_index:]) + zero_cross_index
+    return positive_peak_index, zero_cross_index, negative_peak_index
 
 def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1]):
     tkp.toolkitpy_init("open_circuit_voltage.py")
@@ -185,7 +197,6 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
     cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
     data = cv.run_cv(pstat, max_size = 100000)
     np.savetxt("res/cv/" + output_file_name + ".csv", data, delimiter = ',', header = 'Point,time,Vf,Vu,Im,Ach,vsig,temp,Cycle,ie_range,overload,stop_test', fmt = '%s') 
-
 
     df_file = "res/cv/" + output_file_name+ ".csv"
     s_df_file = "res/cv_test_summaries.csv"
@@ -197,27 +208,43 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
     s = time.localtime(time.time())
     curr_time = time.strftime("%Y-%m-%d %H:%M:%S", s)
 
+    vf_diff,vf_max,vf_min  = cv_interpret("res/cv/" + output_file_name+ ".csv")
+    
+    new_row = pd.DataFrame([[output_file_name, vf_max, vf_min, vf_diff, temperature, curr_time]], columns=['test name', 'vf_max', 'vf_min', 'vf_diff', 'temp', 'time'])
+    s_df = pd.concat([s_df, new_row], ignore_index=True)
+    s_df.to_csv(s_df_file, index=False)   
+
+def cv_interpret(filename):
+    df_file = filename
+    df = pd.read_csv(df_file, index_col='# Point')
+
+    positive,zero,negative = find_peaks_and_zero_crossings(df)
+
     targ_max = 0.000024
     targ_min = -0.000024
 
     im_col = df["Im"]
+    im_colPositive = im_col[0:positive]
+    im_colNegative = im_col[zero:negative]
+
+    vf_col = df["Vf"]
+    vf_colPositive = vf_col[0:positive]
+    vf_colNegative = vf_col[zero:negative]
 
     #get xmax
     #translate column by target and get absolute values. find index of minimum (closest to 0)
-    im_col_translated = (im_col - targ_max).abs()
-    min_idx = im_col_translated.idxmin()
-    vf_max = df['Vf'].loc[min_idx]  # Use .loc to get the value at that index
+    im_col_translated_pos = (im_colPositive - targ_max).abs()
+    min_idx_pos = im_col_translated_pos.idxmin()
+    vf_max = vf_colPositive.loc[min_idx_pos]  # Use .loc to get the value at that index
 
     #get xmin
-    im_col_translated = (im_col - targ_min).abs()
-    min_idx = im_col_translated.idxmin()
-    vf_min = df['Vf'].loc[min_idx]  # Use .loc to get the value at that index
+    im_col_translated_neg = (im_colNegative + targ_max).abs()
+    min_idx_neg = im_col_translated_neg.idxmin()
+    vf_min = vf_colNegative.loc[min_idx_neg]  # Use .loc to get the value at that index
 
     vf_diff = vf_max-vf_min
 
-    new_row = pd.DataFrame([[output_file_name, vf_max, vf_min, vf_diff, temperature, curr_time]], columns=['test name', 'vf_max', 'vf_min', 'vf_diff', 'temp', 'time'])
-    s_df = pd.concat([s_df, new_row], ignore_index=True)
-    s_df.to_csv(s_df_file, index=False)   
+    return(vf_diff,vf_max,vf_min )
 
 '''
 if __name__ == "__main__":

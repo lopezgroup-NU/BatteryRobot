@@ -232,3 +232,21 @@ class SourceRack():
         delattr(self, pos)
         self.update_csv(pos, "e")
 
+    def get_sol_vols(self):
+        """
+        Using dataframe, get volumes of solutions
+        Return as dictionary of pos: volume
+        Solutions defined as any non empty, non purge vial slot.
+        """
+        self.sol_vols = {}
+
+        for i in range(7, -1, -1):
+            for j in range(6):
+                entry = self.df.loc[j,i].split()
+                if len(entry) == 3:
+                    vol = int(entry[1])
+                    idx = (7 - i) * 6 + j
+                    pos = self.index_to_pos(idx)
+                    self.sol_vols[pos] = vol
+
+        return self.sol_vols

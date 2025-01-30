@@ -577,19 +577,6 @@
         0.0
       ]
     },
-    "cap_holder_1_approach": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -162,
-        13803,
-        41336,
-        21700
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
     "heatplate_official": {
       "type": "Grid",
       "tool": 0,
@@ -696,6 +683,19 @@
         15753,
         42299,
         21623
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "cap_holder_1_approach": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -71,
+        13885,
+        41478,
+        21885
       ],
       "ik_soln": 0,
       "reference": false,
