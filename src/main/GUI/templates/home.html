@@ -1,0 +1,31 @@
+<html>
+    <head>
+        <link rel="stylesheet" href="{{ url_for('static',filename='styles.css') }}">
+    </head>
+    <body>
+        <script src = "{{ url_for('static',filename='script.js') }}"> </script>
+        <p>
+            Home page for Rob the robot. What would you like Rob to do?
+        </p>    
+        </br>
+
+        <button id="armOptionsButton" class="reveal-button" data-target="armOptions">Robot arm options</button>
+        <button id="workflowOptionsButton" class = "reveal-button" data-target="workflowOptions">Workflow options</button>
+        <button id="drawAndTestButton" class = "reveal-button" data-target="drawAndTestOptions">Electrolyte drawing and testing</button>
+        <br/>
+        <br/>
+
+        <div id="armOptions" class = "hidden options" >
+            <button>Move arm</button>
+        </div>
+
+        <div id="workflowOptions" class = "hidden options">
+            <button>Design workflow</button>
+        </div>
+
+        <div id="drawAndTestOptions" class = "hidden options" >
+            <button>Draw and test electrolyte</button>
+        </div>
+    </body>
+
+</html>

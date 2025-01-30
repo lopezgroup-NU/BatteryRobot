@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.1401
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "ToolkitPySamples", "ToolkitPySamples.pyproj", "{5AF48C45-36F5-49C1-9B50-554B6761605F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5AF48C45-36F5-49C1-9B50-554B6761605F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5AF48C45-36F5-49C1-9B50-554B6761605F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5AF48C45-36F5-49C1-9B50-554B6761605F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5AF48C45-36F5-49C1-9B50-554B6761605F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5AF48C45-36F5-49C1-9B50-554B6761605F}.Release|x64.ActiveCfg = Release|Any CPU
+		{5AF48C45-36F5-49C1-9B50-554B6761605F}.Release|x86.ActiveCfg = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F5B9A5E8-537B-47A5-94EC-75D2970DE6CF}
+	EndGlobalSection
+EndGlobal
