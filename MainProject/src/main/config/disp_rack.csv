@@ -1,6 +1,6 @@
-purge ,purge ,purge ,purge ,purge,e,x,Empty5 4 0
-purge ,purge ,purge ,purge ,purge,e,LiAC 6 7,Empty6 4 0
-purge ,purge ,purge ,purge ,purge,e,Empty7 0 0,LiSO4 4 3
-purge ,purge ,purge ,purge ,purge,purge,Empty8 0 0,Empty2 4 0
+purge ,purge ,purge ,purge ,purge,e,x,FSI1m 5 1
+purge ,purge ,purge ,purge ,purge,e,LiAC 6 7,FSI4p2m 5 2
+purge ,purge ,purge ,purge ,purge,e,Empty7 0 0,FSI10m 5 5
+purge ,purge ,purge ,purge ,purge,purge,Empty8 0 0,FSI21m 5 0
 purge ,purge ,purge ,purge ,purge,purge,e,Empty3 0 0
 purge ,purge ,purge ,purge ,purge,purge,e,Empty4 0 0

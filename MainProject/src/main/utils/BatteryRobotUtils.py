@@ -236,7 +236,7 @@ class BatteryRobot(NorthC9):
                         run_geis(output_file_name=output_file_name + \
                                 f"_geis{i}", parameter_list=geis_parameter_list)
                         run_geis(output_file_name=output_file_name + \
-                                f"2_geis{i}", parameter_list=geis_parameter_list)
+                                f"_2geis{i}", parameter_list=geis_parameter_list)
                         self.draw_sensor1to2(target_idx, viscous=True)
                         self.set_output(6, True)
                         self.set_output(7, True)
@@ -272,7 +272,7 @@ class BatteryRobot(NorthC9):
                     run_geis(output_file_name=output_file_name + \
                                 f"_geis{i}", parameter_list=geis_parameter_list)
                     run_geis(output_file_name=output_file_name + \
-                                f"2_geis{i}", parameter_list=geis_parameter_list)
+                                f"_2geis{i}", parameter_list=geis_parameter_list)
                 elif CV:
                     self.move_vial(rack_disp_official[target_idx], vial_carousel)
                     if len(test.CV_CONDITIONS.split()) != 3:
@@ -883,7 +883,7 @@ class BatteryRobot(NorthC9):
         else:
             raise Exception("Cap holders are taken!")
 
-        self.cap(revs=4.8, torque_thresh=400)
+        self.cap(revs=3.5, torque_thresh=400)
         self.open_gripper()
         self.delay(.5)
         return cap_holder_id
