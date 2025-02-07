@@ -41,35 +41,32 @@ class DataAnalyzer():
         self.minR = self.ReZ_data_1[np.argmin(self.ImZ_data_1)]
 
 
-    def impedance(self, x, R1, R2, alpha1, alpha2,  sigma1, sigma2):
+    def impedance(self, x, R1, R2, R3, alpha1, alpha2,  sigma1, sigma2):
         w = 2*np.pi*x
         Z1 = sigma1*((1j*w)**alpha1)
         Z2 = sigma2*((1j*w)**alpha2)
-        RC1 = 1 / (1/(R1) + 1/Z1)
-        RC2 = 1 / (1/(R2) + 1/Z2)
-        Rf =  RC1 + RC2
+        RC1 = 1 / (1/(R1) + Z1)
+        RC2 = 1 / (1/(R2) + Z2)
+        Rf =  R3 + RC1 + RC2
         return Rf
 
-    def impedance1(self, x, C1, C2, R1, R2, R3):
+    def impedance1(self, x, R1, R2, alpha1, sigma1):
         w = 2*np.pi*x
-        #Zw = sigma1*w**(-0.5) - 1j*(sigma1*w**(-0.5))
-        RC2 = 1 / (1/(R2) + 1j*w*C1)
-        #Zw2 = sigma2*w**(-0.5) - 1j*(sigma2*w**(-0.5))
-        RC3 = 1 / (1/(R3) + 1j*w*C2)
-        Rf = R1 + RC2 + RC3
+        RC2 = 1 /(1/R2 + sigma1*((1j*w)**alpha1))
+        Rf = R1 + RC2
         return Rf
 
-    def Zreal(self, x, R1, R2,  alpha1, alpha2, sigma1, sigma2):
-        return self.impedance(x, R1, R2, alpha1, alpha2, sigma1, sigma2).real
+    def Zreal(self,  x, R1, R2, R3, alpha1, alpha2,  sigma1, sigma2):
+        return self.impedance( x, R1, R2, R3, alpha1, alpha2,  sigma1, sigma2).real
 
-    def Zimag(self, x,  R1, R2, alpha1, alpha2, sigma1, sigma2):
-        return -(self.impedance(x,  R1, R2,alpha1, alpha2, sigma1, sigma2).imag)
+    def Zimag(self,  x, R1, R2, R3, alpha1, alpha2,  sigma1, sigma2):
+        return -(self.impedance( x, R1, R2, R3, alpha1, alpha2,  sigma1, sigma2).imag)
 
-    def Zreal1(self, x, C1, C2, R1, R2, R3):
-        return self.impedance(x, C1, C2, R1, R2, R3 ).real
+    def Zreal1(self, x, R1, R2, alpha1, sigma1):
+        return self.impedance1(x,  R1,  R2, alpha1, sigma1).real
 
-    def Zimag1(self, x,C1, C2, R1, R2, R3):
-        return -self.impedance(x, C1, C2, R1, R2, R3).imag
+    def Zimag1(self, x,  R1,  R2, alpha1, sigma1):
+        return -(self.impedance1(x,   R1, R2, alpha1, sigma1).imag)
 
     def fit_model(self, x, Zr, Zi, fname, steps):
         x = x
@@ -78,27 +75,26 @@ class DataAnalyzer():
         y2 = np.abs(Zi)
         dy2 = np.abs(Zi)
         
-        params1 = [bmp.Parameter(name = "C1", value = 1e-9).range(0, 1),
-                bmp.Parameter(name = "C2", value = 1e-6).range(0, 1),
-                bmp.Parameter(name = "R1", value = 200).range(0,np.infty),
-                bmp.Parameter(name = "R2", value = 3300).range(0, np.infty),
-                bmp.Parameter(name = "R3", value = 3300).range(0,np.infty),]
+        params1 = [bmp.Parameter(name = "R1", value = self.minR).range(1, np.inf),
+                   bmp.Parameter(name = "R2", value = self.minR*1000).range(1, np.inf),
+                bmp.Parameter(name = "alpha1", value = .5).range(0, 1),
+                bmp.Parameter(name = "sigma1", value = 1e-6).range(0, 1)]
         
-        
-        params = [bmp.Parameter(name = "R1", value = self.minR).range(0, np.infty),
+        params = [bmp.Parameter(name = "R1", value = self.minR*100).range(0, np.infty),
                 bmp.Parameter(name = "R2", value = self.minR*100000).range(0, np.infty),
-                bmp.Parameter(name = "alpha1", value = -1).range(-1, 0),
-                bmp.Parameter(name = "alpha2", value = -1).range(-1, 0),
-                bmp.Parameter(name = "sigma1", value = 1e10).range(0, np.infty),
-                bmp.Parameter(name = "sigma2", value = 1e10).range(0, np.infty)]
+                bmp.Parameter(name = "R3", value = self.minR).range(1, np.inf),
+                bmp.Parameter(name = "alpha1", value = .5).range(0, 1),
+                bmp.Parameter(name = "alpha2", value = .5).range(0, 1),
+                bmp.Parameter(name = "sigma1", value = 1e-6).range(0, 1),
+                bmp.Parameter(name = "sigma2", value = 1e-6).range(0, 1)]
 
         for i in range(len(Zr)):
             dy1[i] *= 0.05
             dy2[i] *= 0.05 
 
-        self.bump.addfunction(self.Zreal,params)
+        self.bump.addfunction(self.Zreal1,params1)
         self.bump.addmodel(x,y1,dy1)
-        self.bump.addfunction(self.Zimag,params)
+        self.bump.addfunction(self.Zimag1,params1)
         self.bump.addmodel(x,y2,dy2)
 
         self.bump.setproblem(self.bump.models)
@@ -132,9 +128,10 @@ class DataAnalyzer():
     def run(self, fname):
         f_d, Z_d = self.imp(self.f_data1, self.ReZ_data_1, self.ImZ_data_1)
         
-        mask = (Z_d.real > 0) & (-Z_d.imag > 0) & (f_d < f_d[np.argmin(-Z_d.imag)+1]*100) & (f_d > f_d[np.argmin(-Z_d.imag)+1]/100)# & (f_d > 99 and f_d < 500)
+        mask = (Z_d.real > 0) & (-Z_d.imag > 0) 
         self.bump, obj = self.fit_model(f_d[mask], Z_d[mask].real, -Z_d[mask].imag,
-                                    fname = 'res/bumps/'+ fname + ".xlsx",steps=10000)
+                                    fname = 'res/bumps/'+ fname + ".xlsx",steps=1000)
+        
         return obj
         # 1000 steps ~ 10seconds
         # 5000 ~ 50seconds

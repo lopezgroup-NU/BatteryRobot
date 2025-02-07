@@ -193,7 +193,7 @@ class BatteryRobot(NorthC9):
         df = pd.read_csv(run_file)
 
         #way to control purge for now
-        water_start = 36
+        water_start = 15
 
         log_file = open("experiments/experiments.log", "a")
         log_file.write("*" * 50 + "\n")
@@ -377,6 +377,7 @@ class BatteryRobot(NorthC9):
         remaining = target_vol
         pos = self.source_rack.index_to_pos(source_id)
         source_name = getattr(self.source_rack, pos)
+        self.set_pump_speed(3, 25)
         while remaining > 0:
             rack = p_asp_high
             curr_vol = getattr(self.source_rack, source_name + "_vol")
@@ -392,10 +393,10 @@ class BatteryRobot(NorthC9):
                 self.aspirate_ml(3, 1 - amount)
                 self.goto_safe(rack[source_id])
             self.aspirate_ml(3, amount)
-            self.delay(.5)
+            self.delay(3)
             self.goto_safe(carousel_dispense)
             self.move_pump(3, 0)
-            self.delay(.5)
+            self.delay(3)
             remaining -= amount
             self.source_rack.set_vial_by_pos(pos, curr_vol - amount)
 
