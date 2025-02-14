@@ -128,9 +128,9 @@ class DataAnalyzer():
     def run(self, fname):
         f_d, Z_d = self.imp(self.f_data1, self.ReZ_data_1, self.ImZ_data_1)
         
-        mask = (Z_d.real > 0) & (-Z_d.imag > 0) 
+        mask = (Z_d.real > 0) & (-Z_d.imag > 20) 
         self.bump, obj = self.fit_model(f_d[mask], Z_d[mask].real, -Z_d[mask].imag,
-                                    fname = 'res/bumps/'+ fname + ".xlsx",steps=1000)
+                                    fname = 'res/bumps/'+ fname + ".xlsx",steps=5000)
         
         return obj
         # 1000 steps ~ 10seconds

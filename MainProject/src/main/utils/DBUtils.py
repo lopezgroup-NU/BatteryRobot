@@ -1,9 +1,18 @@
 import os
 import json
+import time
 import numpy as np
 import pandas as pd 
 from pymongo import MongoClient
 from pathlib import Path
+
+
+def get_time_stamp():
+    """
+    Convert current time to string format
+    """
+    s = time.localtime(time.time())
+    return time.strftime("%Y-%m-%d %H:%M:%S", s)
 
 def find_peaks_and_zero_crossings(data):
     # Find the index of the first occurrence of zero in 'Vf'
@@ -37,24 +46,35 @@ def parse_files(file_list, type="cv"):
         stem = Path(file).stem
         stem_split = stem.split("_")
 
+        salt = []
+        conc = []
+        test_type = []
         # more than one salt
         if len(stem_split) != 3:
-            continue
-
-        salt, conc, test_type = stem_split
+            for index, value in enumerate(stem_split[:-1]):
+                if index % 2 == 0:  # 0-based index for 1st, 3rd, 5th, 7th...
+                    salt.append(value)
+                elif index % 2 == 1:  # 0-based index for 2nd, 4th, 6th, 8th...
+                    conc.append(value)
+            test_type = stem_split[-1]     
+        else:
+            salt, conc, test_type = stem_split
+            salt = [salt]
+            conc = [conc]
+            test_type = test_type
 
         # first part should be salt name
-        salts.add(salt)
+        salts.add(tuple(salt))
 
         # get conc
-        conc = conc[:-1]
-        dec_conc = float(conc.replace("p", "."))
+        dec_conc = [(s.replace("p", ".")) for s in conc]
+        dec_conc = [(s.replace("m", "")) for s in dec_conc]
 
         # keep track
-        if salt in salts_to_conc_list:
-            salts_to_conc_list[salt].append(dec_conc)
+        if tuple(salt) in salts_to_conc_list:
+            salts_to_conc_list[tuple(salt)].append(tuple(dec_conc))
         else:
-            salts_to_conc_list[salt] = [dec_conc]
+            salts_to_conc_list[tuple(salt)] = [tuple(dec_conc)]
 
         # from test_type, determine the test number for this test
         if type == "cv":
@@ -63,13 +83,12 @@ def parse_files(file_list, type="cv"):
             suffix_length = 5
 
         test_num = test_type[:-suffix_length]
+
         if test_num == "":
             test_num = 1
         else:
             test_num = int(test_num)
-
-        salt_and_conc.add((salt, conc, test_num))
-
+        salt_and_conc.add((tuple(salt), tuple(dec_conc), test_num))
     return salts, salt_and_conc, salts_to_conc_list
 
 class MongoConn:
@@ -116,7 +135,7 @@ class MongoQuery:
     collections ~= tables for a sql db
     document ~= row/tuple/record of information for a sql db 
 
-    Current collections - cv_data and geis_data
+    Current collections - data (contains both eis and cv data)
     """
 
     def __init__(self, uri="mongodb://localhost:27017/", db_name="atomdb"):
@@ -129,7 +148,7 @@ class MongoQuery:
         """
         csv_files = [f for f in os.listdir(folder) if f.endswith(".csv")]
         salts, salt_and_conc, salt_to_conc_list = parse_files(csv_files, type="cv")
-        collection = self.conn.get_collection("cv_data")
+        collection = self.conn.get_collection("data")
 
         for tup in salt_and_conc:
             salt, conc, test_num = tup
@@ -140,13 +159,18 @@ class MongoQuery:
             else:
                 prefix = str(test_num)
             
-            name = f"{str(salt)}_{str(conc)}m_{str(test_num)}"
+            name = []
+            for i in range(len(salt)):
+                name.append(f"{str(salt[i])}_{str(conc[i])}m")
+            # Add the test number at the end
+            name = ("_".join(name) + f"_{prefix}") if prefix != "" else "_".join(name)
+            file_named = name.replace(".", "p")
 
-            cv_diff = []
+            all_cv_diff = []
             for i in range(3):
-                file_name = f"{salt}_{conc}m_{prefix}cv{str(i)}.csv"
+                file_name = f"{file_named}_cv{str(i)}.csv"
                 path = folder / Path(file_name)
-                
+
                 try:
                     df = pd.read_csv(path, index_col='# Point')
                 except:
@@ -156,23 +180,38 @@ class MongoQuery:
                 x = df["Vf"]
                 y = df['Im']
 
-                cv_diff.append(abs(x[positive_peak_index] - x[negative_peak_index]))
+                all_cv_diff.append(abs(x[positive_peak_index] - x[negative_peak_index]))
 
-            if len(cv_diff) == 1:
-                avg_cv_diff = cv_diff[0]
+            if len(all_cv_diff) == 1:
+                avg_cv_diff = all_cv_diff[0]
             elif ignore_first:
                 # ignore first value
-                avg_cv_diff = sum(cv_diff[1:]) / (len(cv_diff) - 1) 
+                avg_cv_diff = sum(all_cv_diff[1:]) / (len(all_cv_diff) - 1) 
             else:
-                avg_cv_diff = sum(cv_diff) / (len(cv_diff))
+                avg_cv_diff = sum(all_cv_diff) / (len(all_cv_diff))
 
-            collection.update_one(
-                {"name": name},
-                {"$set": {"avg_cv_diff": avg_cv_diff,
-                          "cv_diff": cv_diff,
-                          "ignore_first": ignore_first}}, 
-                upsert=True
-            )
+            components_dict = {}
+            for i in range(len(salt)):
+                components_dict[salt[i]] = conc[i]
+
+            if len(all_cv_diff) != 0:
+                collection.update_one(
+                    {"name": name},
+                    {"$set": {"avg_cv_diff": avg_cv_diff,
+                            "cv_diff": all_cv_diff,
+                            "ignore_first": ignore_first,
+                            "cv_date_uploaded": get_time_stamp(),
+                            "components": components_dict}}, 
+                    upsert=True
+                )
+
+                if len(all_cv_diff) == 3:
+                    collection.update_one(
+                    {"name": name},
+                    {"$set": {"cv_error": all_cv_diff[2] - all_cv_diff[1],
+                              "components": components_dict}}, 
+                    upsert=True
+                )
 
     def add_geis_data(self, folder, ignore_first=True):
         """
@@ -181,22 +220,26 @@ class MongoQuery:
         """
         csv_files = [f for f in os.listdir(folder) if f.endswith(".csv")]
         salts, salt_and_conc, salt_to_conc_list = parse_files(csv_files, type="geis")
-        collection = self.conn.get_collection("geis_data")
+        collection = self.conn.get_collection("data")
 
         for tup in salt_and_conc:
             salt, conc, test_num = tup
-
             # rebuild file name
             if test_num == 1:
                 prefix  = ""
             else:
                 prefix = str(test_num)
 
-            name = f"{str(salt)}_{str(conc)}m_{str(test_num)}"
+            name = []
+            for i in range(len(salt)):
+                name.append(f"{str(salt[i])}_{str(conc[i])}m")
+            # Add the test number at the end
+            name = ("_".join(name) + f"_{prefix}") if prefix != "" else "_".join(name)
+            file_named = name.replace(".", "p")
 
             all_conductivity = []
             for i in range(3):
-                file_name = f"{salt}_{conc}m_{prefix}geis{str(i)}.csv"
+                file_name = f"{file_named}_geis{str(i)}.csv"
                 path = folder / Path(file_name)
 
                 try:
@@ -219,13 +262,29 @@ class MongoQuery:
             else:
                 avg_conductivity = sum(all_conductivity) / len(all_conductivity)
 
-            collection.update_one(
-                {"name": name},
-                {"$set": {"avg_conductivity": avg_conductivity,
-                          "conductivity": all_conductivity,
-                          "ignore_first": ignore_first}}, 
-                upsert=True
-            )
+
+            components_dict = {}
+            for i in range(len(salt)):
+                components_dict[salt[i]] = conc[i]
+
+            if len(all_conductivity) != 0:
+                collection.update_one(
+                    {"name": name},
+                    {"$set": {"avg_conductivity": avg_conductivity,
+                            "conductivity": all_conductivity,
+                            "ignore_first": ignore_first,
+                            "geis_date_uploaded": get_time_stamp(),
+                            "components": components_dict}}, 
+                    upsert=True
+                )
+
+                if len(all_conductivity) == 3:
+                    collection.update_one(
+                    {"name": name},
+                    {"$set": {"geis_error": all_conductivity[2] - all_conductivity[1],
+                              "components": components_dict}}, 
+                    upsert=True
+                )
 
     def update_ignore(self, collection_name, ignore_first:bool):
         """
@@ -234,7 +293,7 @@ class MongoQuery:
         Also changes the average value if ignore_first is different than before.
         """
         collection = self.conn.get_collection(collection_name)
-        if collection_name == "cv_data":
+        if collection_name == "data":
             data_field, avg_field = "cv_diff", "avg_cv_diff"
             
         else: # collection_name == "geis_data"
@@ -260,6 +319,29 @@ class MongoQuery:
                           "ignore_first": ignore_first}}, 
             )
     
+    def set_saturated_out(self, file):
+        """
+        Takes in file of salts where saturated out = true and updates db values
+
+        Example: file.txt
+
+        TFSI_5m True
+        TFSI_3m False
+        """
+        collection = self.conn.get_collection("data")
+        collection.update_many({}, {"$set": {"precipitated_out": False}})
+
+        with open(file, 'r') as file:
+            for line in file:
+                line = line.strip()
+                if line:
+                    collection.update_one(
+                        {"name": line},
+                        {"$set": {"precipitated_out": True}}, 
+                        upsert=True
+                    )
+
+
     def get_data(self, collection_name, dump_to_file = False):
         """
         Get all data from a certain collection (i.e. table)
@@ -276,14 +358,14 @@ class MongoQuery:
 
         if dump_to_file:
             with open(f"{collection_name}.json", "w", encoding="utf-8") as file:
-                file.write(json_output)
+                json.dump(docs, file, default=str, indent=4)
         return json_output
     
     def drop_data(self, collection_name):
         """
         Drop all data from a certain collection (i.e. table)
 
-        Current collections - cv_data and geis_data
+        Current collections - data
         """
         collection = self.conn.get_collection(collection_name)
         collection.drop()

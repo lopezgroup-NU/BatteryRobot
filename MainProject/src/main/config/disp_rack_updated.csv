@@ -1,7 +1,7 @@
 ,0,1,2,3,4,5,6,7
-0,purge ,purge ,purge ,purge ,purge,e,x,N98 5.0 1
-1,purge ,purge ,purge ,purge ,purge,e,N92 0 0,N97 0 2
-2,purge ,purge ,purge ,purge ,purge,e,N91 0 0,N96 0 5
-3,purge ,purge ,purge ,purge ,purge,purge,SO41 5 0,N95 0 0
-4,purge ,purge ,purge ,purge ,purge,purge,SO42 5 0,N94 0 0
-5,purge ,purge ,purge ,purge ,purge,purge,SO34 5 0,N93 0 0
+0,purge ,purge ,purge ,purge ,purge,e,x,N98 -1.248 1
+1,purge ,purge ,purge ,purge ,purge,e,N92 0 0,N97 -1.248 2
+2,purge ,purge ,purge ,purge ,purge,e,N91 0 0,N96 -1.248 5
+3,purge ,purge ,purge ,purge ,purge,purge,SO41 5 0,N95 -1.248 0
+4,purge ,purge ,purge ,purge ,purge,purge,SO42 5 0,N94 -1.248 0
+5,purge ,purge ,purge ,purge ,purge,purge,SO34 5 0,N93 -1.248 0

@@ -76,11 +76,11 @@ class BatteryRobot(NorthC9):
         df = pd.read_csv(run_file)
 
         #start spinner
-        self.spin_axis(6, 1200)
+        self.spin_axis(6, 7000)
 
         log_file = open("experiments/formulation.log", "a")
         log_file.write("*" * 50 + "\n")
-        log_file.write(f"Making formulations: {self.curr_time()} \n")
+        log_file.write(f"Making formulations: {get_time_stamp()} \n")
 
         for experiment in df.itertuples():
             try:
@@ -93,7 +93,7 @@ class BatteryRobot(NorthC9):
                 target_pos = experiment.Target_vial
                 target_idx = self.disp_rack.pos_to_index(target_pos)
                 log_file.write(
-                    f"   Start formulation for vial at {target_pos} at: {self.curr_time()} \n"
+                    f"   Start formulation for vial at {target_pos} at: {get_time_stamp()} \n"
                     )
 
                 if has_solids:
@@ -160,7 +160,7 @@ class BatteryRobot(NorthC9):
                                        rack_disp_official[target_idx])
                         log_file.write(f"   Finished making formulation for vial at position \
                                         {self.disp_rack.index_to_pos(target_idx)}:\
-                                        {self.curr_time()} \n")
+                                        {get_time_stamp()} \n")
                     else:
                         vials_to_remove = False
                 else:
@@ -175,12 +175,12 @@ class BatteryRobot(NorthC9):
                 heatplate_idx, target_idx = heated_vial[1], heated_vial[2]
                 self.move_vial(heatplate_official[heatplate_idx], rack_disp_official[target_idx])
                 log_file.write(f"   Finished making formulation for vial at position \
-                               {self.disp_rack.index_to_pos(target_idx)}:  {self.curr_time()} \n")
+                               {self.disp_rack.index_to_pos(target_idx)}:  {get_time_stamp()} \n")
 
             else: # if soonest vial isn't ready yet, wait 60 seconds
                 time.sleep(60)
 
-        log_file.write(f"Finished all formulations: {self.curr_time()} \n")
+        log_file.write(f"Finished all formulations: {get_time_stamp()} \n")
         log_file.write("*" * 50 + "\n")
         log_file.close()
 
@@ -197,13 +197,13 @@ class BatteryRobot(NorthC9):
 
         log_file = open("experiments/experiments.log", "a")
         log_file.write("*" * 50 + "\n")
-        log_file.write(f"Running tests: {self.curr_time()} \n")
+        log_file.write(f"Running tests: {get_time_stamp()} \n")
 
         for test in df.itertuples():
             try:
                 target_pos = test.Reagent
                 log_file.write(f"   Beginning tests for position {target_pos} at: \
-                               {self.curr_time()} \n")
+                               {get_time_stamp()} \n")
 
                 target_idx = self.disp_rack.pos_to_index(test.Reagent)
                 GEIS = True if test.GEIS else False
@@ -235,8 +235,6 @@ class BatteryRobot(NorthC9):
                         self.set_output(8, False)
                         run_geis(output_file_name=output_file_name + \
                                 f"_geis{i}", parameter_list=geis_parameter_list)
-                        run_geis(output_file_name=output_file_name + \
-                                f"_2geis{i}", parameter_list=geis_parameter_list)
                         self.draw_sensor1to2(target_idx, viscous=True)
                         self.set_output(6, True)
                         self.set_output(7, True)
@@ -271,8 +269,6 @@ class BatteryRobot(NorthC9):
                     self.draw_to_sensor(target_idx, viscous=True, special=True)
                     run_geis(output_file_name=output_file_name + \
                                 f"_geis{i}", parameter_list=geis_parameter_list)
-                    run_geis(output_file_name=output_file_name + \
-                                f"_2geis{i}", parameter_list=geis_parameter_list)
                 elif CV:
                     self.move_vial(rack_disp_official[target_idx], vial_carousel)
                     if len(test.CV_CONDITIONS.split()) != 3:
@@ -296,7 +292,7 @@ class BatteryRobot(NorthC9):
                     self.set_output(8, False)
 
                 log_file.write(f"   Finished tests for position {target_pos} at: \
-                               {self.curr_time()} \n")
+                               {get_time_stamp()} \n")
 
                 for _ in range(3):
                     self.purge(water_start, n_pumps=7, speed=22)
@@ -309,7 +305,7 @@ class BatteryRobot(NorthC9):
                 elif response.upper() == "NO":
                     break
 
-        log_file.write(f"Finished all formulations: {self.curr_time()} \n")
+        log_file.write(f"Finished all formulations: {get_time_stamp()} \n")
         log_file.write("*" * 50 + "\n")
         log_file.close()
 
@@ -377,7 +373,10 @@ class BatteryRobot(NorthC9):
         remaining = target_vol
         pos = self.source_rack.index_to_pos(source_id)
         source_name = getattr(self.source_rack, pos)
-        self.set_pump_speed(3, 25)
+
+        if "TFSI" in source_name.upper() or "FSI" in source_name.upper():
+             self.set_pump_speed(3, 25)
+
         while remaining > 0:
             rack = p_asp_high
             curr_vol = getattr(self.source_rack, source_name + "_vol")
@@ -399,7 +398,8 @@ class BatteryRobot(NorthC9):
             self.delay(3)
             remaining -= amount
             self.source_rack.set_vial_by_pos(pos, curr_vol - amount)
-
+        
+        self.set_pump_speed(3, 15)
         dispensed = self.read_steady_scale()
         self.goto_safe(safe_zone)
         self.remove_pipette()
@@ -884,7 +884,7 @@ class BatteryRobot(NorthC9):
         else:
             raise Exception("Cap holders are taken!")
 
-        self.cap(revs=3.5, torque_thresh=400)
+        self.cap(revs=2.5, torque_thresh=400)
         self.open_gripper()
         self.delay(.5)
         return cap_holder_id
@@ -904,7 +904,7 @@ class BatteryRobot(NorthC9):
         self.delay(.5)
         self.uncap(revs=3.5)
         self.goto_safe(rack_source_official_approach[source_id])
-        self.cap(torque_thresh=500)
+        self.cap(revs=2.5, torque_thresh=400)
         self.open_gripper()
         self.goto_safe(safe_zone)
 
@@ -994,12 +994,6 @@ class BatteryRobot(NorthC9):
         self.holding_pipette = False
         self.goto_safe(safe_zone) # go to safe zone
 
-    def curr_time(self):
-        """
-        Convert current time to string format
-        """
-        s = time.localtime(time.time())
-        return time.strftime("%Y-%m-%d %H:%M:%S", s)
 
     def increment_pip_id(self):
         """
@@ -1021,3 +1015,10 @@ class BatteryRobot(NorthC9):
         except InitializationError as e:
             print(e)
             print("Fix the rack csvs and try again.")
+
+def get_time_stamp():
+    """
+    Convert current time to string format
+    """
+    s = time.localtime(time.time())
+    return time.strftime("%Y-%m-%d %H:%M:%S", s)
