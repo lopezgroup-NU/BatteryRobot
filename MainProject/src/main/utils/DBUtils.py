@@ -6,14 +6,6 @@ import pandas as pd
 from pymongo import MongoClient
 from pathlib import Path
 
-
-def get_time_stamp():
-    """
-    Convert current time to string format
-    """
-    s = time.localtime(time.time())
-    return time.strftime("%Y-%m-%d %H:%M:%S", s)
-
 def find_peaks_and_zero_crossings(data):
     # Find the index of the first occurrence of zero in 'Vf'
     zero_index = np.argmax(data['Vf'] >= 0)
@@ -29,6 +21,38 @@ def find_peaks_and_zero_crossings(data):
     negative_peak_index = np.argmin(data['Im'][zero_cross_index:]) + zero_cross_index
     
     return positive_peak_index, zero_cross_index, negative_peak_index
+
+def cv_interpret(filename):
+    df_file = filename
+    df = pd.read_csv(df_file, index_col='# Point')
+
+    positive,zero,negative = find_peaks_and_zero_crossings(df)
+
+    targ_max = 0.000024
+    targ_min = -0.000024
+
+    im_col = df["Im"]
+    im_colPositive = im_col[0:positive]
+    im_colNegative = im_col[zero:negative]
+
+    vf_col = df["Vf"]
+    vf_colPositive = vf_col[0:positive]
+    vf_colNegative = vf_col[zero:negative]
+
+    #get xmax
+    #translate column by target and get absolute values. find index of minimum (closest to 0)
+    im_col_translated_pos = (im_colPositive - targ_max).abs()
+    min_idx_pos = im_col_translated_pos.idxmin()
+    vf_max = vf_colPositive.loc[min_idx_pos]  # Use .loc to get the value at that index
+
+    #get xmin
+    im_col_translated_neg = (im_colNegative + targ_max).abs()
+    min_idx_neg = im_col_translated_neg.idxmin()
+    vf_min = vf_colNegative.loc[min_idx_neg]  # Use .loc to get the value at that index
+
+    vf_diff = vf_max-vf_min
+
+    return(vf_diff,vf_max,vf_min )
 
 def parse_files(file_list, type="cv"):
     """
@@ -167,40 +191,52 @@ class MongoQuery:
             file_named = name.replace(".", "p")
 
             all_cv_diff = []
+            low_end_cv = []
+            high_end_cv = []
+
             for i in range(3):
                 file_name = f"{file_named}_cv{str(i)}.csv"
                 path = folder / Path(file_name)
+                
+                if os.path.exists(path):
+                    vf_diff,vf_max,vf_min = cv_interpret(path)
+                    all_cv_diff.append(vf_diff)
+                    low_end_cv.append(vf_min)
+                    high_end_cv.append(vf_max)
 
-                try:
-                    df = pd.read_csv(path, index_col='# Point')
-                except:
-                    continue
-
-                positive_peak_index, zero_cross_index, negative_peak_index = find_peaks_and_zero_crossings(df)
-                x = df["Vf"]
-                y = df['Im']
-
-                all_cv_diff.append(abs(x[positive_peak_index] - x[negative_peak_index]))
+                    # get timestamp of latest file for specific run
+                    time_stamp = os.path.getmtime(path)
+                    time_stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_stamp))
 
             if len(all_cv_diff) == 1:
                 avg_cv_diff = all_cv_diff[0]
+                avg_cv_low = low_end_cv[0]
+                avg_cv_high = high_end_cv[0]
             elif ignore_first:
                 # ignore first value
                 avg_cv_diff = sum(all_cv_diff[1:]) / (len(all_cv_diff) - 1) 
+                avg_cv_low = sum(low_end_cv[1:]) / (len(low_end_cv) - 1) 
+                avg_cv_high = sum(high_end_cv[1:]) / (len(high_end_cv) - 1) 
             else:
                 avg_cv_diff = sum(all_cv_diff) / (len(all_cv_diff))
+                avg_cv_low = sum(low_end_cv) / (len(low_end_cv))
+                avg_cv_high = sum(high_end_cv) / (len(high_end_cv))
 
             components_dict = {}
             for i in range(len(salt)):
-                components_dict[salt[i]] = conc[i]
+                components_dict[salt[i]] = float(conc[i])
 
             if len(all_cv_diff) != 0:
                 collection.update_one(
                     {"name": name},
                     {"$set": {"avg_cv_diff": avg_cv_diff,
                             "cv_diff": all_cv_diff,
+                            "avg_highV": avg_cv_high,
+                            "highV": high_end_cv,
+                            "avg_lowV": avg_cv_low,
+                            "lowV": low_end_cv,
                             "ignore_first": ignore_first,
-                            "cv_date_uploaded": get_time_stamp(),
+                            "cv_date_uploaded": time_stamp,
                             "components": components_dict}}, 
                     upsert=True
                 )
@@ -242,17 +278,18 @@ class MongoQuery:
                 file_name = f"{file_named}_geis{str(i)}.csv"
                 path = folder / Path(file_name)
 
-                try:
+                if os.path.exists(path):
                     df = pd.read_csv(path, index_col='# point')
-                except:
-                    continue
+                    # extract zreal, compute conductivity
+                    df_no_negatives = df[df.reflected_zimag >=0]
+                    min_index = df_no_negatives['reflected_zimag'].idxmin()  # Get the index of the minimum value
+                    zreal = df_no_negatives['zreal'].loc[min_index]  # Use .loc to get the value at that index
+                    conductivity =  6.06007673/zreal  
+                    all_conductivity.append(conductivity)
 
-                # extract zreal, compute conductivity
-                df_no_negatives = df[df.reflected_zimag >=0]
-                min_index = df_no_negatives['reflected_zimag'].idxmin()  # Get the index of the minimum value
-                zreal = df_no_negatives['zreal'].loc[min_index]  # Use .loc to get the value at that index
-                conductivity =  6.06007673/zreal  
-                all_conductivity.append(conductivity)
+                    # get timestamp of latest file for specific run
+                    time_stamp = os.path.getmtime(path)
+                    time_stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_stamp))
                 
             if len(all_conductivity) == 1:
                 avg_conductivity = all_conductivity[0]
@@ -265,7 +302,7 @@ class MongoQuery:
 
             components_dict = {}
             for i in range(len(salt)):
-                components_dict[salt[i]] = conc[i]
+                components_dict[salt[i]] = float(conc[i])
 
             if len(all_conductivity) != 0:
                 collection.update_one(
@@ -273,7 +310,7 @@ class MongoQuery:
                     {"$set": {"avg_conductivity": avg_conductivity,
                             "conductivity": all_conductivity,
                             "ignore_first": ignore_first,
-                            "geis_date_uploaded": get_time_stamp(),
+                            "geis_date_uploaded": time_stamp,
                             "components": components_dict}}, 
                     upsert=True
                 )
@@ -300,44 +337,65 @@ class MongoQuery:
             data_field, avg_field = "conductivity", "avg_conductivity"
 
         for doc in collection.find():
-            # if already same as specified, just skip
-            if doc["ignore_first"] == ignore_first:
+            # in case doc doesnt have ignore_first, skip to avoid crash
+            try:
+                # if already same as specified, just skip
+                if doc["ignore_first"] == ignore_first:
+                    continue
+
+                data = doc[data_field]
+                if len(data) == 1:
+                    new_value = data[0]
+                elif ignore_first:
+                    # ignore first value
+                    new_value = sum(data[1:]) / (len(data) - 1) 
+                else:
+                    new_value = sum(data) / len(data)
+
+                collection.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {avg_field: new_value,
+                            "ignore_first": ignore_first}}, 
+                )
+
+            except:
                 continue
 
-            data = doc[data_field]
-            if len(data) == 1:
-                new_value = data[0]
-            elif ignore_first:
-                # ignore first value
-                new_value = sum(data[1:]) / (len(data) - 1) 
-            else:
-                new_value = sum(data) / len(data)
-
-            collection.update_one(
-                {"_id": doc["_id"]},
-                {"$set": {avg_field: new_value,
-                          "ignore_first": ignore_first}}, 
-            )
     
     def set_saturated_out(self, file):
         """
-        Takes in file of salts where saturated out = true and updates db values
+        Takes in file of salts where saturated out = true
+        Adds them to db
+        Add breakdown of components as well
 
         Example: file.txt
 
-        TFSI_5m True
-        TFSI_3m False
+        TFSI_5m
+        TFSI_3m
         """
+        
         collection = self.conn.get_collection("data")
-        collection.update_many({}, {"$set": {"precipitated_out": False}})
 
         with open(file, 'r') as file:
             for line in file:
                 line = line.strip()
                 if line:
+                    s = line.split("_")
+                    components_dict = {}
+                    
+                    for i in range(0, len(s), 2):
+                        salt = s[i]
+                        conc_str = s[i+1]
+                        # remove the trailing m
+                        conc_str = conc_str[:-1]
+                        conc_str = conc_str.replace('p', '.')
+                        conc = float(conc_str)
+                        components_dict[salt] = conc
+
                     collection.update_one(
                         {"name": line},
-                        {"$set": {"precipitated_out": True}}, 
+                        {"$set": {"precipitated_out": True,
+                                  "components": components_dict}}, 
                         upsert=True
                     )
 

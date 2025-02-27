@@ -869,7 +869,7 @@ class BatteryRobot(NorthC9):
         """
         self.close_gripper()
         self.delay(.5)
-        self.uncap()
+        self.uncap(revs=4)
 
         if self.cap_holder_1_free:
             self.goto_safe(cap_holder_1_approach)
@@ -884,7 +884,7 @@ class BatteryRobot(NorthC9):
         else:
             raise Exception("Cap holders are taken!")
 
-        self.cap(revs=2.5, torque_thresh=400)
+        self.cap(revs=2.75, torque_thresh=400)
         self.open_gripper()
         self.delay(.5)
         return cap_holder_id
@@ -904,7 +904,7 @@ class BatteryRobot(NorthC9):
         self.delay(.5)
         self.uncap(revs=3.5)
         self.goto_safe(rack_source_official_approach[source_id])
-        self.cap(revs=2.5, torque_thresh=400)
+        self.cap(revs=2.75, torque_thresh=400)
         self.open_gripper()
         self.goto_safe(safe_zone)
 
@@ -972,7 +972,7 @@ class BatteryRobot(NorthC9):
         print(f"getting pipette at index {self.pip_id}")
         self.goto_safe(pipette_grid[pipette_order[self.pip_id]])
         self.increment_pip_id()
-        self.move_z(400) # lift up before moving to safe spot
+        self.move_z(400, vel=10) # lift up before moving to safe spot
         self.goto_safe(safe_zone) # go to safe zone
         self.holding_pipette = True
 
