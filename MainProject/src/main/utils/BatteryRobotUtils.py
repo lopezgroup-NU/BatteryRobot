@@ -884,7 +884,7 @@ class BatteryRobot(NorthC9):
         else:
             raise Exception("Cap holders are taken!")
 
-        self.cap(revs=2.75, torque_thresh=400)
+        self.cap(revs=3, torque_thresh=400)
         self.open_gripper()
         self.delay(.5)
         return cap_holder_id
@@ -904,7 +904,7 @@ class BatteryRobot(NorthC9):
         self.delay(.5)
         self.uncap(revs=3.5)
         self.goto_safe(rack_source_official_approach[source_id])
-        self.cap(revs=2.75, torque_thresh=400)
+        self.cap(revs=3, torque_thresh=400)
         self.open_gripper()
         self.goto_safe(safe_zone)
 

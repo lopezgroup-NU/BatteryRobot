@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd 
 from pymongo import MongoClient
 from pathlib import Path
+from .CalculationUtils import get_water_weight_from_components
 
 def find_peaks_and_zero_crossings(data):
     # Find the index of the first occurrence of zero in 'Vf'
@@ -226,6 +227,8 @@ class MongoQuery:
             for i in range(len(salt)):
                 components_dict[salt[i]] = float(conc[i])
 
+            water_weight = get_water_weight_from_components(components_dict)
+
             if len(all_cv_diff) != 0:
                 collection.update_one(
                     {"name": name},
@@ -237,7 +240,10 @@ class MongoQuery:
                             "lowV": low_end_cv,
                             "ignore_first": ignore_first,
                             "cv_date_uploaded": time_stamp,
-                            "components": components_dict}}, 
+                            "components": components_dict,
+                            "water_weight": water_weight,
+                            "precipitated_out": False
+                            }}, 
                     upsert=True
                 )
 
@@ -304,6 +310,8 @@ class MongoQuery:
             for i in range(len(salt)):
                 components_dict[salt[i]] = float(conc[i])
 
+            water_weight = get_water_weight_from_components(components_dict)
+
             if len(all_conductivity) != 0:
                 collection.update_one(
                     {"name": name},
@@ -311,7 +319,10 @@ class MongoQuery:
                             "conductivity": all_conductivity,
                             "ignore_first": ignore_first,
                             "geis_date_uploaded": time_stamp,
-                            "components": components_dict}}, 
+                            "components": components_dict,
+                            "water_weight": water_weight,
+                            "precipitated_out": False
+                            }}, 
                     upsert=True
                 )
 
@@ -392,10 +403,13 @@ class MongoQuery:
                         conc = float(conc_str)
                         components_dict[salt] = conc
 
+                    water_weight = get_water_weight_from_components(components_dict)
+
                     collection.update_one(
                         {"name": line},
                         {"$set": {"precipitated_out": True,
-                                  "components": components_dict}}, 
+                                  "components": components_dict,
+                                  "water_weight": water_weight}}, 
                         upsert=True
                     )
 

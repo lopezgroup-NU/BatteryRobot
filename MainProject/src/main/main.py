@@ -14,11 +14,11 @@ for i in paths:
 rob = BatteryRobot('A', network_serial='AU06EZ1P', home = True)
 t8 = T8('B', network = rob.network)
 p2 = PowderShaker('C', network = rob.network)
-
+    
 rob.initialize_deck("config/disp_rack.csv", "config/source_rack.csv", "config/heat_rack.csv")
 waters = list(range(10,48))
 
-rob.run_formulation('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/formulation.csv')
+# rob.run_formulation('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/formulation.csv')
 # rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv')
 
 #capping vials on asprack takes about 800 units of torque
