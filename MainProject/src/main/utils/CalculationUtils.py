@@ -70,12 +70,12 @@ def get_water_weight(fsic=0, clo4c=0, tfsic=0, no3c=0, so4c=0, acc=0):
     # Define variables
     a, b, c, x, y, z, w = symbols('a b c x y z w')
     # Define equations
-    eq1 = Eq(fsic, (y *FSIp  * FSId) / (FSImm* w))
-    eq2 = Eq(tfsic, (x * TFSIp * TFSId) / (TFSImm* w))
-    eq3 = Eq(clo4c, (a * ClO4p  * ClO4d) / (ClO4mm * w))
-    eq4 = Eq(no3c, (z * NO3p * NO3d) / (NO3mm * w))
-    eq5 = Eq(so4c, (b * SO4p *  SO4d) / (SO4mm * w))
-    eq6 = Eq(acc, (c * ACp  * ACd) / (ACmm  * w))
+    eq1 = Eq(fsic/1000, (y *FSIp  * FSId) / (FSImm* w))
+    eq2 = Eq(tfsic/1000, (x * TFSIp * TFSId) / (TFSImm* w))
+    eq3 = Eq(clo4c/1000, (a * ClO4p  * ClO4d) / (ClO4mm * w))
+    eq4 = Eq(no3c/1000, (z * NO3p * NO3d) / (NO3mm * w))
+    eq5 = Eq(so4c/1000, (b * SO4p *  SO4d) / (SO4mm * w))
+    eq6 = Eq(acc/1000, (c * ACp  * ACd) / (ACmm  * w))
     eq7 = Eq(w, 5 - x - y - z - a - b - c + (1 - ClO4p) * a * ClO4d + (1 - FSIp) * y *FSId + (1 - TFSIp) * x * TFSId + (1 - NO3p) * z * NO3d + (1 - SO4p) * b * SO4d + (1 - ACp) * c * ACd )
     #Solve the system of equations
     solution = solve((eq1, eq2, eq3, eq4, eq5, eq6, eq7), (a, b, c, x, y, z, w))

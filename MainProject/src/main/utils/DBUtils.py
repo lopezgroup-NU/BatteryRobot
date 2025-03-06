@@ -114,6 +114,7 @@ def parse_files(file_list, type="cv"):
         else:
             test_num = int(test_num)
         salt_and_conc.add((tuple(salt), tuple(dec_conc), test_num))
+
     return salts, salt_and_conc, salts_to_conc_list
 
 class MongoConn:
@@ -190,7 +191,6 @@ class MongoQuery:
             # Add the test number at the end
             name = ("_".join(name) + f"_{prefix}") if prefix != "" else "_".join(name)
             file_named = name.replace(".", "p")
-
             all_cv_diff = []
             low_end_cv = []
             high_end_cv = []
@@ -198,7 +198,6 @@ class MongoQuery:
             for i in range(3):
                 file_name = f"{file_named}_cv{str(i)}.csv"
                 path = folder / Path(file_name)
-                
                 if os.path.exists(path):
                     vf_diff,vf_max,vf_min = cv_interpret(path)
                     all_cv_diff.append(vf_diff)
@@ -228,10 +227,9 @@ class MongoQuery:
                 components_dict[salt[i]] = float(conc[i])
 
             water_weight = get_water_weight_from_components(components_dict)
-
             if len(all_cv_diff) != 0:
                 collection.update_one(
-                    {"name": name},
+                    {"name": file_named},
                     {"$set": {"avg_cv_diff": avg_cv_diff,
                             "cv_diff": all_cv_diff,
                             "avg_highV": avg_cv_high,
@@ -249,7 +247,7 @@ class MongoQuery:
 
                 if len(all_cv_diff) == 3:
                     collection.update_one(
-                    {"name": name},
+                    {"name": file_named},
                     {"$set": {"cv_error": all_cv_diff[2] - all_cv_diff[1],
                               "components": components_dict}}, 
                     upsert=True
@@ -314,7 +312,7 @@ class MongoQuery:
 
             if len(all_conductivity) != 0:
                 collection.update_one(
-                    {"name": name},
+                    {"name": file_named},
                     {"$set": {"avg_conductivity": avg_conductivity,
                             "conductivity": all_conductivity,
                             "ignore_first": ignore_first,
@@ -328,7 +326,7 @@ class MongoQuery:
 
                 if len(all_conductivity) == 3:
                     collection.update_one(
-                    {"name": name},
+                    {"name": file_named},
                     {"$set": {"geis_error": all_conductivity[2] - all_conductivity[1],
                               "components": components_dict}}, 
                     upsert=True
@@ -413,7 +411,6 @@ class MongoQuery:
                         upsert=True
                     )
 
-
     def get_data(self, collection_name, dump_to_file = False):
         """
         Get all data from a certain collection (i.e. table)
@@ -453,9 +450,3 @@ class MongoQuery:
             print(f"Deleted {name}")
         else:
             print("No deletion occurred")
-
-    def plot_cv(self):
-        pass
-
-    def plot_eis(self):
-        pass

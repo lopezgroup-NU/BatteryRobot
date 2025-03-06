@@ -385,12 +385,11 @@ class BatteryRobot(NorthC9):
             elif curr_vol <= 6:
                 rack = p_asp_mid
 
-            self.goto_safe(rack[source_id])
             amount = min(remaining, 1)
             if amount < 1:
-                self.move_z(200)
+                self.goto_xy_safe(rack[source_id])
                 self.aspirate_ml(3, 1 - amount)
-                self.goto_safe(rack[source_id])
+            self.goto_safe(rack[source_id])
             self.aspirate_ml(3, amount)
             self.delay(3)
             self.goto_safe(carousel_dispense)
@@ -745,107 +744,12 @@ class BatteryRobot(NorthC9):
         except:
             print("No vial with this name!")
 
-    def make_mixture(self, dest, args):
-        """
-        TODO
-
-        Takes arbitrary number of params depending on which components form the mixture
-        Assume args is list of 2-tuples e.g. [(name1, conc1, sat1),(name2, conc2, sat2)]
-        """
-        self.move_vial(rack_disp_official[dest], vial_carousel)
-        self.move_cap_to_holder()
-
-        first_component = args[0]
-        second_component = args[1]
-
-        vols = self.calc_vol(args)
-
-        for chemical, conc in args:
-            self.goto_safe(rack_source_official[self.source_rack[chemical]])
-
-    def calc_vol(self, s1, s2, s1_conc, s2_conc, target1, target2, target_vol=8):
-        """
-        Uses small volume to find density of each input.
-        Find volumes to reach 1g of solution using ratios from calc_liquid_molal.
-        Scale as needed.
-        """
-
-        s1_prop, s2_prop, water_prop = self.calc_liquid_molal(s1_conc, s2_conc, target1, target2)
-
-        water_v = water_prop/0.9998
-
-        rack = self.get_pip_height(s1)
-        self.zero_scale()
-        self.goto_safe(rack[self.source_rack[s1]])
-        self.delay(0.5)
-        self.aspirate_ml(3, 0.1)
-        self.delay(0.5)
-        self.move_z(200)
-        self.aspirate_ml(3, 0.9)
-        self.delay(0.5)
-        self.goto_safe(carousel_dispense)
-        self.dispense_ml(3, 1)
-        s1_mass = self.read_steady_scale()
-        #should we use a test vial? or use the same vial that we ran the density tests in later
-        s1_p = s1_mass/0.1
-        s1_v = s1_prop/s1_p
-
-        rack = self.get_pip_height(s2)
-        self.zero_scale()
-        self.goto_safe(rack[self.source_rack[s2]])
-        self.delay(0.5)
-        self.aspirate_ml(3, 0.1)
-        self.delay(0.5)
-        self.move_z(200)
-        self.aspirate_ml(3, 0.9)
-        self.delay(0.5)
-        self.goto_safe(carousel_dispense)
-        self.dispense_ml(3, 1)
-        s2_mass = self.read_steady_scale()
-        #should we use a test vial? or use the same vial that we ran the density tests in later
-        s2_p = s2_mass/0.1
-        s2_v = s2_prop/s2_p
-
-        return s1_v, s2_v, water_v
-
     def calc_liquid_mol(self, mol, gram, mol_mass):
         """
         Calculates how much liquid to dispense to get a certain Molarity
         """
         liquid_amount = gram/(mol_mass*mol)
         return liquid_amount
-
-    def calc_liquid_molal(first, second, target1, target2):
-        """
-        Takes in the molals of two solutions.
-        Returns amount of each to reach target ratio (target1:target2) of final solution.
-        Return format is:
-        <proportion of first solution>, <proportion of second solution>, <proportion of water>
-        """
-        l = max(first, second)  #more concentrated of the two inputs
-        lt = max(target1, target2) #greatest of the targets
-        s = min(first, second) #less concentrated of the two inputs
-        st = min(target1, target2) #smallest of the targets
-
-        if lt > l or st > l:
-            return -1, -1, -1
-
-        if st >= s:
-            return target1, target2, 0
-        else:
-            rf = target1 / first
-            rs = target2 / second
-
-            Rf = (rf)/(rf+rs)
-            Rs = (rs)/(rf+rs)
-
-            print(rf, rs, Rf, Rs)
-            if Rf < rf:
-                return 'No Solution'
-
-            water = (Rs * second)/target2-1
-            total = (Rf+Rs+water)
-            return Rf/total, Rs/total, water/total
 
     def gram_to_mol(self, solutes: list, solvent_vol: float):
         """
