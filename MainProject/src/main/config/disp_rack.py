@@ -36,7 +36,6 @@ class DispRack():
 
     """
 
-
     def __init__(self, csv_path):
         #no duplicates
         self.name = "DispRack"
@@ -74,6 +73,9 @@ class DispRack():
 
                     if vial in vials:
                         raise InitializationError(f"{self.name}: No duplicate vial names!")
+
+                    # map vial name to pos 
+                    setattr(self, vial, self.index_to_pos(i))
 
                     #map vial volumes
                     setattr(self, vial + "_vol", float(vol))
@@ -168,6 +170,15 @@ class DispRack():
 
         self.df.to_csv(self.update_path)
 
+    def get_vial_by_name(self, name):
+        """
+        Returns vial pos if vial exists 
+        """
+        if not hasattr(self, name):
+            return None
+        
+        # returns pos
+        return getattr(self, name)
     
     def get_vial_by_pos(self, pos):
         """

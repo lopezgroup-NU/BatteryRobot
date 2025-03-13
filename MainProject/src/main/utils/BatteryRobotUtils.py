@@ -10,6 +10,7 @@ from utils.PStat.cv import *
 from utils.PStat.ocv import *
 from .PowderShakerUtils import PowderShaker
 from .ExceptionUtils import *
+from .CalculationUtils import get_time_stamp
 """
 Module for BatteryRobot operation
 """
@@ -114,7 +115,7 @@ class BatteryRobot(NorthC9):
                 #liquids
                 if has_liquids:
                     source_list = str(experiment.Sources).split()
-                    vol_list = str(experiment.Volume_mL).split()
+                    vol_list = str(experiment.Volumes_mL).split()
                     vol_list = [float(vol) for vol in vol_list]
 
                     if len(source_list) != len(vol_list):
@@ -126,7 +127,7 @@ class BatteryRobot(NorthC9):
                         ret = bool(i == len(source_list) - 1)
                         source_idx = self.source_rack.pos_to_index(source_pos)
                         #updates source rack contents
-                        self.dispense_liquid_vol(target_idx, source_idx, vol, collect, ret)
+                        self.dispense_vol(target_idx, source_idx, vol, collect, ret)
                         collect = False
                         #update disp rack contents
                         disp_vial_name = getattr(self.disp_rack, target_pos)
@@ -351,7 +352,7 @@ class BatteryRobot(NorthC9):
         data["Time Taken(s)"] = t_taken
         return data
 
-    def dispense_liquid_vol(self, dest_id, source_id, target_vol, collect=False, ret=True):
+    def dispense_vol(self, dest_id, source_id, target_vol, collect=False, ret=True):
         """
         Dispense {target_vol} ml from vial with id {source_id} into vial with id {dest_id}
         Destination vials are from rack_dispense_official while source_vials are from
@@ -420,10 +421,10 @@ class BatteryRobot(NorthC9):
         data["Real(ml)"] = dispensed
         return data
 
-    def dispense_liquid_mass(self, dest_id, source, target_mass,
+    def dispense_mass(self, dest_id, source, target_mass,
                              density, collect=False, ret=True):
         """
-        Dispense liquid based on target mass
+        Dispense based on target mass
         """
         self.check_remove_pipette()
         self.goto_safe(rack_source_official[getattr(self.source_rack, str(source))])
@@ -919,10 +920,3 @@ class BatteryRobot(NorthC9):
         except InitializationError as e:
             print(e)
             print("Fix the rack csvs and try again.")
-
-def get_time_stamp():
-    """
-    Convert current time to string format
-    """
-    s = time.localtime(time.time())
-    return time.strftime("%Y-%m-%d %H:%M:%S", s)

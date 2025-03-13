@@ -1,6 +1,6 @@
-purge ,purge ,purge ,purge ,purge,e,x,N91 5 1
-purge ,purge ,purge ,purge ,purge,e,N73 0 0,N78 5 2
-purge ,purge ,purge ,purge ,purge,e,N72 0 0,N77 5 5
-purge ,purge ,purge ,purge ,purge,purge,AC1 5 0,N76 4.83 0
-purge ,purge ,purge ,purge ,purge,purge,AC4 5 0,N75 0 0
-purge ,purge ,purge ,purge ,purge,purge,AC7 5 0,N74 0 0
+purge ,purge ,purge ,purge ,purge,e,x,N65 5 1
+purge ,purge ,purge ,purge ,purge,e,e,N60 5 2
+purge ,purge ,purge ,purge ,purge,e,e,N55 5 5
+purge ,purge ,purge ,purge ,purge,purge,e,N525 5 5
+purge ,purge ,purge ,purge ,purge,purge,e,e
+purge ,purge ,purge ,purge ,purge,purge,e,e
