@@ -835,7 +835,7 @@ class BatteryRobot(NorthC9):
         self.move_carousel(0, 0)
         self.close_clamp()
         self.goto_safe(vial_carousel_approach)
-        self.cap(torque_thresh=500)
+        self.cap( revs = 2, torque_thresh=500)
         self.holding_vial = True
         self.open_clamp()
         self.goto_safe(rack[dest_id])

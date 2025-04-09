@@ -1,7 +1,7 @@
 ,0,1,2,3,4,5,6,7
-0,purge ,purge ,purge ,purge ,purge,e,x,N65 3.7519999999999993 1
-1,purge ,purge ,purge ,purge ,purge,e,e,N60 5 2
-2,purge ,purge ,purge ,purge ,purge,e,e,N55 5 5
-3,purge ,purge ,purge ,purge ,purge,purge,e,N525 5 5
-4,purge ,purge ,purge ,purge ,purge,purge,e,e
-5,purge ,purge ,purge ,purge ,purge,purge,e,e
+0,purge ,purge ,purge ,purge ,purge,e,x,Exp1 0 5
+1,purge ,purge ,purge ,purge ,purge,e,e,Exp2 6.46 5
+2,purge ,purge ,purge ,purge ,purge,e,e,Exp3 0 5
+3,purge ,purge ,purge ,purge ,purge,purge,e,Exp4 0 5
+4,purge ,purge ,purge ,purge ,purge,purge,e,Exp5 0 5
+5,purge ,purge ,purge ,purge ,purge,purge,e,Exp6 0 5

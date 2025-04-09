@@ -194,7 +194,6 @@ class MongoQuery:
             all_cv_diff = []
             low_end_cv = []
             high_end_cv = []
-
             for i in range(3):
                 file_name = f"{file_named}_cv{str(i)}.csv"
                 path = folder / Path(file_name)
@@ -225,7 +224,7 @@ class MongoQuery:
             components_dict = {}
             for i in range(len(salt)):
                 components_dict[salt[i]] = float(conc[i])
-
+           
             water_weight = get_water_weight_from_components(components_dict)
             if len(all_cv_diff) != 0:
                 collection.update_one(
