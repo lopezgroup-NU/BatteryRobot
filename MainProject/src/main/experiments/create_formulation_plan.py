@@ -45,10 +45,9 @@ def create_formulation(plan_file, source_rack_file):
     so4_name = ""
     ac_name = ""
     for source in sources:
+        if "TFSI" in source.upper():
+            tfsi_name = source
         if "FSI" in source.upper():
-            if "TFSI" in source.upper():
-                tfsi_name = source
-                continue
             fsi_name = source
         elif "NO3" in source.upper():
             no3_name = source
@@ -81,8 +80,8 @@ def create_formulation(plan_file, source_rack_file):
         components = [tfsi_name, fsi_name, no3_name, clo4_name, so4_name, ac_name, "H2O"]
         h2o_vol = 5 - sum(vols)
         vols.append(h2o_vol)
-        # check sources 
 
+        # check sources 
         drop = False
         for name, vol in zip(components, vols):
             result = rack_checker(source_rack, name, vol)
@@ -96,6 +95,7 @@ def create_formulation(plan_file, source_rack_file):
             continue 
 
         # now we add new entry to disp_rack 
+        # TODO
         name = f"N"
         if id < 10:
             name = name + "0" + str(id)
@@ -123,7 +123,8 @@ def rack_checker(rack, source_name, desired_vol):
     num = 1
 
     while True:
-        # loop through all with name
+        # TODO
+        # loop through all with name and determine if enough
         name = f"{source_name}_{str(num)}"
         num = num + 1
 

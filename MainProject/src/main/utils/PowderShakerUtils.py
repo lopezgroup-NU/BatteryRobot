@@ -1,7 +1,6 @@
 import sys
 sys.path.append('C:\\Users\\llf1362\\Desktop\\BatteryRobot\\MainProject\\src\\main\\settings')
 
-from config import PowderProtocol, PowderSettings
 from north import NorthC9
 from time import perf_counter
 import pandas as pd

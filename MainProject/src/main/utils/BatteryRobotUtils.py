@@ -47,22 +47,17 @@ class BatteryRobot(NorthC9):
             "alconox": 3
         }
         self.pip_id = 0
-
+#sup nerd bye - G, a full grown man and phd student 
         # stores index:volume_remaining for each water source for purging.
         # index in relation to disp_rack
         self.deck_initialized = False
         self.disp_rack = None
         self.source_rack = None
         self.heat_rack = None
-
-    def assemble(self, deck_file, experiment_file):
-        """
-        Break up experiments into batches given deck file and experiment file
-        Optimize for number of deck resets
-        Outputs different run files, and one file for tests that cannot be synthesized
-
-        Implement in the future to increase autonomy
-        """
+        self.res1_vol = 67.2 
+        self.res2_vol = 67.2
+        self.vol_purge = 19 
+        self.water_start = 15
 
     def run_formulation(self, run_file):
         """
@@ -295,9 +290,7 @@ class BatteryRobot(NorthC9):
                 log_file.write(f"   Finished tests for position {target_pos} at: \
                                {get_time_stamp()} \n")
 
-                for _ in range(3):
-                    self.purge(water_start, n_pumps=7, speed=22)
-                    water_start += 1
+                self.purge()
 
             except ContinuableRuntimeError as e:
                 response = input(f"{e}. Unable to run current test. Continue with others? Yes/No")
@@ -624,27 +617,45 @@ class BatteryRobot(NorthC9):
         self.pump_helper(length=1000, v_in=v_in, v_out=v_out)
         self.reset_pump()
 
-    def purge(self, water_location, speed=30, rack=rack_disp_official,
-              n_pumps=6, length=3000):
+    def purge(self, speed=30, rack=rack_disp_official,
+              n_pumps=18, length=3000):
         """
-        Purge plumbing system
-        Full vial needs total length 18000
-        If all the way to brim, length 20000
+        Purge plumbing system using reservoir. 
+        Purge 20ml worth
+        Length 3000 (full pump) is about 
+
         """
-        self.move_carousel(0, 0)
-        self.move_vial(rack[water_location], vial_carousel)
+        #can use reservoir
+        if self.res1_vol > self.vol_purge or self.res2_vol > self.vol_purge:
+            if self.res1_vol > self.vol_purge:
+                self.move_carousel(91, 85)
+                self.res1_vol -= self.vol_purge
+            else:       
+                self.move_carousel(137,85)
+                self.res2_vol -= self.vol_purge
 
-        self.uncap_vial_in_carousel()
-        self.move_carousel(33, 85) # carousel moves 33 degrees, 85 mm down
+            for _ in range(n_pumps):
+                self.pump_helper(length=length, speed=speed, v_out=5)
+            
+            self.move_carousel(0, 0)
+        #use water vials
+        else:
+            for i in range(self.water_start,  self.water_start+3):
+                self.move_carousel(0, 0)
+                self.move_vial(rack[i], vial_carousel)
 
-        for _ in range(n_pumps):
-            self.pump_helper(length=length, v_in=speed, v_out=5)
+                self.uncap_vial_in_carousel()
+                self.move_carousel(33, 85) # carousel moves 33 degrees, 85 mm down
+                for _ in range(6):
+                    self.pump_helper(length=length, v_in=speed, v_out=5)
 
-        self.move_carousel(0, 0)
-        self.cap_and_return_vial_to_rack(water_location, rack)
+                self.move_carousel(0, 0)    
+                self.cap_and_return_vial_to_rack(i, rack)
 
-        for _ in range(n_pumps):
-            self.pump_helper(length=length, v_in=15, v_out=5)
+                for _ in range(6):
+                    self.pump_helper(length=length, v_in=15, v_out=5)
+            self.water_start += 3
+
 
     def purge_auto(self, desired_vol=4):
         """
