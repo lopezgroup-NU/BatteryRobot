@@ -1,14 +1,13 @@
 #Galv EIS
 from temper_windows import TemperWindows
-import sys
 import toolkitpy as tkp
 import numpy as np                       #Used to store and manipulate raw data output
 import time                              #Used for script time delay
 import math
 import matplotlib
-from matplotlib import pyplot as plt
 import pandas as pd
-from .dataanalysis import DataAnalyzer
+from utils.DBUtils import MongoQuery
+
 matplotlib.use('TkAgg')
 
 def check_eis_points(initial_freq, final_freq, points_per_decade):
@@ -161,26 +160,16 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}):
     s_df_file = "res/geis_test_summaries.csv"
 
     df = pd.read_csv(df_file, index_col='# point')
-    s_df = pd.read_csv(s_df_file)
     reflected_zimag = [-val for val in df['zimag']]
     df.insert(2, 'reflected_zimag', reflected_zimag)
+    df['temp(C)'] = temperature
+    df.to_csv(df_file)
 
     # extract minima
+    s_df = pd.read_csv(s_df_file)
     df_no_negatives = df[df.reflected_zimag >=0]
     min_index = df_no_negatives['reflected_zimag'].idxmin()  # Get the index of the minimum value
     R1_nofit = df_no_negatives['zreal'].loc[min_index]  # Use .loc to get the value at that index
-
-
-    #bumps = DataAnalyzer("res/geis/"+ output_file_name + ".csv")
-    #obj = bumps.run(output_file_name)
-    #print(obj)
-    #R1 = obj["R1"]
-    #if "(" in R1:
-    #    open_paren = R1.index("(")
-    #    close_paren = R1.index(")")
-    #    R1 = R1[:open_paren] + R1[close_paren+1:]  
-    #R1 = float(R1)
-    
     R1 = 10
     temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
     temperature = temper.get_temperature()[1]
@@ -190,7 +179,7 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}):
 
     s_df = pd.concat([s_df, new_row], ignore_index=True)
     s_df.to_csv(s_df_file, index=False)   
-    df.to_csv(df_file)
+
 
     return zcurve
 

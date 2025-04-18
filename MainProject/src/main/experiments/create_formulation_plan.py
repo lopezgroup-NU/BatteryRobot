@@ -1,6 +1,6 @@
 import csv
 import pandas as pd
-from utils.CalculationUtils import get_weights
+from MainProject.src.main.utils.MathUtils import get_weights
 from config.source_rack import SourceRack
 def create_formulation(plan_file, source_rack_file):
     """

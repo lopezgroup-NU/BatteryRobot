@@ -5,6 +5,8 @@ import toolkitpy as tkp
 import time as Time
 import numpy as np
 from .experiment import Experiment
+from ..MathUtils import kinetic_fit
+
 #Statement of work
 #A modular rerunnable experiment according to given parameters. The resulting 
 class CV(Experiment): 
@@ -178,10 +180,10 @@ class CV(Experiment):
             pstat.set_stability(tkp.STABILITY_FAST)
             pstat.set_vch_range(10.0)
         return  
-    
+
 def find_peaks_and_zero_crossings(data):
     # Find the index of the first occurrence of zero in 'Vf'
-    zero_index = 0
+    zero_index = np.argmax(data['Vf'] >= 0)
     # Find the positive peak (maximum after the first zero crossing)
     positive_peak_index = np.argmax(data['Im'][zero_index:]) + zero_index
     # Find where the voltage crosses 0 after the positive peak
@@ -191,26 +193,32 @@ def find_peaks_and_zero_crossings(data):
     negative_peak_index = np.argmin(data['Im'][zero_cross_index:]) + zero_cross_index
     return positive_peak_index, zero_cross_index, negative_peak_index
 
+
 def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1]):
     tkp.toolkitpy_init("open_circuit_voltage.py")
     pstat = tkp.Pstat("PSTAT")
     cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
     data = cv.run_cv(pstat, max_size = 100000)
-    np.savetxt("res/cv/" + output_file_name + ".csv", data, delimiter = ',', header = 'Point,time,Vf,Vu,Im,Ach,vsig,temp,Cycle,ie_range,overload,stop_test', fmt = '%s') 
-
-    df_file = "res/cv/" + output_file_name+ ".csv"
-    s_df_file = "res/cv_test_summaries.csv"
-    df = pd.read_csv(df_file, index_col='# Point')
-    s_df = pd.read_csv(s_df_file)
+    #TODO  
+    #add the new columns to the actual CSV file
+    out_path = "res/cv/" + output_file_name + ".csv"
+    np.savetxt(out_path, data, delimiter = ',', header = 'Point,time,Vf,Vu,Im,Ach,vsig,temp,Cycle,ie_range,overload,stop_test', fmt = '%s') 
 
     temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
     temperature = temper.get_temperature()[1]
+    df = pd.read_csv(out_path, index_col='# Point')
+    df['temp(C)'] = temperature
+    df.to_csv(out_path, index=False)
+
+    s_df_file = "res/cv_test_summaries.csv"
+    s_df = pd.read_csv(s_df_file)
+
     s = time.localtime(time.time())
     curr_time = time.strftime("%Y-%m-%d %H:%M:%S", s)
 
-    vf_diff,vf_max,vf_min  = cv_interpret("res/cv/" + output_file_name+ ".csv")
-    
-    new_row = pd.DataFrame([[output_file_name, vf_max, vf_min, vf_diff, temperature, curr_time]], columns=['test name', 'vf_max', 'vf_min', 'vf_diff', 'temp', 'time'])
+    vf_diff,vf_max,vf_min  = cv_interpret(out_path)
+    overP, i0, alpha_c = kinetic_fit(out_path)
+    new_row = pd.DataFrame([[output_file_name, vf_max, vf_min, vf_diff, overP, i0, alpha_c, temperature, curr_time]], columns=['test name', 'vf_max', 'vf_min', 'vf_diff',  "overP", "i0", "alpha_c", 'temp', 'time'])
     s_df = pd.concat([s_df, new_row], ignore_index=True)
     s_df.to_csv(s_df_file, index=False)   
 

@@ -10,7 +10,7 @@ from utils.PStat.cv import *
 from utils.PStat.ocv import *
 from .PowderShakerUtils import PowderShaker
 from .ExceptionUtils import *
-from .CalculationUtils import get_time_stamp
+from .MathUtils import get_time_stamp
 """
 Module for BatteryRobot operation
 """
@@ -47,7 +47,7 @@ class BatteryRobot(NorthC9):
             "alconox": 3
         }
         self.pip_id = 0
-#sup nerd bye - G, a full grown man and phd student 
+#"sup nerd bye" - G, a full grown man and phd student 
         # stores index:volume_remaining for each water source for purging.
         # index in relation to disp_rack
         self.deck_initialized = False
@@ -630,12 +630,13 @@ class BatteryRobot(NorthC9):
             if self.res1_vol > self.vol_purge:
                 self.move_carousel(91, 85)
                 self.res1_vol -= self.vol_purge
+            # use second reservoir
             else:       
                 self.move_carousel(137,85)
                 self.res2_vol -= self.vol_purge
 
             for _ in range(n_pumps):
-                self.pump_helper(length=length, speed=speed, v_out=5)
+                self.pump_helper(length=length, v_in=speed, v_out=5)
             
             self.move_carousel(0, 0)
         #use water vials

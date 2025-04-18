@@ -5,23 +5,76 @@ import numpy as np
 import pandas as pd 
 from pymongo import MongoClient
 from pathlib import Path
-from .CalculationUtils import get_water_weight_from_components
+from .MathUtils import get_water_weight_from_components
+from scipy.optimize import curve_fit
+import matplotlib.pyplot as plt
+
+F = 96485  # C/mol
+R = 8.314  # J/mol·K
+
+def butler_volmer(eta, j0, alphaC, n=2, T=298.15):
+    #alpha A
+    return j0 *  - np.exp(-(alphaC) * n * F * eta / (R * T))
+
+def fit_butler_volmer(eta_data, current_data, T=298.15, n = 1, plot=False): #change name to tafel_fit
+    """Fits the Butler-Volmer equation to experimental data."""
+    def bv_fit_func(eta, i0, alphaC):
+        return butler_volmer(eta, i0, alphaC, n=n, T=T)
+    initial_guess = [1, 0.5]
+    bounds = ([.00001, 0.0], [200, 1])
+    popt, pcov = curve_fit(bv_fit_func, eta_data, current_data, p0=initial_guess, bounds=bounds,maxfev=500000)
+
+    return popt, pcov
+    
+def find_zero_crossings_from_lists(x_list, y_list):
+    """
+    Finds zero crossings in two parallel lists: x-values and y-values.
+    Parameters:
+        x_list (list of float): X-axis values (e.g., voltage).
+        y_list (list of float): Y-axis values (e.g., current).
+    Returns:
+        List of (x, 0.0) points where the curve crosses the x-axis.
+    """
+    zero_crossings = []
+    for i in range(len(y_list) - 1):
+        x1, y1 = x_list[i], y_list[i]
+        x2, y2 = x_list[i + 1], y_list[i + 1]
+        # Check for sign change
+        if y1 * y2 < 0:
+            x_zero = x1 - y1 * (x2 - x1) / (y2 - y1)
+            zero_crossings.append((x_zero, 0.0))
+        elif y1 == 0:
+            zero_crossings.append((x1, 0.0))
+    return zero_crossings
 
 def find_peaks_and_zero_crossings(data):
     # Find the index of the first occurrence of zero in 'Vf'
     zero_index = np.argmax(data['Vf'] >= 0)
-    
     # Find the positive peak (maximum after the first zero crossing)
     positive_peak_index = np.argmax(data['Im'][zero_index:]) + zero_index
-    
     # Find where the voltage crosses 0 after the positive peak
     # We are looking for the first zero-crossing point after the positive peak
     zero_cross_index = np.argmax(np.diff(np.sign(data['Vf'][positive_peak_index:])) != 0) + positive_peak_index
-    
     # Find the negative peak (minimum after the 0V crossing)
     negative_peak_index = np.argmin(data['Im'][zero_cross_index:]) + zero_cross_index
-    
     return positive_peak_index, zero_cross_index, negative_peak_index
+
+def kinetic_fit(cv_file):
+    data_first = pd.read_csv(cv_file)
+    positive_peak_index, zero_cross_index, negative_peak_index = find_peaks_and_zero_crossings(data_first)
+    E = data_first['Vf']
+    I = data_first['Im']*1000/0.020
+    E = E[negative_peak_index:]
+    I = I[negative_peak_index:]
+    switch_x = find_zero_crossings_from_lists(E.to_numpy(), I.to_numpy())
+    E = E  - switch_x[0][0]
+    mask =  (E <= -.06)
+    if len(E[mask])>2: 
+        E = E[mask]
+        I = I[mask]
+        params, covariance = fit_butler_volmer(E, I, T=298.15, plot=True)
+        return (switch_x[0][0], f"{params[0]:.3e}", f"{params[1]:.5f}")
+    else: return(switch_x[0][0], np.nan, np.nan)
 
 def cv_interpret(filename):
     df_file = filename
@@ -194,32 +247,69 @@ class MongoQuery:
             all_cv_diff = []
             low_end_cv = []
             high_end_cv = []
+            all_overP = []
+            all_i0 = []
+            all_alpha_c = []
             for i in range(3):
                 file_name = f"{file_named}_cv{str(i)}.csv"
                 path = folder / Path(file_name)
                 if os.path.exists(path):
                     vf_diff,vf_max,vf_min = cv_interpret(path)
+                    overP, i0, alpha_c = kinetic_fit(path)
                     all_cv_diff.append(vf_diff)
                     low_end_cv.append(vf_min)
                     high_end_cv.append(vf_max)
+                    all_overP.append(overP)
+                    all_i0.append(i0)
+                    all_alpha_c.append(alpha_c)
 
                     # get timestamp of latest file for specific run
+                    # i.e. if two files, get timestamp of second
                     time_stamp = os.path.getmtime(path)
                     time_stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_stamp))
+
+                    #do the same, for temp
+                    df = pd.read_csv(path)
+                    if 'temp(C)' in df.columns:
+                        temp = df['temp(C)'].iloc[0]
+                    else:
+                        temp = 20
 
             if len(all_cv_diff) == 1:
                 avg_cv_diff = all_cv_diff[0]
                 avg_cv_low = low_end_cv[0]
                 avg_cv_high = high_end_cv[0]
+                avg_overP = all_overP[0]
+                avg_i0 = all_i0[0]
+                avg_alpha_c = all_alpha_c[0]
             elif ignore_first:
                 # ignore first value
-                avg_cv_diff = sum(all_cv_diff[1:]) / (len(all_cv_diff) - 1) 
-                avg_cv_low = sum(low_end_cv[1:]) / (len(low_end_cv) - 1) 
-                avg_cv_high = sum(high_end_cv[1:]) / (len(high_end_cv) - 1) 
+                def compute_avg_ignore(lst):
+                    # Auto-cast all elements to float if possible
+                    try:
+                        lst = [float(x) for x in lst]
+                    except (ValueError, TypeError):
+                        raise ValueError("List contains non-numeric values that can't be converted.")
+                    return sum(lst[1:]) / (len(lst) - 1)
+                avg_cv_diff = compute_avg_ignore(all_cv_diff)
+                avg_cv_low =  compute_avg_ignore(low_end_cv)
+                avg_cv_high =  compute_avg_ignore(high_end_cv)
+                avg_overP =  compute_avg_ignore(all_overP)
+                avg_i0 =  compute_avg_ignore(all_i0)
+                avg_alpha_c =  compute_avg_ignore(all_alpha_c)
             else:
-                avg_cv_diff = sum(all_cv_diff) / (len(all_cv_diff))
-                avg_cv_low = sum(low_end_cv) / (len(low_end_cv))
-                avg_cv_high = sum(high_end_cv) / (len(high_end_cv))
+                def compute_avg(lst):
+                    try:
+                        lst = [float(x) for x in lst]
+                    except (ValueError, TypeError):
+                        raise ValueError("List contains non-numeric values that can't be converted.")
+                    return sum(lst) / (len(lst))
+                avg_cv_diff = compute_avg(all_cv_diff)
+                avg_cv_low =  compute_avg(low_end_cv)
+                avg_cv_high =  compute_avg(high_end_cv)
+                avg_overP =  compute_avg(all_overP)
+                avg_i0 =  compute_avg(all_i0)
+                avg_alpha_c =  compute_avg(all_alpha_c)
 
             components_dict = {}
             for i in range(len(salt)):
@@ -235,11 +325,18 @@ class MongoQuery:
                             "highV": high_end_cv,
                             "avg_lowV": avg_cv_low,
                             "lowV": low_end_cv,
+                            "avg_overP": avg_overP,
+                            "overP": all_overP,
+                            "avg_i0": avg_i0,
+                            "i0": all_i0,
+                            "avg_alpha_c": avg_alpha_c,
+                            "alpha_c": all_alpha_c,
                             "ignore_first": ignore_first,
                             "cv_date_uploaded": time_stamp,
                             "components": components_dict,
                             "water_weight": water_weight,
-                            "precipitated_out": False
+                            "precipitated_out": False,
+                            "temp(C)": temp
                             }}, 
                     upsert=True
                 )
@@ -293,6 +390,12 @@ class MongoQuery:
                     # get timestamp of latest file for specific run
                     time_stamp = os.path.getmtime(path)
                     time_stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_stamp))
+                    #do the same, for temp
+                    df = pd.read_csv(path)
+                    if 'temp(C)' in df.columns:
+                        temp = df['temp(C)'].iloc[0]
+                    else:
+                        temp = 20
                 
             if len(all_conductivity) == 1:
                 avg_conductivity = all_conductivity[0]
@@ -301,7 +404,6 @@ class MongoQuery:
                 avg_conductivity = sum(all_conductivity[1:]) / (len(all_conductivity) - 1) 
             else:
                 avg_conductivity = sum(all_conductivity) / len(all_conductivity)
-
 
             components_dict = {}
             for i in range(len(salt)):
@@ -318,7 +420,8 @@ class MongoQuery:
                             "geis_date_uploaded": time_stamp,
                             "components": components_dict,
                             "water_weight": water_weight,
-                            "precipitated_out": False
+                            "precipitated_out": False,
+                            "temp(C)": temp
                             }}, 
                     upsert=True
                 )
@@ -330,6 +433,12 @@ class MongoQuery:
                               "components": components_dict}}, 
                     upsert=True
                 )
+
+    def add_cv_row(self, data):
+        pass
+
+    def add_geis_row(self, data):
+        pass
 
     def update_ignore(self, collection_name, ignore_first:bool):
         """
@@ -427,7 +536,6 @@ class MongoQuery:
         if dump_to_file:
             with open(f"{collection_name}.json", "w", encoding="utf-8") as file:
                 json.dump(docs, file, default=str, indent=4)
-        return json_output
     
     def drop_data(self, collection_name):
         """
@@ -449,3 +557,23 @@ class MongoQuery:
             print(f"Deleted {name}")
         else:
             print("No deletion occurred")
+
+    def update_temps(self, file_path):
+        """
+        Give summary file, update temps based on that
+        """
+        df = pd.read_csv(file_path)
+        temp_dict = dict(zip(df['test name'], df['temp']))
+        collection = self.conn.get_collection("data")
+        for document in collection.find():
+            # names in the summary are appended with _cv0, _cv1 or _cv2
+            # our db doesnt have that as it aggregates all 3
+            # additionally, it is possible that the machine stopped early,
+            # this code accounts for that by updating with the latest one 
+            for i in range(3):
+                name = document.get('name') + f"_cv{str(i)}"
+                if name in temp_dict:
+                    collection.update_one(
+                        {'_id': document['_id']},
+                        {'$set': {'temp(C)': temp_dict[name]}}
+                    )
