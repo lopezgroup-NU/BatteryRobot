@@ -155,6 +155,9 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}):
     np.savetxt("res/geis/" + output_file_name+ ".csv", zcurve.acq_data(),delimiter = ',', 
                header = 'point,freq,zreal,zimag,zmod,zphz,zsig,Idc,Vdc,ie_range,gain,vmod,vphz,vsig,vthd,imod,iphz,isig,ithd,zreal_drift,zimag_drift,zmod_drift,zphz_drift')
     
+    temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
+    temperature = temper.get_temperature()[1]
+    
     #below is processing
     df_file = "res/geis/" + output_file_name+ ".csv"
     s_df_file = "res/geis_test_summaries.csv"
@@ -171,8 +174,6 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}):
     min_index = df_no_negatives['reflected_zimag'].idxmin()  # Get the index of the minimum value
     R1_nofit = df_no_negatives['zreal'].loc[min_index]  # Use .loc to get the value at that index
     R1 = 10
-    temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
-    temperature = temper.get_temperature()[1]
     s = time.localtime(time.time())
     curr_time = time.strftime("%Y-%m-%d %H:%M:%S", s)
     new_row = pd.DataFrame([[output_file_name, R1, R1_nofit, temperature, curr_time]], columns=['test name', 'zreal', 'minima', 'temp', 'time'])

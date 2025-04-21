@@ -639,6 +639,26 @@ class BatteryRobot(NorthC9):
                 self.pump_helper(length=length, v_in=speed, v_out=5)
             
             self.move_carousel(0, 0)
+
+            for _ in range(6):
+                self.pump_helper(length=length, v_in=15, v_out=5)
+        # elif (self.res1_vol + self.res2_vol) >= self.vol_purge:
+        #     remaining = self.vol_purge
+
+        #     # draw from res1 first
+        #     # 1250 = 0.4 ml
+        #     self.move_carousel(91, 85)
+        #     n_pumps_res1 = math.ceil( self.res1_vol / ((3000/1250) * 0.4) )
+
+        #     for _ in range(n_pumps_res1):
+        #         self.pump_helper(length=length, v_in=speed, v_out=5)
+
+        #     self.res1_vol = 0
+        #     remaining -= self.res1_vol
+
+        #     # draw from res2 now
+        #     self.move_carousel(137,85)
+    
         #use water vials
         else:
             for i in range(self.water_start,  self.water_start+3):
@@ -656,6 +676,7 @@ class BatteryRobot(NorthC9):
                 for _ in range(6):
                     self.pump_helper(length=length, v_in=15, v_out=5)
             self.water_start += 3
+
 
 
     def purge_auto(self, desired_vol=4):

@@ -1,7 +1,7 @@
 ,0,1,2,3,4,5,6,7
 0,purge ,purge ,purge ,purge ,purge,e,x,Exp1 0 5
-1,purge ,purge ,purge ,purge ,purge,e,Exp7 -1.248 5,Exp2 0 5
-2,purge ,purge ,purge ,purge ,purge,e,e,Exp3 0 5
+1,purge ,purge ,purge ,purge ,purge,e,Exp7 0 5,Exp2 0 5
+2,purge ,purge ,purge ,purge ,purge,e,Exp8 -0.416 5,Exp3 0 5
 3,purge ,purge ,purge ,purge ,purge,purge,e,Exp4 0 5
 4,purge ,purge ,purge ,purge ,purge,purge,e,Exp5 0 5
 5,purge ,purge ,purge ,purge ,purge,purge,e,Exp6 0 5

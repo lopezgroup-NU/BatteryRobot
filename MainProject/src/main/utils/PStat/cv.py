@@ -208,7 +208,7 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
     temperature = temper.get_temperature()[1]
     df = pd.read_csv(out_path, index_col='# Point')
     df['temp(C)'] = temperature
-    df.to_csv(out_path, index=False)
+    df.to_csv(out_path)
 
     s_df_file = "res/cv_test_summaries.csv"
     s_df = pd.read_csv(s_df_file)
