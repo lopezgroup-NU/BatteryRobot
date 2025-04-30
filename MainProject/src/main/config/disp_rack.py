@@ -97,22 +97,24 @@ class DispRack():
 
                 i += 1
 
-    def index_to_pos(self, index):
+    @classmethod
+    def index_to_pos(cls, index):
         """
         Given index (0 to 47) returns grid position (A1 - H6)
         """
         if index < 0 or index > 47:
-            raise ContinuableRuntimeError(f"{self.name}: Enter valid grid index!")
+            raise ContinuableRuntimeError(f"{cls.__name__}: Enter valid grid index!")
 
         cols = ["A", "B", "C", "D", "E", "F", "G", "H"]
         return cols[index//6] + str(index % 6 + 1)
     
-    def pos_to_index(self, pos):
+    @classmethod
+    def pos_to_index(cls, pos):
         """
         Given grid position (A1 - H6) return index (0 to 47)
         """
         if pos[0] not in ["A", "B", "C", "D", "E", "F", "G", "H"] or pos[1] not in ["1", "2", "3", "4", "5", "6", "7", "8"]:
-            raise ContinuableRuntimeError(f"{self.name}: Enter valid grid position!")
+            raise ContinuableRuntimeError(f"{cls.__name__}: Enter valid grid position!")
 
         mapping = {
             "A": 0,

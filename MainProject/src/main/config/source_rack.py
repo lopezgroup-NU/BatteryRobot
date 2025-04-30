@@ -89,6 +89,7 @@ class SourceRack():
                     vial, vol, conc = el.split()
 
                     if vial in vials:
+                        print(vial)
                         raise InitializationError(f"{self.name}: No duplicate vial names!")
 
                     # map vial name to pos 

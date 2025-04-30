@@ -197,15 +197,15 @@ class BatteryRobot(NorthC9):
 
         for test in df.itertuples():
             try:
-                target_pos = test.Reagent
+                target_pos = test.Target_vial
                 log_file.write(f"   Beginning tests for position {target_pos} at: \
                                {get_time_stamp()} \n")
 
-                target_idx = self.disp_rack.pos_to_index(test.Reagent)
+                target_idx = self.disp_rack.pos_to_index(target_pos)
                 GEIS = True if test.GEIS else False
                 CV = True if test.CV else False
                 CE = True if test.CE else False
-                output_file_name = test.Test_Name
+                output_file_name = test.Experiment
 
                 if GEIS and CV:
                     if len(test.GEIS_Conditions.split()) != 3:
