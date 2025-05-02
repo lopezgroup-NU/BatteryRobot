@@ -224,7 +224,10 @@ def kinetic_fit(cv_file):
     E = E  - switch_x[0][0]
     mask =  (E <= -.06)
     E = E[mask]
-    I = I[mask]
-    ax3.plot(E+switch_x[0][0],I, label = "To be fit")
-    params, covariance = fit_butler_volmer(E, I, T=298.15, plot=True)
-    return (switch_x[0][0], f"{params[0]:.3e}", f"{params[1]:.5f}")
+    if len(E) == 0:
+        return(99,99,99) 
+    else:
+        I = I[mask]
+        ax3.plot(E+switch_x[0][0],I, label = "To be fit")
+        params, covariance = fit_butler_volmer(E, I, T=298.15, plot=True)
+        return (switch_x[0][0], f"{params[0]:.3e}", f"{params[1]:.5f}")

@@ -1,5 +1,6 @@
 import time
 import heapq
+import yaml
 from north import NorthC9
 from molmass import Formula
 import pandas as pd
@@ -22,7 +23,7 @@ class BatteryRobot(NorthC9):
     child of NorthC9 - inherits North's methods plus methods defined in here
     """
 
-    def __init__(self, address, network_serial, home=False):
+    def __init__(self, address, network_serial, home=False, config_path = "config/config.yaml"):
         """
         Startup procedures
         """
@@ -35,37 +36,43 @@ class BatteryRobot(NorthC9):
             self.home_pump(0) #Pump system sensing homing
             self.set_pump_valve(3, 0) #Set pump system valve at input position
 
-        self.holding_pipette = False # is arm holding pipette
-        self.holding_vial = False # is arm holding cap
-        self.cap_holder_1_free = True
-        self.cap_holder_2_free = True
+        with open(config_path, 'r') as f:
+            self.config = yaml.safe_load(f)
 
-        self.cartridge_on_carousel: PowderProtocol = None
-        self.cartridge_pos = {
+        hw_states = self.config.get("hardware_states", {})
+        self.holding_pipette = hw_states.get("holding_pipette", False)  # is arm holding pipette
+        self.holding_vial = hw_states.get("holding_vial", False)  # is arm holding cap
+        self.cap_holder_1_free = hw_states.get("cap_holder_1_free", True) # is cap holder 1 free
+        self.cap_holder_2_free = hw_states.get("cap_holder_2_free", True) 
+        self.pip_id = hw_states.get("pip_id", 0) 
+
+        carousel_config = self.config.get("carousel", {})
+        self.cartridge_on_carousel = None
+        self.cartridge_pos = carousel_config.get("cartridge_positions", {
             "LiOAc": 1,
             "default": 2,
             "alconox": 3
-        }
-        self.pip_id = 0
-#"sup nerd bye" - G, a full grown man and phd student 
-        # stores index:volume_remaining for each water source for purging.
-        # index in relation to disp_rack
-        self.deck_initialized = False
-        self.disp_rack = None
-        self.source_rack = None
-        self.heat_rack = None
-        self.res1_vol = 67.2 
-        self.res2_vol = 67.2
-        self.vol_purge = 19 
-        self.water_start = 15
+        })
+
+        rack_files = self.config.get("racks", {})
+        self.initialize_deck(
+            rack_files.get("disp_rack"),
+            rack_files.get("source_rack"),
+            rack_files.get("heat_rack")
+        )
+
+        resources = self.config.get("resources", {})
+        self.res1_vol = resources.get("res1_vol", 67.2)
+        self.res2_vol = resources.get("res2_vol", 67.2)
+        self.vol_purge = resources.get("vol_purge", 19)
+        self.water_start = resources.get("water_start", 15)
+        self.water_end = resources.get("water_end", 47)
 
     def run_formulation(self, run_file):
         """
         Takes input file path to a csv containing test details.
         Synthesizes each specified formulation.
         """
-        if not self.deck_initialized:
-            raise Exception("Initialize deck first! Use initialize_deck()")
         heating_tasks = []
         heapq.heapify(heating_tasks)
 
@@ -187,9 +194,6 @@ class BatteryRobot(NorthC9):
     def run_test(self, run_file):
         '''Runs the testing files'''
         df = pd.read_csv(run_file)
-
-        #way to control purge for now
-        water_start = 15
 
         log_file = open("experiments/experiments.log", "a")
         log_file.write("*" * 50 + "\n")
@@ -661,21 +665,24 @@ class BatteryRobot(NorthC9):
     
         #use water vials
         else:
-            for i in range(self.water_start,  self.water_start+3):
-                self.move_carousel(0, 0)
-                self.move_vial(rack[i], vial_carousel)
+            if self.water_start + 3 <= self.water_end + 1:
+                for i in range(self.water_start,  self.water_start+3):
+                    self.move_carousel(0, 0)
+                    self.move_vial(rack[i], vial_carousel)
 
-                self.uncap_vial_in_carousel()
-                self.move_carousel(33, 85) # carousel moves 33 degrees, 85 mm down
-                for _ in range(6):
-                    self.pump_helper(length=length, v_in=speed, v_out=5)
+                    self.uncap_vial_in_carousel()
+                    self.move_carousel(33, 85) # carousel moves 33 degrees, 85 mm down
+                    for _ in range(6):
+                        self.pump_helper(length=length, v_in=speed, v_out=5)
 
-                self.move_carousel(0, 0)    
-                self.cap_and_return_vial_to_rack(i, rack)
+                    self.move_carousel(0, 0)    
+                    self.cap_and_return_vial_to_rack(i, rack)
 
-                for _ in range(6):
-                    self.pump_helper(length=length, v_in=15, v_out=5)
-            self.water_start += 3
+                    for _ in range(6):
+                        self.pump_helper(length=length, v_in=15, v_out=5)
+                self.water_start += 3
+            else:
+                raise CriticalRuntimeError("Error: No more water left to purge! Check configs for")
 
 
 
@@ -949,7 +956,6 @@ class BatteryRobot(NorthC9):
             self.disp_rack = DispRack(disp_rack_path)
             self.source_rack = SourceRack(source_rack_path)
             self.heat_rack = HeatRack(heat_rack_path)
-            self.deck_initialized = True
         except InitializationError as e:
             print(e)
             print("Fix the rack csvs and try again.")

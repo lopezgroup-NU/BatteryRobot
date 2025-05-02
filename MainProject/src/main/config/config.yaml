@@ -1,0 +1,39 @@
+# Robot Configuration
+
+# Initialization settings
+initialization:
+  home_on_start: true
+
+# Carousel settings
+carousel:
+  cartridge_positions:
+    LiOAc: 1
+    default: 2
+    alconox: 3
+
+# Robot states
+hardware_states:
+  holding_pipette: false
+  holding_vial: false
+  cap_holder_1_free: true
+  cap_holder_2_free: true
+  pip_id : 0 
+
+# Deck configuration
+deck:
+  initialized: false
+  
+# Resource volumes (in ml)
+resources:
+  res1_vol: 67.2
+  res2_vol: 67.2
+  vol_purge: 19 # vol required per purge
+  # water vials must be consecutive from start to end
+  water_start: 15
+  water_end: 47
+
+# CSV files for each rack
+racks:
+  disp_rack: config/disp_rack.csv
+  source_rack: config/source_rack.csv 
+  heat_rack:  config/heat_rack.csv
