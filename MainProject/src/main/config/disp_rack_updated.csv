@@ -2,6 +2,6 @@
 0,purge ,purge ,purge ,purge ,purge,e,x,Exp1 -1.248 5
 1,purge ,purge ,purge ,purge ,purge,e,Exp7 0 5,Exp2 -1.248 5
 2,purge ,purge ,purge ,purge ,purge,e,Exp8 0 5,Exp3 -1.248 5
-3,purge ,purge ,purge ,purge ,purge,purge,Exp9 0 5,Exp4 0 5
-4,purge ,purge ,purge ,purge ,purge,purge,e,Exp5 0 5
-5,purge ,purge ,purge ,purge ,purge,purge,e,Exp6 0 5
+3,purge ,purge ,purge ,purge ,purge,purge,Exp9 0 5,Exp4 -1.248 5
+4,purge ,purge ,purge ,purge ,purge,purge,e,Exp5 -1.248 5
+5,purge ,purge ,purge ,purge ,purge,purge,e,Exp6 -1.248 5
