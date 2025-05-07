@@ -1,1 +1,1 @@
-from rack_gui import *
+from .rack_gui import *

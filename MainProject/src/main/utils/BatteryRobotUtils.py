@@ -1,9 +1,11 @@
 import time
 import heapq
 import yaml
+import pandas as pd
+import tkinter as tk
+from GUI import *
 from north import NorthC9
 from molmass import Formula
-import pandas as pd
 from Locator import *
 from config import SourceRack, HeatRack, DispRack, PowderProtocol
 from utils.PStat.geis import *
@@ -23,9 +25,10 @@ class BatteryRobot(NorthC9):
     child of NorthC9 - inherits North's methods plus methods defined in here
     """
 
-    def __init__(self, address, network_serial, home=False, config_path = "config/config.yaml"):
+    def __init__(self, address, network_serial, home=False, config_path = "config/config.yaml", setup_gui=False):
         """
         Startup procedures
+        setup_gui will prompt user to check on disp and source rack csvs. Set to false for closed loop, so that robot doesnt get blocked
         """
         super().__init__(address, network_serial=network_serial)
         if home:
@@ -55,12 +58,21 @@ class BatteryRobot(NorthC9):
         })
 
         rack_files = self.config.get("racks", {})
+
+        disp_rack_filename =  rack_files.get("disp_rack")
+        source_rack_filename =  rack_files.get("source_rack")
+
+        if setup_gui:
+            root = tk.Tk()
+            source_rack_filename = "config/source_rack.csv"
+            app = DispRackEditor(root, filename=disp_rack_filename, source_rack_filename=source_rack_filename)
+            root.mainloop()
+
         self.initialize_deck(
-            rack_files.get("disp_rack"),
-            rack_files.get("source_rack"),
+            disp_rack_filename,
+            source_rack_filename,
             rack_files.get("heat_rack")
         )
-
         resources = self.config.get("resources", {})
         self.res1_vol = resources.get("res1_vol", 67.2)
         self.res2_vol = resources.get("res2_vol", 67.2)

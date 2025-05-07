@@ -60,16 +60,6 @@ def create_formulation(plan_file, source_rack_file):
     disp_rack = [["e" for _ in range(8)] for _ in range(6)]
     # loop thrrough input file
     for i, row in enumerate(in_df.itertuples(), start=1):
-        print(
-            [
-            str(getattr(row, tfsi_name)),
-            str(getattr(row, fsi_name)),
-            str(getattr(row, no3_name)),
-            str(getattr(row, clo4_name)),
-            str(getattr(row, so4_name)),
-            str(getattr(row, ac_name)),
-        ]
-        )
         vols = get_water_V(
             float(getattr(row, tfsi_name)),
             float(getattr(row, fsi_name)),
@@ -127,7 +117,6 @@ def create_formulation(plan_file, source_rack_file):
             if len(result) == 0:
                 drop = True
                 break
-            print(result)
             for source, vol in result:
                 source_list = source_list + source
                 vol_list = vol_list + vol
@@ -167,8 +156,8 @@ def create_formulation(plan_file, source_rack_file):
         writer.writerows(disp_rack)
 
     # write to gen_formulation.csv
-    plan_df.to_csv("gen_formulation.csv") 
-    dropped_df.to_csv("dropped_formulation_vols.csv")
+    plan_df.to_csv("experiments/gen_formulation.csv") 
+    dropped_df.to_csv("experiments/dropped_formulation_vols.csv")
 
     print("Generated plan. See gen_formulation.csv and gen_disp_rack.csv")
 
@@ -185,7 +174,6 @@ def rack_checker(rack, source_name, desired_vol):
         reagent_name = f"{source_name}_{str(num)}"
         pos = rack.get_vial_by_name(reagent_name)   
         if not pos:
-            print(reagent_name)
             break
             
         _, vol, _ = rack.get_vial_by_pos(pos)
@@ -212,3 +200,6 @@ def rack_checker(rack, source_name, desired_vol):
         formatted_result.append((f"{pos} ", f"{vol} "))
     
     return formatted_result
+
+if __name__ == "__main__":
+    create_formulation("top_constrained_15_ori.csv", "../config/source_rack.csv")
