@@ -7,6 +7,7 @@ import math
 import matplotlib
 import pandas as pd
 from utils.DBUtils import MongoQuery
+from pathlib import Path
 
 matplotlib.use('TkAgg')
 
@@ -61,7 +62,7 @@ def initialize_pstat1(pstat):
      pstat.set_pos_feed_enable(False)
      pstat.set_irupt_mode(tkp.IRUPTOFF)
 
-def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}):
+def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}, save_to_db_folder = True):
     tkp.toolkitpy_init("galvanostatic_eis.py")
     pstat = tkp.Pstat("PSTAT")
     #Parameters
@@ -152,23 +153,26 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}):
         time.sleep(.010)
 
     pstat.set_cell(False)
-    np.savetxt("res/geis/" + output_file_name+ ".csv", zcurve.acq_data(),delimiter = ',', 
+    out_path = "res/geis/" + output_file_name+ ".csv"
+    np.savetxt(out_path, zcurve.acq_data(),delimiter = ',', 
                header = 'point,freq,zreal,zimag,zmod,zphz,zsig,Idc,Vdc,ie_range,gain,vmod,vphz,vsig,vthd,imod,iphz,isig,ithd,zreal_drift,zimag_drift,zmod_drift,zphz_drift')
     
     temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
     temperature = temper.get_temperature()[1]
     
-    #below is processing
-    df_file = "res/geis/" + output_file_name+ ".csv"
-    s_df_file = "res/geis_test_summaries.csv"
 
-    df = pd.read_csv(df_file, index_col='# point')
+    df = pd.read_csv(out_path, index_col='# point')
     reflected_zimag = [-val for val in df['zimag']]
     df.insert(2, 'reflected_zimag', reflected_zimag)
     df['temp(C)'] = temperature
-    df.to_csv(df_file)
+    df.to_csv(out_path)
+
+    if save_to_db_folder:
+        db_path = Path(r"c:\Users\llf1362\Desktop\DB\eis") / f"{output_file_name}.csv"
+        df.to_csv(db_path) 
 
     # extract minima
+    s_df_file = "res/geis_test_summaries.csv"
     s_df = pd.read_csv(s_df_file)
     df_no_negatives = df[df.reflected_zimag >=0]
     min_index = df_no_negatives['reflected_zimag'].idxmin()  # Get the index of the minimum value
@@ -179,8 +183,7 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}):
     new_row = pd.DataFrame([[output_file_name, R1, R1_nofit, temperature, curr_time]], columns=['test name', 'zreal', 'minima', 'temp', 'time'])
 
     s_df = pd.concat([s_df, new_row], ignore_index=True)
-    s_df.to_csv(s_df_file, index=False)   
-
+    s_df.to_csv(s_df_file, index=False)  
 
     return zcurve
 

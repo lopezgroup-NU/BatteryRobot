@@ -86,11 +86,11 @@ def cv_interpret(filename):
     targ_min = -0.000024
 
     im_col = df["Im"]
-    im_colPositive = im_col[0:positive]
+    im_colPositive = im_col[:positive]
     im_colNegative = im_col[zero:negative]
 
     vf_col = df["Vf"]
-    vf_colPositive = vf_col[0:positive]
+    vf_colPositive = vf_col[:positive]
     vf_colNegative = vf_col[zero:negative]
 
     #get xmax

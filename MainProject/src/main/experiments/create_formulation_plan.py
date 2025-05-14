@@ -1,6 +1,6 @@
 import csv
 import pandas as pd
-from utils.MathUtils import get_water_V
+from utils.MathUtils import get_weights
 from config.source_rack import SourceRack
 from config.disp_rack import DispRack
 
@@ -60,7 +60,7 @@ def create_formulation(plan_file, source_rack_file):
     disp_rack = [["e" for _ in range(8)] for _ in range(6)]
     # loop thrrough input file
     for i, row in enumerate(in_df.itertuples(), start=1):
-        vols = get_water_V(
+        vols = get_weights(
             float(getattr(row, tfsi_name)),
             float(getattr(row, fsi_name)),
             float(getattr(row, no3_name)),
@@ -69,10 +69,12 @@ def create_formulation(plan_file, source_rack_file):
             float(getattr(row, ac_name)),
         )
         vols = [round(vol, 2) for vol in vols]
-        if (sum(vols[:-1]) > 5)  or any(vol < 0 for vol in vols):
+        if (sum(vols) > 5)  or any(vol < 0 for vol in vols):
+            print(sum(vols))
             cannot_rows.append(i)
             continue
-
+        water_vol = round(5 - sum(vols), 2)
+        vols.append(water_vol)
         # do the volume_concentration thing for the experiment_name
         comps = ["TFSI", "FSI", "NO3", "CLO4", "SO4", "AC"]
         concs = [
@@ -85,11 +87,11 @@ def create_formulation(plan_file, source_rack_file):
         ]
 
         experiment_name = ""
-        for comp, conc in zip(comps, concs):  
+        for comp, conc in zip(comps, concs):
             if float(conc) > 0:
                 if experiment_name:
                     experiment_name += "_"
-                
+
                 conc_val = float(conc)
                 whole_part = int(conc_val)
                 decimal_part = int((conc_val - whole_part) * 100)
@@ -97,42 +99,51 @@ def create_formulation(plan_file, source_rack_file):
 
                 experiment_name += f"{comp}_{formatted_conc}"
 
-        # check space on disp_rack first 
+        # check space on disp_rack first
         if disp_rack_curr == disp_rack_max:
-            dropped_df.loc[experiment_name] = vols
+            dropped_df.loc[experiment_name] = [round(v, 2) for v in vols]
             continue
-        
+
         # must make sure names on source rack.csv is equal to what henry's is
-        # e.g. if Henry say's "LiTFSI", we have to use "LiTFSI_x" as well where x is the 
+        # e.g. if Henry say's "LiTFSI", we have to use "LiTFSI_x" as well where x is the
         # id of that vial, e.g. LiTFSI_1, LiTFSI_2 etc
-        # check sources 
+        # check sources
         source_list = ""
         vol_list = ""
 
         drop = False
-        for name, vol in zip(components + ["H2O"], vols):
-            # source rack should be passed by reference
-            # make changes to source rack in the rack_checker
-            result = rack_checker(source_rack, name, vol)
-            if len(result) == 0:
-                drop = True
-                break
-            for source, vol in result:
-                source_list = source_list + source
-                vol_list = vol_list + vol
+        temp_source_vols = {} # Store used volumes temporarily
+        for name, desired_v in zip(components + ["H2O"], vols):
+            if desired_v > 0.0:
+                result = rack_checker(source_rack, name, desired_v)
+                if not result:
+                    drop = True
+                    break
+                for source, vol in result.items():
+                    source_list += f"{source} "
+                    vol_list += f"{round(vol, 2)} "
+                    if source not in temp_source_vols:
+                        temp_source_vols[source] = 0
+                    temp_source_vols[source] += vol
 
         if drop:
-            dropped_df.loc[experiment_name] = vols
-            continue 
+            dropped_df.loc[experiment_name] = [round(v, 2) for v in vols]
+            # Revert changes to source rack if formulation was dropped
+            for source, vol in temp_source_vols.items():
+                current_vol = source_rack.get_vial_by_pos(source)[1]
+                source_rack.set_vial_by_pos(source, round(current_vol + vol, 2))
+            continue
 
         # add new entry to formulation df
+        heat_pos = ""
+        
         new_row = {
             "Target_vial": DispRack.index_to_pos(disp_rack_curr),
             "Sources": source_list.strip(),
             "Volumes_mL": vol_list.strip(),
             "Solids": "",
             "Weights_g": "",
-            "Heat": True,
+            "Heat": heat_pos,
             "Time_h": "0.5"
         }
 
@@ -150,56 +161,62 @@ def create_formulation(plan_file, source_rack_file):
     if cannot_rows:
         print(f"Rows that are impossible to make (1-indexed): {str(cannot_rows)}")
 
-    # write to gen_disp_rack.csv
-    with open('config/gen_disp_rack.csv', 'w', newline='') as disp_file:
+    # write to disp_rack.csv
+    with open('config/disp_rack.csv', 'w', newline='') as disp_file:
         writer = csv.writer(disp_file)
         writer.writerows(disp_rack)
 
     # write to gen_formulation.csv
-    plan_df.to_csv("experiments/gen_formulation.csv") 
-    dropped_df.to_csv("experiments/dropped_formulation_vols.csv")
+    generated_formulation_file = "formulation.csv"
+    dropped_formulations_file = "dropped_formulation_vols.csv"
 
-    print("Generated plan. See gen_formulation.csv and gen_disp_rack.csv")
+    plan_df.to_csv(f"experiments/{generated_formulation_file}")
+    dropped_df.to_csv(f"experiments/{dropped_formulations_file}")
+
+    print(f"Generated plan. See {generated_formulation_file} and gen_disp_rack.csv")
+    print(f"Dropped formulations are available in experiments/{dropped_formulations_file}. \n \
+          These were dropped because of resource constraints on the source rack, but are possible to make. \n \
+          You can copy these back into the plan file and run it again")
 
 def rack_checker(rack, source_name, desired_vol):
     """
     Helper function to check source rack for source availability
     """
     num = 1
-    sources = {}
-    remaining_vol = desired_vol
-    
+    sources_used = {}
+    remaining_vol = round(desired_vol, 2)
+
     # loop through all vials with the same base name (e.g., water1, water2, etc.)
-    while True:
+    while remaining_vol > 0:
         reagent_name = f"{source_name}_{str(num)}"
-        pos = rack.get_vial_by_name(reagent_name)   
+        pos = rack.get_vial_by_name(reagent_name)
         if not pos:
             break
-            
+
         _, vol, _ = rack.get_vial_by_pos(pos)
-        
-        if remaining_vol > 0 and vol > 0:
+        vol = round(vol, 2)
+
+        if vol > 0:
             use_vol = min(remaining_vol, vol)
-            sources[pos] = use_vol
-            
+            use_vol = round(use_vol, 2)
+            sources_used[pos] = use_vol
+
             remaining_vol -= use_vol
-            new_vol = vol - use_vol
-            
+            remaining_vol = round(remaining_vol, 2)
+            new_vol = round(vol - use_vol, 2)
+
             rack.set_vial_by_pos(pos, new_vol)
-            
-        if remaining_vol <= 0:
-            break
-            
+
         num += 1
-    
+
     if remaining_vol > 0:
+        # Revert any changes made to the rack since we couldn't fulfill the volume
+        for pos, used_vol in sources_used.items():
+            current_vol = rack.get_vial_by_pos(pos)[1]
+            rack.set_vial_by_pos(pos, round(current_vol + used_vol, 2))
         return {}
-    
-    formatted_result = []
-    for pos, vol in sources.items():
-        formatted_result.append((f"{pos} ", f"{vol} "))
-    
-    return formatted_result
+
+    return sources_used
 
 if __name__ == "__main__":
     create_formulation("top_constrained_15_ori.csv", "../config/source_rack.csv")

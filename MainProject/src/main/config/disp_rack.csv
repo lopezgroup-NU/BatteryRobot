@@ -1,6 +1,6 @@
-purge,purge,purge,purge,purge,purge,x,TFSI_10p28m_NO3_2m_AC_1p37m 4 1
-purge,purge,purge,purge,purge,purge,purge,TFSI_10p54m_NO3_1p36m_AC_1p33m 4 1
-purge,purge,purge,purge,purge,purge,purge,TFSI_10p46m_NO3_2p15m_AC_0p69m 4 1
-purge,purge,purge,purge,purge,purge,purge,purge
-purge,purge,purge,purge,purge,purge,purge,purge
-purge,purge,purge,purge,purge,purge,purge,purge
+e,e,e,e,e,e,e,AC_1p00m 0 1
+e,e,e,e,e,e,e,FSI_1p00m_AC_1p00m 0 1
+e,e,e,e,e,e,e,CLO4_1p00m 0 1
+e,e,e,e,e,e,e,SO4_1p00m 0 1
+e,e,e,e,e,e,e,e
+e,e,e,e,e,e,e,e

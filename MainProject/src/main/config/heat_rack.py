@@ -55,3 +55,9 @@ class HeatRack():
             "D": 3,
         }
         return mapping[pos[0]] * 3 + int(pos[1]) - 1
+    
+    def get_free(self):
+        """
+        Return next free slot on heatrack and mark that as taken.
+        """
+        

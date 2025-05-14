@@ -17,7 +17,7 @@ p2 = PowderShaker('C', network = rob.network)
 waters = list(range(10,48))
 
 #rob.run_formulation('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/formulation.csv')
-rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv')
+#rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv')
 
 #capping vials on asprack takes about 800 units of torque
 #todo

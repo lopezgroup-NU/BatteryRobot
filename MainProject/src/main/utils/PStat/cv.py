@@ -6,6 +6,7 @@ import time as Time
 import numpy as np
 from .experiment import Experiment
 from ..MathUtils import kinetic_fit
+from pathlib import Path
 
 #Statement of work
 #A modular rerunnable experiment according to given parameters. The resulting 
@@ -194,7 +195,7 @@ def find_peaks_and_zero_crossings(data):
     return positive_peak_index, zero_cross_index, negative_peak_index
 
 
-def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1]):
+def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], save_to_db_folder = True):
     tkp.toolkitpy_init("open_circuit_voltage.py")
     pstat = tkp.Pstat("PSTAT")
     cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
@@ -206,9 +207,14 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
 
     temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
     temperature = temper.get_temperature()[1]
+    
     df = pd.read_csv(out_path, index_col='# Point')
     df['temp(C)'] = temperature
     df.to_csv(out_path)
+
+    if save_to_db_folder:
+        db_path = Path(r"c:\Users\llf1362\Desktop\DB\cv") / f"{output_file_name}.csv"
+        df.to_csv(db_path)   
 
     s_df_file = "res/cv_test_summaries.csv"
     s_df = pd.read_csv(s_df_file)

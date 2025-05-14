@@ -1,2 +1,5 @@
 Experiment,Target_vial,Sources,Volumes_mL,Solids,Weights_g,Heat,Time_h
-1,A2,E3 A3 D1 C2,2.15 0.92 0.89 2.50,,,A2,0.5
+AC_1p00m,A1,C1 B1,0.85 4.2,,,True,0.5
+FSI_1p00m_AC_1p00m,A2,C3 C1 B1,0.61 0.78 3.61,,,True,0.5
+CLO4_1p00m,A3,C4 B1 B2,1.17 0.19 3.64,,,True,0.5
+SO4_1p00m,A4,B4 B2,1.86 3.14,,,True,0.5
