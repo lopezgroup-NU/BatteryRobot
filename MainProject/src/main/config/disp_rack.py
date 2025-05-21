@@ -187,7 +187,7 @@ class DispRack():
         Given pos, return vial information (name, vol, conc)
         """
         if not hasattr(self, pos):
-            raise ValueError(f"{self.name}: No vial information found at position {pos}")
+           return None
         
         name = getattr(self, pos)
         vol = getattr(self, name + "_vol")
@@ -225,7 +225,7 @@ class DispRack():
         Given pos, delete vial and all associated information (vol, conc)
         """
         if not hasattr(self, pos):
-            raise ValueError(f"{self.name}: No vial to delete at position {pos}")
+            return
 
         name = getattr(self, pos)
         delattr(self, name + "_vol")

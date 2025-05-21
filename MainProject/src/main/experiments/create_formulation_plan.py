@@ -3,6 +3,7 @@ import pandas as pd
 from utils.MathUtils import get_weights
 from config.source_rack import SourceRack
 from config.disp_rack import DispRack
+from config.heat_rack import HeatRack
 
 def create_formulation(plan_file, source_rack_file):
     """
@@ -59,6 +60,9 @@ def create_formulation(plan_file, source_rack_file):
     disp_rack_max = 48
     disp_rack = [["e" for _ in range(8)] for _ in range(6)]
     # loop thrrough input file
+
+    # max for now is 12
+    heat_idx = 0
     for i, row in enumerate(in_df.itertuples(), start=1):
         vols = get_weights(
             float(getattr(row, tfsi_name)),
@@ -135,20 +139,21 @@ def create_formulation(plan_file, source_rack_file):
             continue
 
         # add new entry to formulation df
-        heat_pos = ""
-        
+
+
         new_row = {
             "Target_vial": DispRack.index_to_pos(disp_rack_curr),
             "Sources": source_list.strip(),
             "Volumes_mL": vol_list.strip(),
             "Solids": "",
             "Weights_g": "",
-            "Heat": heat_pos,
+            "Heat": HeatRack.index_to_pos(heat_idx),
             "Time_h": "0.5"
         }
 
         plan_df.loc[experiment_name] = new_row
-
+        heat_idx += 1
+        
         # volume is 0 as hasnt been made yet. concentration is 1 as placeholder
         entry = f"{experiment_name} 0 1"
         row = disp_rack_curr % 6

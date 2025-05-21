@@ -62,7 +62,7 @@ def initialize_pstat1(pstat):
      pstat.set_pos_feed_enable(False)
      pstat.set_irupt_mode(tkp.IRUPTOFF)
 
-def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}, save_to_db_folder = True):
+def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}, save_to_db_folder = True, standard = False):
     tkp.toolkitpy_init("galvanostatic_eis.py")
     pstat = tkp.Pstat("PSTAT")
     #Parameters
@@ -153,7 +153,11 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}, save_t
         time.sleep(.010)
 
     pstat.set_cell(False)
-    out_path = "res/geis/" + output_file_name+ ".csv"
+
+    if standard:
+        out_path = "res/standard/geis/" + output_file_name+ ".csv"
+    else:
+        out_path = "res/geis/" + output_file_name+ ".csv"
     np.savetxt(out_path, zcurve.acq_data(),delimiter = ',', 
                header = 'point,freq,zreal,zimag,zmod,zphz,zsig,Idc,Vdc,ie_range,gain,vmod,vphz,vsig,vthd,imod,iphz,isig,ithd,zreal_drift,zimag_drift,zmod_drift,zphz_drift')
     
@@ -167,12 +171,15 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}, save_t
     df['temp(C)'] = temperature
     df.to_csv(out_path)
 
-    if save_to_db_folder:
+    if save_to_db_folder and not standard:
         db_path = Path(r"c:\Users\llf1362\Desktop\DB\eis") / f"{output_file_name}.csv"
         df.to_csv(db_path) 
 
     # extract minima
-    s_df_file = "res/geis_test_summaries.csv"
+    if standard:
+        s_df_file = "res/standard/std_geis_test_summaries.csv"
+    else:
+        s_df_file = "res/geis_test_summaries.csv"
     s_df = pd.read_csv(s_df_file)
     df_no_negatives = df[df.reflected_zimag >=0]
     min_index = df_no_negatives['reflected_zimag'].idxmin()  # Get the index of the minimum value

@@ -76,7 +76,7 @@ def kinetic_fit(cv_file):
         return (switch_x[0][0], f"{params[0]:.3e}", f"{params[1]:.5f}")
     else: return(switch_x[0][0], np.nan, np.nan)
 
-def cv_interpret(filename):
+def cv_interpret(filename, reverse_peak = False):
     df_file = filename
     df = pd.read_csv(df_file, index_col='# Point')
 
@@ -84,14 +84,21 @@ def cv_interpret(filename):
 
     targ_max = 0.000024
     targ_min = -0.000024
-
     im_col = df["Im"]
-    im_colPositive = im_col[:positive]
-    im_colNegative = im_col[zero:negative]
-
     vf_col = df["Vf"]
-    vf_colPositive = vf_col[:positive]
-    vf_colNegative = vf_col[zero:negative]
+
+    if reverse_peak:
+        im_colPositive = im_col[:positive]
+        im_colNegative = im_col[zero:negative]
+
+        vf_colPositive = vf_col[:positive]
+        vf_colNegative = vf_col[zero:negative]
+    else:
+        im_colPositive = im_col[positive:zero]
+        im_colNegative = im_col[:negative]
+
+        vf_colPositive = vf_col[positive:zero]
+        vf_colNegative = vf_col[:negative]
 
     #get xmax
     #translate column by target and get absolute values. find index of minimum (closest to 0)
@@ -220,7 +227,7 @@ class MongoQuery:
     def __init__(self, uri="mongodb://localhost:27017/", db_name="atomdb"):
         self.conn = MongoConn(uri=uri, db_name=db_name)
 
-    def add_cv_data(self, folder, ignore_first=True):
+    def add_cv_data(self, folder, ignore_first=True, reverse_peak = False):
         """
         Set ignore_first to True if you want to ignore the first of the three values
         when calculating average 
@@ -254,7 +261,7 @@ class MongoQuery:
                 file_name = f"{file_named}_cv{str(i)}.csv"
                 path = folder / Path(file_name)
                 if os.path.exists(path):
-                    vf_diff,vf_max,vf_min = cv_interpret(path)
+                    vf_diff,vf_max,vf_min = cv_interpret(path, reverse_peak=reverse_peak)
                     overP, i0, alpha_c = kinetic_fit(path)
                     all_cv_diff.append(vf_diff)
                     low_end_cv.append(vf_min)
@@ -265,7 +272,7 @@ class MongoQuery:
 
                     # get timestamp of latest file for specific run
                     # i.e. if two files, get timestamp of second
-                    time_stamp = os.path.getmtime(path)
+                    time_stamp = os.path.getctime(path)
                     time_stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_stamp))
 
                     #do the same, for temp

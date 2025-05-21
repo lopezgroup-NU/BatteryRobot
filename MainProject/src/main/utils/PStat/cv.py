@@ -195,14 +195,18 @@ def find_peaks_and_zero_crossings(data):
     return positive_peak_index, zero_cross_index, negative_peak_index
 
 
-def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], save_to_db_folder = True):
+def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], save_to_db_folder = True, standard = False):
     tkp.toolkitpy_init("open_circuit_voltage.py")
     pstat = tkp.Pstat("PSTAT")
     cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
     data = cv.run_cv(pstat, max_size = 100000)
     #TODO  
     #add the new columns to the actual CSV file
-    out_path = "res/cv/" + output_file_name + ".csv"
+
+    if standard:
+        out_path = "res/standard/cv/" + output_file_name+ ".csv"
+    else:
+        out_path = "res/cv/" + output_file_name + ".csv"
     np.savetxt(out_path, data, delimiter = ',', header = 'Point,time,Vf,Vu,Im,Ach,vsig,temp,Cycle,ie_range,overload,stop_test', fmt = '%s') 
 
     temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
@@ -212,11 +216,15 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
     df['temp(C)'] = temperature
     df.to_csv(out_path)
 
-    if save_to_db_folder:
+    if save_to_db_folder and not standard:
         db_path = Path(r"c:\Users\llf1362\Desktop\DB\cv") / f"{output_file_name}.csv"
         df.to_csv(db_path)   
 
-    s_df_file = "res/cv_test_summaries.csv"
+    if standard:
+        s_df_file = "res/standard/std_cv_test_summaries.csv"
+    else:
+        s_df_file = "res/cv_test_summaries.csv"
+
     s_df = pd.read_csv(s_df_file)
 
     s = time.localtime(time.time())

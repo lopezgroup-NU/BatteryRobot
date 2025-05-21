@@ -12,8 +12,10 @@ from utils.PStat.geis import *
 from utils.PStat.cv import *
 from utils.PStat.ocv import *
 from .PowderShakerUtils import PowderShaker
+from .T8Utils import T8
 from .ExceptionUtils import *
 from .MathUtils import get_time_stamp
+
 """
 Module for BatteryRobot operation
 """
@@ -87,11 +89,11 @@ class BatteryRobot(NorthC9):
         """
         heating_tasks = []
         heapq.heapify(heating_tasks)
-
         df = pd.read_csv(run_file)
 
-        #start spinner
+        #start spinner and heat
         self.spin_axis(6, 7000)
+        self.set_temp(0, 50)
 
         log_file = open("experiments/formulation.log", "a")
         log_file.write("*" * 50 + "\n")
@@ -149,12 +151,13 @@ class BatteryRobot(NorthC9):
                         self.disp_rack.set_vial_by_pos(target_pos, current_vol + vol)
 
                 #heat and wait for them
-                heatplate_pos = experiment.Heat
-                heatplate_idx = self.heat_rack.pos_to_index(heatplate_pos)
-                heat_time = float(experiment.Time_h) * 3600 # convert to seconds
-                self.move_vial(rack_disp_official[target_idx], heatplate_official[heatplate_idx])
-                #store in binary heap as tuple - binary heap autosorts everytime you insert
-                heapq.heappush(heating_tasks, (time.time()+heat_time, heatplate_idx, target_idx))
+                if not pd.isna(experiment.Heat) and str(experiment.Heat).strip():
+                    heatplate_pos = experiment.Heat
+                    heatplate_idx = self.heat_rack.pos_to_index(heatplate_pos)
+                    heat_time = float(experiment.Time_h) * 3600 # convert to seconds
+                    self.move_vial(rack_disp_official[target_idx], heatplate_official[heatplate_idx])
+                    #store in binary heap as tuple - binary heap autosorts everytime you insert
+                    heapq.heappush(heating_tasks, (time.time()+heat_time, heatplate_idx, target_idx))
 
             except ContinuableRuntimeError as e:
                 response = input(f"{e}. \nError with current formulation. Continue? Yes/No")
@@ -199,19 +202,49 @@ class BatteryRobot(NorthC9):
         log_file.write("*" * 50 + "\n")
         log_file.close()
 
-        #turn off spinner
+        #turn off spinner and heat
         self.spin_axis(6, 0)
+        self.set_temp(0, 10)
         print("Done running!")
 
-    def run_test(self, run_file):
-        '''Runs the testing files'''
+    def run_test(self, run_file, standard = None):
+        '''
+        Runs the testing files
+        If standard is provided, will run experiment before and after test file is done
+        Standard should be a dict consisting of the standard's name (default to "standard") 
+        and the position it is located. e.g.
+
+        standard = {
+            "name": "standard",
+            "pos": "B5"
+        }
+
+        '''
         df = pd.read_csv(run_file)
+        run_standard = standard is not None
+        if run_standard:
+            # perform checks on disp rack and ensure vial has been added. 
+            name = standard.get("name", "standard")
+            pos = standard.get("pos")
+
+            tup = self.disp_rack.get_vial_by_pos(pos)
+            if tup is None:
+                raise Exception("Add vial named standard to disp_rack.csv first!")
+
+            if tup[0] != name:
+                raise Exception(f"Make sure vial name at {pos} on disp_rack.csv is the same \
+                                as what you provide to run_test()")
+            
+            #  add row before and after run file
+            row = [standard, pos, True, "250000 1 0.00001", True, "2 -2 0.020", False]
+            new_row = pd.DataFrame([row], columns=df.columns)
+            df = pd.concat([new_row, df, new_row], ignore_index=True)
 
         log_file = open("experiments/experiments.log", "a")
         log_file.write("*" * 50 + "\n")
         log_file.write(f"Running tests: {get_time_stamp()} \n")
 
-        for test in df.itertuples():
+        for i, test in enumerate(df.itertuples()):
             try:
                 target_pos = test.Target_vial
                 log_file.write(f"   Beginning tests for position {target_pos} at: \
@@ -245,8 +278,12 @@ class BatteryRobot(NorthC9):
                         self.set_output(6, False)
                         self.set_output(7, False)
                         self.set_output(8, False)
-                        run_geis(output_file_name=output_file_name + \
-                                f"_geis{i}", parameter_list=geis_parameter_list)
+
+                        row_is_standard = run_standard and (i ==0 or i==len(df) - 1)
+
+                        run_geis(output_file_name=output_file_name + f"_geis{i}", 
+                                parameter_list=geis_parameter_list, 
+                                standard=row_is_standard)
                         self.draw_sensor1to2(target_idx, viscous=True)
                         self.set_output(6, True)
                         self.set_output(7, True)
@@ -257,7 +294,8 @@ class BatteryRobot(NorthC9):
                                         [rate, rate, rate],
                                         [0.05, 0.05, 0.05],
                                         1,
-                                        0.1])
+                                        0.1],
+                                standard=row_is_standard)
                         self.set_output(6, False)
                         self.set_output(7, False)
                         self.set_output(8, False)
