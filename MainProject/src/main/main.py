@@ -11,13 +11,15 @@ paths = ['C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages','C:\\User
 for i in paths:
     sys.path.append(i)
 
-rob = BatteryRobot('A', network_serial='AU06EZ1P', home = True)
+rob = BatteryRobot('A', network_serial='AU06EZ1P', home = True, setup_gui = True)
 t8 = T8('B', network = rob.network)
 p2 = PowderShaker('C', network = rob.network)
 waters = list(range(10,48))
+standard = {"name": "7m_NO3",
+            "pos": "A1"}
 
 #rob.run_formulation('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/formulation.csv')
-#rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv')
+# rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv', standard = standard)
 
 #capping vials on asprack takes about 800 units of torque
 #todo

@@ -74,9 +74,9 @@ def create_formulation(plan_file, source_rack_file):
         )
         vols = [round(vol, 2) for vol in vols]
         if (sum(vols) > 5)  or any(vol < 0 for vol in vols):
-            print(sum(vols))
             cannot_rows.append(i)
             continue
+
         water_vol = round(5 - sum(vols), 2)
         vols.append(water_vol)
         # do the volume_concentration thing for the experiment_name
@@ -104,7 +104,7 @@ def create_formulation(plan_file, source_rack_file):
                 experiment_name += f"{comp}_{formatted_conc}"
 
         # check space on disp_rack first
-        if disp_rack_curr == disp_rack_max:
+        if disp_rack_curr == disp_rack_max or heat_idx >= 12:
             dropped_df.loc[experiment_name] = [round(v, 2) for v in vols]
             continue
 
@@ -139,8 +139,6 @@ def create_formulation(plan_file, source_rack_file):
             continue
 
         # add new entry to formulation df
-
-
         new_row = {
             "Target_vial": DispRack.index_to_pos(disp_rack_curr),
             "Sources": source_list.strip(),
@@ -180,7 +178,7 @@ def create_formulation(plan_file, source_rack_file):
 
     print(f"Generated plan. See {generated_formulation_file} and gen_disp_rack.csv")
     print(f"Dropped formulations are available in experiments/{dropped_formulations_file}. \n \
-          These were dropped because of resource constraints on the source rack, but are possible to make. \n \
+          These were dropped because of resource constraints on the source rack/heat rack, but are possible to make. \n \
           You can copy these back into the plan file and run it again")
 
 def rack_checker(rack, source_name, desired_vol):

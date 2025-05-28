@@ -701,14 +701,14 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "heatplate_official_2": {
+    "heatplate_official2": {
       "type": "Grid",
       "tool": 0,
       "counts": [
-        -729,
-        35120,
-        17473,
-        14859
+        -2065,
+        35188,
+        17478,
+        14870
       ],
       "ik_soln": 0,
       "reference": false,
@@ -724,6 +724,19 @@
         28,
         0.0
       ]
+    },
+    "carousel_aspirate": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        101,
+        5925,
+        39910,
+        17142
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
     }
   },
   "sim_inputs": {

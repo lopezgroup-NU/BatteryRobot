@@ -33,13 +33,6 @@ class BatteryRobot(NorthC9):
         setup_gui will prompt user to check on disp and source rack csvs. Set to false for closed loop, so that robot doesnt get blocked
         """
         super().__init__(address, network_serial=network_serial)
-        if home:
-            self.home_robot() #Robot arm homing
-            self.home_carousel() #Robot carousel homing
-            self.reset_pump()
-            self.home_pump(3)  #Pipette pump homing
-            self.home_pump(0) #Pump system sensing homing
-            self.set_pump_valve(3, 0) #Set pump system valve at input position
 
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)
@@ -81,6 +74,15 @@ class BatteryRobot(NorthC9):
         self.vol_purge = resources.get("vol_purge", 19)
         self.water_start = resources.get("water_start", 15)
         self.water_end = resources.get("water_end", 47)
+
+        #home before we do anything
+        if home:
+            self.home_robot() #Robot arm homing
+            self.home_carousel() #Robot carousel homing
+            self.reset_pump()
+            self.home_pump(3)  #Pipette pump homing
+            self.home_pump(0) #Pump system sensing homing
+            self.set_pump_valve(3, 0) #Set pump system valve at input position
 
     def run_formulation(self, run_file):
         """
@@ -225,18 +227,21 @@ class BatteryRobot(NorthC9):
         if run_standard:
             # perform checks on disp rack and ensure vial has been added. 
             name = standard.get("name", "standard")
-            pos = standard.get("pos")
-
+            try:
+                pos = standard.get("pos")
+            except:
+                raise Exception("Need to provide a pos for standard!")
+            
             tup = self.disp_rack.get_vial_by_pos(pos)
             if tup is None:
-                raise Exception("Add vial named standard to disp_rack.csv first!")
+                raise Exception("Add standard vial to disp_rack.csv first!")
 
             if tup[0] != name:
                 raise Exception(f"Make sure vial name at {pos} on disp_rack.csv is the same \
                                 as what you provide to run_test()")
             
             #  add row before and after run file
-            row = [standard, pos, True, "250000 1 0.00001", True, "2 -2 0.020", False]
+            row = [name, pos, True, "250000 1 0.00001", True, "2 -2 0.020", False]
             new_row = pd.DataFrame([row], columns=df.columns)
             df = pd.concat([new_row, df, new_row], ignore_index=True)
 
@@ -271,7 +276,11 @@ class BatteryRobot(NorthC9):
                         "ac_current": amp           #AC current amplitude
                     }
 
-                    for i in range(3):
+                    # this test is a standard test if we determine we're running a standard
+                    # and this is the first or last row of the run
+                    row_is_standard = run_standard and (i ==0 or i==len(df) - 1)
+                    # run test three times
+                    for j in range(3):
                         self.move_vial(rack_disp_official[target_idx], vial_carousel)
                         self.goto_safe(safe_zone)
                         self.draw_to_sensor(target_idx, viscous=True, special=True)
@@ -279,9 +288,8 @@ class BatteryRobot(NorthC9):
                         self.set_output(7, False)
                         self.set_output(8, False)
 
-                        row_is_standard = run_standard and (i ==0 or i==len(df) - 1)
 
-                        run_geis(output_file_name=output_file_name + f"_geis{i}", 
+                        run_geis(output_file_name=output_file_name + f"_geis{j}", 
                                 parameter_list=geis_parameter_list, 
                                 standard=row_is_standard)
                         self.draw_sensor1to2(target_idx, viscous=True)
@@ -289,7 +297,8 @@ class BatteryRobot(NorthC9):
                         self.set_output(7, True)
                         self.set_output(8, True)
                         ocv = RunOCV_lastV()
-                        run_cv2(output_file_name=output_file_name + f"_cv{i}",
+
+                        run_cv2(output_file_name=output_file_name + f"_cv{j}",
                                 values=[[ocv, point1, point2, 0],
                                         [rate, rate, rate],
                                         [0.05, 0.05, 0.05],
@@ -734,8 +743,6 @@ class BatteryRobot(NorthC9):
             else:
                 raise CriticalRuntimeError("Error: No more water left to purge! Check configs for")
 
-
-
     def purge_auto(self, desired_vol=4):
         """
         Loop through purge_sources in disp_rack and find
@@ -754,9 +761,38 @@ class BatteryRobot(NorthC9):
 
         self.purge(id)
 
+    def run_ce(self, source, target, target_vol):
+        """
+        Run CE
+
+        (G_insert_CE_Stuff_here)
+
+        source - position of source vial on disp_rack
+        target - ID of target slot on microplate
+        target_vol - volume to draw
+        """
+
+        #move vial to the carousel and uncap it
+        self.move_carousel(0,0)
+        self.move_vial(rack_disp_official[source], vial_carousel)
+        self.uncap_vial_in_carousel()
+        self.get_pipette()
+        self.zero_scale()
+
+        # draw from the vial in the carousel and dispense it at the microplate
+        self.goto_safe(carousel_aspirate)
+        self.aspirate_ml(target_vol)
+        self.goto_safe(microplate_official[target])
+        self.dispense_ml(target_vol)
+
+        # remove pipette and cap and return vial
+        self.remove_pipette()
+        self.cap_and_return_vial_to_rack(source)
+
+        #do whatever you want...
+
     def get_needle_height(self, pos):
         vol = self.disp_rack.sol_vols[pos]
-
         if vol <= 5:
             return 85
         elif vol <= 6:

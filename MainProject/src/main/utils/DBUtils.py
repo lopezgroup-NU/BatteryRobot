@@ -227,7 +227,7 @@ class MongoQuery:
     def __init__(self, uri="mongodb://localhost:27017/", db_name="atomdb"):
         self.conn = MongoConn(uri=uri, db_name=db_name)
 
-    def add_cv_data(self, folder, ignore_first=True, reverse_peak = False):
+    def add_cv_data(self, folder, ignore_first=True):
         """
         Set ignore_first to True if you want to ignore the first of the three values
         when calculating average 
@@ -254,6 +254,11 @@ class MongoQuery:
             all_cv_diff = []
             low_end_cv = []
             high_end_cv = []
+
+            all_cv_diff_rev = []
+            low_end_cv_rev = []
+            high_end_cv_rev = []
+
             all_overP = []
             all_i0 = []
             all_alpha_c = []
@@ -261,14 +266,20 @@ class MongoQuery:
                 file_name = f"{file_named}_cv{str(i)}.csv"
                 path = folder / Path(file_name)
                 if os.path.exists(path):
-                    vf_diff,vf_max,vf_min = cv_interpret(path, reverse_peak=reverse_peak)
-                    overP, i0, alpha_c = kinetic_fit(path)
+                    vf_diff,vf_max,vf_min = cv_interpret(path, reverse_peak=False)
                     all_cv_diff.append(vf_diff)
                     low_end_cv.append(vf_min)
                     high_end_cv.append(vf_max)
-                    all_overP.append(overP)
-                    all_i0.append(i0)
-                    all_alpha_c.append(alpha_c)
+
+                    vf_diff_rev,vf_max_rev,vf_min_rev = cv_interpret(path, reverse_peak=True)
+                    all_cv_diff_rev.append(vf_diff_rev)
+                    low_end_cv_rev.append(vf_min_rev)
+                    high_end_cv_rev.append(vf_max_rev)
+                    
+                    # overP, i0, alpha_c = kinetic_fit(path)
+                    # all_overP.append(overP)
+                    # all_i0.append(i0)
+                    # all_alpha_c.append(alpha_c)
 
                     # get timestamp of latest file for specific run
                     # i.e. if two files, get timestamp of second
@@ -286,9 +297,15 @@ class MongoQuery:
                 avg_cv_diff = all_cv_diff[0]
                 avg_cv_low = low_end_cv[0]
                 avg_cv_high = high_end_cv[0]
-                avg_overP = all_overP[0]
-                avg_i0 = all_i0[0]
-                avg_alpha_c = all_alpha_c[0]
+
+                avg_cv_diff_rev = all_cv_diff_rev[0]
+                avg_cv_low_rev= low_end_cv_rev[0]
+                avg_cv_high_rev = high_end_cv_rev[0]
+
+                # avg_overP = all_overP[0]
+                # avg_i0 = all_i0[0]
+                # avg_alpha_c = all_alpha_c[0]
+
             elif ignore_first:
                 # ignore first value
                 def compute_avg_ignore(lst):
@@ -301,9 +318,15 @@ class MongoQuery:
                 avg_cv_diff = compute_avg_ignore(all_cv_diff)
                 avg_cv_low =  compute_avg_ignore(low_end_cv)
                 avg_cv_high =  compute_avg_ignore(high_end_cv)
-                avg_overP =  compute_avg_ignore(all_overP)
-                avg_i0 =  compute_avg_ignore(all_i0)
-                avg_alpha_c =  compute_avg_ignore(all_alpha_c)
+                
+                avg_cv_diff_rev = compute_avg_ignore(all_cv_diff_rev)
+                avg_cv_low_rev=  compute_avg_ignore(low_end_cv_rev)
+                avg_cv_high_rev =  compute_avg_ignore(high_end_cv_rev)
+                
+                # avg_overP =  compute_avg_ignore(all_overP)
+                # avg_i0 =  compute_avg_ignore(all_i0)
+                # avg_alpha_c =  compute_avg_ignore(all_alpha_c)
+
             else:
                 def compute_avg(lst):
                     try:
@@ -314,9 +337,14 @@ class MongoQuery:
                 avg_cv_diff = compute_avg(all_cv_diff)
                 avg_cv_low =  compute_avg(low_end_cv)
                 avg_cv_high =  compute_avg(high_end_cv)
-                avg_overP =  compute_avg(all_overP)
-                avg_i0 =  compute_avg(all_i0)
-                avg_alpha_c =  compute_avg(all_alpha_c)
+
+                avg_cv_diff_rev = compute_avg(all_cv_diff_rev)
+                avg_cv_low_rev=  compute_avg(low_end_cv_rev)
+                avg_cv_high_rev =  compute_avg(high_end_cv_rev)
+
+                # avg_overP =  compute_avg(all_overP)
+                # avg_i0 =  compute_avg(all_i0)
+                # avg_alpha_c =  compute_avg(all_alpha_c)
 
             components_dict = {}
             for i in range(len(salt)):
@@ -332,12 +360,20 @@ class MongoQuery:
                             "highV": high_end_cv,
                             "avg_lowV": avg_cv_low,
                             "lowV": low_end_cv,
-                            "avg_overP": avg_overP,
-                            "overP": all_overP,
-                            "avg_i0": avg_i0,
-                            "i0": all_i0,
-                            "avg_alpha_c": avg_alpha_c,
-                            "alpha_c": all_alpha_c,
+
+                            "avg_cv_diff_rev": avg_cv_diff_rev,
+                            "cv_diff_rev": all_cv_diff_rev,
+                            "avg_highV_rev": avg_cv_high_rev,
+                            "highV_rev": high_end_cv_rev,
+                            "avg_lowV_rev": avg_cv_low_rev,
+                            "lowV_rev": low_end_cv_rev,
+
+                            # "avg_overP": avg_overP,
+                            # "overP": all_overP,
+                            # "avg_i0": avg_i0,
+                            # "i0": all_i0,
+                            # "avg_alpha_c": avg_alpha_c,
+                            # "alpha_c": all_alpha_c,
                             "ignore_first": ignore_first,
                             "cv_date_uploaded": time_stamp,
                             "components": components_dict,
