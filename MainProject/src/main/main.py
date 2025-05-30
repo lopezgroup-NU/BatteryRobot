@@ -18,6 +18,8 @@ waters = list(range(10,48))
 standard = {"name": "7m_NO3",
             "pos": "A1"}
 
+blablalablababloooawdwa
+
 #rob.run_formulation('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/formulation.csv')
 # rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv', standard = standard)
 
