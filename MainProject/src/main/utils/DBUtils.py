@@ -88,17 +88,17 @@ def cv_interpret(filename, reverse_peak = False):
     vf_col = df["Vf"]
 
     if reverse_peak:
+        im_colPositive = im_col[positive:zero]
+        im_colNegative = im_col[negative:]
+
+        vf_colPositive = vf_col[positive:zero]
+        vf_colNegative = vf_col[negative:]
+    else:
         im_colPositive = im_col[:positive]
         im_colNegative = im_col[zero:negative]
 
         vf_colPositive = vf_col[:positive]
         vf_colNegative = vf_col[zero:negative]
-    else:
-        im_colPositive = im_col[positive:zero]
-        im_colNegative = im_col[:negative]
-
-        vf_colPositive = vf_col[positive:zero]
-        vf_colNegative = vf_col[:negative]
 
     #get xmax
     #translate column by target and get absolute values. find index of minimum (closest to 0)

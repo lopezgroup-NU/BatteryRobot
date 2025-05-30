@@ -155,12 +155,16 @@ class BatteryRobot(NorthC9):
 
                 #heat and wait for them
                 if not pd.isna(experiment.Heat) and str(experiment.Heat).strip():
-                    heatplate_pos = experiment.Heat
-                    heatplate_idx = self.heat_rack.pos_to_index(heatplate_pos)
+                    heatrack_pos = experiment.Heat
+                    heatrack_idx, heatrack_num = self.heat_rack.pos_to_index(heatrack_pos)
+                    if heatrack_num == 1:
+                        heatrack = heatplate_official
+                    elif heatrack_num == 2:
+                        heatrack = heatplate_official2
                     heat_time = float(experiment.Time_h) * 3600 # convert to seconds
-                    self.move_vial(rack_disp_official[target_idx], heatplate_official[heatplate_idx])
+                    self.move_vial(rack_disp_official[target_idx], heatrack[heatrack_idx])
                     #store in binary heap as tuple - binary heap autosorts everytime you insert
-                    heapq.heappush(heating_tasks, (time.time()+heat_time, heatplate_idx, target_idx))
+                    heapq.heappush(heating_tasks, (time.time()+heat_time, heatrack_idx, heatrack, target_idx))
 
             except ContinuableRuntimeError as e:
                 response = input(f"{e}. \nError with current formulation. Continue? Yes/No")
@@ -176,8 +180,8 @@ class BatteryRobot(NorthC9):
                     time_done = soonest[0]
                     if time_done <= time.time():
                         heated_vial = heapq.heappop(heating_tasks)
-                        heatplate_idx, target_idx = heated_vial[1], heated_vial[2]
-                        self.move_vial(heatplate_official[heatplate_idx],
+                        heatrack_idx, heatrack, target_idx = heated_vial[1], heated_vial[2], heated_vial[3]
+                        self.move_vial(heatrack[heatrack_idx],
                                        rack_disp_official[target_idx])
                         log_file.write(f"   Finished making formulation for vial at position \
                                         {self.disp_rack.index_to_pos(target_idx)}:\
@@ -193,8 +197,8 @@ class BatteryRobot(NorthC9):
             time_done = soonest[0]
             if time_done <= time.time():
                 heated_vial = heapq.heappop(heating_tasks)
-                heatplate_idx, target_idx = heated_vial[1], heated_vial[2]
-                self.move_vial(heatplate_official[heatplate_idx], rack_disp_official[target_idx])
+                heatrack_idx, heatrack, target_idx = heated_vial[1], heated_vial[2], heated_vial[3]
+                self.move_vial(heatrack[heatrack_idx], rack_disp_official[target_idx])
                 log_file.write(f"   Finished making formulation for vial at position \
                                {self.disp_rack.index_to_pos(target_idx)}:  {get_time_stamp()} \n")
 

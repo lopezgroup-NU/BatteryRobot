@@ -61,8 +61,8 @@ def create_formulation(plan_file, source_rack_file):
     disp_rack = [["e" for _ in range(8)] for _ in range(6)]
     # loop thrrough input file
 
-    # max for now is 12
     heat_idx = 0
+    max_heat_slots = 24
     for i, row in enumerate(in_df.itertuples(), start=1):
         vols = get_weights(
             float(getattr(row, tfsi_name)),
@@ -104,7 +104,7 @@ def create_formulation(plan_file, source_rack_file):
                 experiment_name += f"{comp}_{formatted_conc}"
 
         # check space on disp_rack first
-        if disp_rack_curr == disp_rack_max or heat_idx >= 12:
+        if disp_rack_curr == disp_rack_max or heat_idx == max_heat_slots:
             dropped_df.loc[experiment_name] = [round(v, 2) for v in vols]
             continue
 
@@ -150,7 +150,6 @@ def create_formulation(plan_file, source_rack_file):
         }
 
         plan_df.loc[experiment_name] = new_row
-        heat_idx += 1
         
         # volume is 0 as hasnt been made yet. concentration is 1 as placeholder
         entry = f"{experiment_name} 0 1"
@@ -160,6 +159,7 @@ def create_formulation(plan_file, source_rack_file):
 
         # have to skip index 6, which corresponds to B1
         disp_rack_curr = disp_rack_curr + 1 if disp_rack_curr != 5 else disp_rack_curr + 2
+        heat_idx += 1
 
     if cannot_rows:
         print(f"Rows that are impossible to make (1-indexed): {str(cannot_rows)}")

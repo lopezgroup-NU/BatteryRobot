@@ -33,14 +33,16 @@ class HeatRack():
     @classmethod
     def index_to_pos(self, index):
         """
-        Given index (0 to 11) returns position (A1 - D3)
+        Given index (0 to 23) returns position (A1 - D3) followed by plate number
+        e.g. A1-1, A1-2 
         """
-        if index < 0 or index > 11:
+        if index < 0 or index > 23:
             raise ContinuableRuntimeError(f"{self.name}: Enter valid grid index!")
 
+        racknum = str(index // 12 + 1)
 
         cols = ["A", "B", "C", "D"]
-        return cols[index//3] + str(index % 3 + 1)
+        return cols[index//3] + str(index % 3 + 1) + "-" + racknum 
     
     @classmethod
     def pos_to_index(self, pos):
@@ -56,7 +58,7 @@ class HeatRack():
             "C": 2,
             "D": 3,
         }
-        return mapping[pos[0]] * 3 + int(pos[1]) - 1
+        return mapping[pos[0]] * 3 + int(pos[1]) - 1, int(pos[-1])
     
     def get_free(self):
         """
