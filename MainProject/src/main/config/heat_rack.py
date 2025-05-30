@@ -63,29 +63,30 @@ class HeatRack():
         Return next free slot on heatrack and mark that as taken.
         """
 
-class DualHeatRack:
-    """
-    We need to manage the two heatplates as a single logical unit.
-    """
-    def __init__(self, csv_path_rack1, csv_path_rack2):
-        self.rack1 = HeatRack(csv_path_rack1)
-        self.rack2 = HeatRack(csv_path_rack2)
-        self.name = "DualHeatRack"  
+# implement this if/when you want to manage the heatplates together as one
+# class DualHeatRack:
+#     """
+#     We need to manage the two heatplates as a single logical unit.
+#     """
+#     def __init__(self, csv_path_rack1, csv_path_rack2):
+#         self.rack1 = HeatRack(csv_path_rack1)
+#         self.rack2 = HeatRack(csv_path_rack2)
+#         self.name = "DualHeatRack"  
 
-    def index_to_pos(self, index):
-        """Convert global index (0–23) to position (A1–D3 for rack1, E1–H3 for rack2)."""
-        if 0 <= index <= 11:
-            return self.rack1.index_to_pos(index)
-        elif 12 <= index <= 23:
-            return chr(ord("E") + (index - 12) // 3) + str((index - 12) % 3 + 1)
-        else:
-            raise ContinuableRuntimeError(f"{self.name}: Index {index} out of range (0–23)!")
+#     def index_to_pos(self, index):
+#         """Convert global index (0–23) to position (A1–D3 for rack1, E1–H3 for rack2)."""
+#         if 0 <= index <= 11:
+#             return self.rack1.index_to_pos(index)
+#         elif 12 <= index <= 23:
+#             return chr(ord("E") + (index - 12) // 3) + str((index - 12) % 3 + 1)
+#         else:
+#             raise ContinuableRuntimeError(f"{self.name}: Index {index} out of range (0–23)!")
     
-    def pos_to_index(self, pos):
-        """Convert position (A1–H3) to global index (0–23)."""
-        if pos[0] in ["A", "B", "C", "D"]:
-            return self.rack1.pos_to_index(pos)
-        elif pos[0] in ["E", "F", "G", "H"]:
-            return 12 + (ord(pos[0]) - ord("E")) * 3 + int(pos[1]) - 1
-        else:
-            raise ContinuableRuntimeError(f"{self.name}: Invalid position {pos}!") 
+#     def pos_to_index(self, pos):
+#         """Convert position (A1–H3) to global index (0–23)."""
+#         if pos[0] in ["A", "B", "C", "D"]:
+#             return self.rack1.pos_to_index(pos)
+#         elif pos[0] in ["E", "F", "G", "H"]:
+#             return 12 + (ord(pos[0]) - ord("E")) * 3 + int(pos[1]) - 1
+#         else:
+#             raise ContinuableRuntimeError(f"{self.name}: Invalid position {pos}!") 

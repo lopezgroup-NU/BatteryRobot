@@ -66,7 +66,8 @@ class BatteryRobot(NorthC9):
         self.initialize_deck(
             disp_rack_filename,
             source_rack_filename,
-            rack_files.get("heat_rack")
+            rack_files.get("heat_rack"),
+            rack_files.get("heat_rack2")
         )
         resources = self.config.get("resources", {})
         self.res1_vol = resources.get("res1_vol", 67.2)
@@ -1034,7 +1035,7 @@ class BatteryRobot(NorthC9):
         if self.pip_id >= 48:
             self.pip_id = 0
 
-    def initialize_deck(self, disp_rack_path, source_rack_path, heat_rack_path):
+    def initialize_deck(self, disp_rack_path, source_rack_path, heat_rack_path, heat_rack2_path):
         """
         Initialize deck by mapping rack contents
         """
@@ -1042,6 +1043,7 @@ class BatteryRobot(NorthC9):
             self.disp_rack = DispRack(disp_rack_path)
             self.source_rack = SourceRack(source_rack_path)
             self.heat_rack = HeatRack(heat_rack_path)
+            self.heat_rack = HeatRack(heat_rack2_path)
         except InitializationError as e:
             print(e)
             print("Fix the rack csvs and try again.")

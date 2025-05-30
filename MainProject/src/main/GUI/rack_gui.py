@@ -6,7 +6,7 @@ import os
 class RackEditor:
     """Base class for rack editors with common functionality"""
     
-    def __init__(self, root, filename, source_rack_filename=None, rows=None, cols=None, title="Rack Grid Editor", parent=None):
+    def __init__(self, root, filename, rows=None, cols=None, title="Rack Grid Editor", parent=None):
         self.root = root
         self.parent = parent
         self.root.title(title)
@@ -15,7 +15,6 @@ class RackEditor:
         self.cols = cols
         self.grid_data = [["" for _ in range(self.cols)] for _ in range(self.rows)]
         self.filename = filename
-        self.source_rack_filename = source_rack_filename
         
         self.main_frame = tk.Frame(root, padx=10, pady=10)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
@@ -185,7 +184,7 @@ class DispRackEditor(RackEditor):
     """Editor for the Disp Rack (6x8)"""
     
     def __init__(self, root, filename="config/disp_rack.csv", source_rack_filename="config/source_rack.csv", parent=None):
-        super().__init__(root, filename, source_rack_filename=source_rack_filename, rows=6, cols=8, title="Disp Rack Grid Editor", parent=parent)
+        super().__init__(root, filename, rows=6, cols=8, title="Disp Rack Grid Editor", parent=parent)
         
         # Add next button to save and proceed to source rack
         self.next_button = tk.Button(self.main_frame, text="Next: Source Rack Editor →", 
@@ -193,6 +192,7 @@ class DispRackEditor(RackEditor):
                                     bg="#4CAF50", fg="white", font=("Arial", 10, "bold"),
                                     padx=15, pady=5)
         self.next_button.pack(pady=10)
+        self.source_rack_filename = source_rack_filename
     
     def proceed_to_source_rack(self):
         """Save the current grid, close this window, and open the Source Rack Editor"""
@@ -210,7 +210,7 @@ class SourceRackEditor(RackEditor):
     """Editor for the Source Rack (6x5)"""
     
     def __init__(self, root, filename="config/source_rack.csv", parent=None):
-        super().__init__(root, filename, source_rack_filename=None, rows=6, cols=5, title="Source Rack Grid Editor", parent=parent)
+        super().__init__(root, filename, rows=6, cols=5, title="Source Rack Grid Editor", parent=parent)
         
         # Add optional Back button to return to Disp Rack
         if parent:
@@ -223,6 +223,26 @@ class SourceRackEditor(RackEditor):
         if self.save_csv():
             disp_window = tk.Tk()
             disp_editor = DispRackEditor(disp_window, "config/disp_rack.csv")
+            
+            self.close()
+
+class HeatRackEditor(RackEditor):
+    """Editor for the Heat Rack. 2 x (3x4)"""
+    
+    def __init__(self, root, filename="config/heat_rack.csv", parent=None):
+        super().__init__(root, filename, rows=3, cols=4, title="Heat Rack Grid Editor", parent=parent)
+        
+        # Add optional Back button to return to Source Rack
+        if parent:
+            self.back_button = tk.Button(self.main_frame, text="← Back to Disp Rack", 
+                                       command=self.back_to_disp_rack)
+            self.back_button.pack(pady=5)
+    
+    def back_to_source_rack(self):
+        """Save the current grid, close this window, and return to Disp Rack"""
+        if self.save_csv():
+            source_window = tk.Tk()
+            source_editor = SourceRackEditor(source_window, "config/source_rack.csv")
             
             self.close()
 
