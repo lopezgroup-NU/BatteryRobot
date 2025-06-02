@@ -221,7 +221,7 @@ def rack_checker(rack, source_name, desired_vol):
         _, vol, _ = rack.get_vial_by_pos(pos)
         vol = round(vol, 2)
 
-        if vol > 0:
+        if vol > 2:
             use_vol = min(remaining_vol, vol)
             use_vol = round(use_vol, 2)
             sources_used[pos] = use_vol
