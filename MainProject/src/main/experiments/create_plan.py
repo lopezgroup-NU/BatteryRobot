@@ -167,10 +167,7 @@ def create_plan(plan_file, source_rack_file):
             "CE": False 
         }
 
-        exp_df.loc[experiment_name] = new_exp_row
-
-        heat_idx += 1
-        
+        exp_df.loc[experiment_name] = new_exp_row        
         # volume is 0 as hasnt been made yet. concentration is 1 as placeholder
         entry = f"{experiment_name} 0 1"
         row = disp_rack_curr % 6
@@ -222,8 +219,10 @@ def rack_checker(rack, source_name, desired_vol):
         _, vol, _ = rack.get_vial_by_pos(pos)
         vol = round(vol, 2)
 
-        if vol > 2:
-            use_vol = min(remaining_vol, vol)
+        # Available volume is whatever is above 2 mL
+        available_vol = max(0, vol - 2) 
+        if available_vol > 0:
+            use_vol = min(remaining_vol, available_vol)
             use_vol = round(use_vol, 2)
             sources_used[pos] = use_vol
 
