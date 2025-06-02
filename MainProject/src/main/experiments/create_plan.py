@@ -5,7 +5,7 @@ from config.source_rack import SourceRack
 from config.disp_rack import DispRack
 from config.heat_rack import HeatRack
 
-def create_formulation(plan_file, source_rack_file):
+def create_plan(plan_file, source_rack_file):
     """
     Currently based off of new_diverse_candidates.csv
 
@@ -15,9 +15,14 @@ def create_formulation(plan_file, source_rack_file):
     """
 
     # initialize new formulation plan csv
-    columns = ["Experiment","Target_vial","Sources","Volumes_mL","Solids","Weights_g","Heat","Time_h"]
-    plan_df = pd.DataFrame(columns=columns)
-    plan_df.set_index('Experiment', inplace=True)
+    formulation_columns = ["Experiment","Target_vial","Sources","Volumes_mL","Solids","Weights_g","Heat","Time_h"]
+    formulation_df = pd.DataFrame(columns=formulation_columns)
+    formulation_df.set_index('Experiment', inplace=True)
+
+    # initialize new experiments csv
+    exp_columns = ["Experiment","Target_vial","GEIS","GEIS_Conditions","CV","CV_Conditions","CE"]
+    exp_df = pd.DataFrame(columns=exp_columns)
+    exp_df.set_index('Experiment', inplace=True)
 
     # store rows that are physically impossible to make
     cannot_rows = []
@@ -59,6 +64,7 @@ def create_formulation(plan_file, source_rack_file):
     disp_rack_curr = 0
     disp_rack_max = 48
     disp_rack = [["e" for _ in range(8)] for _ in range(6)]
+    disp_rack[0][6] = "x"
     # loop thrrough input file
 
     heat_idx = 0
@@ -149,7 +155,21 @@ def create_formulation(plan_file, source_rack_file):
             "Time_h": "0.5"
         }
 
-        plan_df.loc[experiment_name] = new_row
+        formulation_df.loc[experiment_name] = new_row
+        
+        # add new entry to expriments df
+        new_exp_row = {
+            "Target_vial": DispRack.index_to_pos(disp_rack_curr),
+            "GEIS": True,
+            "GEIS_Conditions": "250000 1 0.00001",
+            "CV": True,
+            "CV_Conditions": "2 -2 0.020",
+            "CE": False 
+        }
+
+        exp_df.loc[experiment_name] = new_exp_row
+
+        heat_idx += 1
         
         # volume is 0 as hasnt been made yet. concentration is 1 as placeholder
         entry = f"{experiment_name} 0 1"
@@ -160,6 +180,7 @@ def create_formulation(plan_file, source_rack_file):
         # have to skip index 6, which corresponds to B1
         disp_rack_curr = disp_rack_curr + 1 if disp_rack_curr != 5 else disp_rack_curr + 2
         heat_idx += 1
+
 
     if cannot_rows:
         print(f"Rows that are impossible to make (1-indexed): {str(cannot_rows)}")
@@ -172,11 +193,13 @@ def create_formulation(plan_file, source_rack_file):
     # write to gen_formulation.csv
     generated_formulation_file = "formulation.csv"
     dropped_formulations_file = "dropped_formulation_vols.csv"
+    generated_exp_file = "experiments.csv"
 
-    plan_df.to_csv(f"experiments/{generated_formulation_file}")
+    formulation_df.to_csv(f"experiments/{generated_formulation_file}")
+    exp_df.to_csv(f"experiments/{generated_exp_file}")
     dropped_df.to_csv(f"experiments/{dropped_formulations_file}")
 
-    print(f"Generated plan. See {generated_formulation_file} and gen_disp_rack.csv")
+    print(f"Generated plan. See {generated_formulation_file}, {generated_exp_file}, and disp_rack.csv")
     print(f"Dropped formulations are available in experiments/{dropped_formulations_file}. \n \
           These were dropped because of resource constraints on the source rack/heat rack, but are possible to make. \n \
           You can copy these back into the plan file and run it again")
@@ -199,7 +222,7 @@ def rack_checker(rack, source_name, desired_vol):
         _, vol, _ = rack.get_vial_by_pos(pos)
         vol = round(vol, 2)
 
-        if vol > 0:
+        if vol > 2:
             use_vol = min(remaining_vol, vol)
             use_vol = round(use_vol, 2)
             sources_used[pos] = use_vol
@@ -222,4 +245,4 @@ def rack_checker(rack, source_name, desired_vol):
     return sources_used
 
 if __name__ == "__main__":
-    create_formulation("top_constrained_15_ori.csv", "../config/source_rack.csv")
+    create_plan("top_constrained_15_ori.csv", "../config/source_rack.csv")

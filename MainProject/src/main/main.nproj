@@ -577,30 +577,6 @@
         0.0
       ]
     },
-    "heatplate_official": {
-      "type": "Grid",
-      "tool": 0,
-      "counts": [
-        -436,
-        35438,
-        25981,
-        14733
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0,
-      "n": [
-        4,
-        3,
-        1
-      ],
-      "pitch": [
-        32,
-        28,
-        0.0
-      ]
-    },
     "rack_source_official": {
       "type": "Grid",
       "tool": 0,
@@ -737,6 +713,54 @@
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null
+    },
+    "heatplate_official2": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        -436,
+        35438,
+        25981,
+        14733
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        4,
+        3,
+        1
+      ],
+      "pitch": [
+        32,
+        28,
+        0.0
+      ]
+    },
+    "heatplate_official": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        -2065,
+        35188,
+        17478,
+        14870
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        4,
+        3,
+        1
+      ],
+      "pitch": [
+        32,
+        28,
+        0.0
+      ]
     }
   },
   "sim_inputs": {

@@ -27,7 +27,7 @@ class BatteryRobot(NorthC9):
     child of NorthC9 - inherits North's methods plus methods defined in here
     """
 
-    def __init__(self, address, network_serial, home=False, config_path = "config/config.yaml", setup_gui=False):
+    def __init__(self, address, network_serial, home=False, config_path = "config/config.yaml"):
         """
         Startup procedures
         setup_gui will prompt user to check on disp and source rack csvs. Set to false for closed loop, so that robot doesnt get blocked
@@ -56,12 +56,6 @@ class BatteryRobot(NorthC9):
 
         disp_rack_filename =  rack_files.get("disp_rack")
         source_rack_filename =  rack_files.get("source_rack")
-
-        if setup_gui:
-            root = tk.Tk()
-            source_rack_filename = "config/source_rack.csv"
-            app = DispRackEditor(root, filename=disp_rack_filename, source_rack_filename=source_rack_filename)
-            root.mainloop()
 
         self.initialize_deck(
             disp_rack_filename,
@@ -95,8 +89,9 @@ class BatteryRobot(NorthC9):
         df = pd.read_csv(run_file)
 
         #start spinner and heat
+        t8 = T8('B', network = self.network)
         self.spin_axis(6, 7000)
-        self.set_temp(0, 50)
+        t8.set_temp(0, 50)
 
         log_file = open("experiments/formulation.log", "a")
         log_file.write("*" * 50 + "\n")
@@ -211,7 +206,7 @@ class BatteryRobot(NorthC9):
 
         #turn off spinner and heat
         self.spin_axis(6, 0)
-        self.set_temp(0, 10)
+        t8.set_temp(0, 10)
         print("Done running!")
 
     def run_test(self, run_file, standard = None):
@@ -905,7 +900,7 @@ class BatteryRobot(NorthC9):
         """
         self.close_gripper()
         self.delay(.5)
-        self.uncap(revs=4)
+        self.uncap(revs=6)
 
         if self.cap_holder_1_free:
             self.goto_safe(cap_holder_1_approach)
@@ -938,7 +933,7 @@ class BatteryRobot(NorthC9):
 
         self.close_gripper()
         self.delay(.5)
-        self.uncap(revs=3.5)
+        self.uncap(revs=5)
         self.goto_safe(rack_source_official_approach[source_id])
         self.cap(revs=3, torque_thresh=400)
         self.open_gripper()

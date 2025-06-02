@@ -227,6 +227,12 @@ class MongoQuery:
     def __init__(self, uri="mongodb://localhost:27017/", db_name="atomdb"):
         self.conn = MongoConn(uri=uri, db_name=db_name)
 
+    def add_cv_data_one(self, file, ignore_first=True):
+        pass
+
+    def add_geis_data_one(self, file, ignore_first=True):
+        pass
+    
     def add_cv_data(self, folder, ignore_first=True):
         """
         Set ignore_first to True if you want to ignore the first of the three values

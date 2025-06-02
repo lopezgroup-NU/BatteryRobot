@@ -1,7 +1,7 @@
 ,0,1,2,3,4,5,6,7
-0,e,e,e,e,e,e,e,7m_NO3 5.503999999999998 8
-1,e,e,e,e,e,e,e,FSI_1p00m_AC_1p00m -1.248 1
-2,e,e,e,e,e,e,e,CLO4_1p00m -1.248 1
-3,e,e,e,e,e,e,e,SO4_1p00m 0 1
-4,e,e,e,e,e,e,e,e
-5,e,e,e,e,e,e,e,e
+0,e,e,e,e,e,e,x,AC_1p00m 0 1
+1,e,e,e,e,e,e,7m_NO3 5 0,AC_2p00m 0 1
+2,e,e,e,e,e,e,e,AC_3p00m 0 1
+3,e,e,e,e,e,e,e,AC_4p00m 5.0 1
+4,e,e,e,e,e,e,e,NO3_1p00m 5.0 1
+5,e,e,e,e,e,e,e,NO3_2p00m 5.0 1
