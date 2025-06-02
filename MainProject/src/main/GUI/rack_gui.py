@@ -226,7 +226,12 @@ class SourceRackEditor(RackEditor):
             
             self.close()
 
-
+def setup_gui():
+    root = tk.Tk()
+    source_rack_filename = "config/source_rack.csv"
+    app = DispRackEditor(root, filename=disp_rack_filename, source_rack_filename=source_rack_filename)
+    root.mainloop()
+    
 if __name__ == "__main__":
     root = tk.Tk()
     disp_rack_filename = "config/disp_rack.csv"
