@@ -241,6 +241,11 @@ class BatteryRobot(NorthC9):
                                 as what you provide to run_test()")
             
             #  add row before and after run file
+            import datetime
+
+            today = datetime.date.today()
+            formatted_date = today.strftime("%m%d%y")
+            name = name + "_" + formatted_date
             row = [name, pos, True, "250000 1 0.00001", True, "2 -2 0.020", False]
             new_row = pd.DataFrame([row], columns=df.columns)
             df = pd.concat([new_row, df, new_row], ignore_index=True)

@@ -231,8 +231,8 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
     curr_time = time.strftime("%Y-%m-%d %H:%M:%S", s)
 
     vf_diff,vf_max,vf_min  = cv_interpret(out_path)
-    overP, i0, alpha_c = kinetic_fit(out_path)
-    new_row = pd.DataFrame([[output_file_name, vf_max, vf_min, vf_diff, overP, i0, alpha_c, temperature, curr_time]], columns=['test name', 'vf_max', 'vf_min', 'vf_diff',  "overP", "i0", "alpha_c", 'temp', 'time'])
+    # overP, i0, alpha_c = kinetic_fit(out_path)
+    new_row = pd.DataFrame([[output_file_name, vf_max, vf_min, vf_diff, None, None, None, temperature, curr_time]], columns=['test name', 'vf_max', 'vf_min', 'vf_diff',  "overP", "i0", "alpha_c", 'temp', 'time'])
     s_df = pd.concat([s_df, new_row], ignore_index=True)
     s_df.to_csv(s_df_file, index=False)   
 

@@ -1,6 +1,6 @@
-e,e,e,e,e,e,x,AC_1p00m 0 1
-e,e,e,e,e,e,e,AC_2p00m 0 1
-e,e,e,e,e,e,e,AC_3p00m 0 1
+e,e,e,e,e,e,x,AC_1p00m 5 1
+e,e,e,e,e,e,7m_NO3 5 0,AC_2p00m 5 1
+e,e,e,e,e,e,e,AC_3p00m 5 1
 e,e,e,e,e,e,e,AC_4p00m 0 1
-e,e,e,e,e,e,e,NO3_1p00m 0 1
-e,e,e,e,e,e,e,NO3_2p00m 0 1
+e,e,e,e,e,e,e,NO3_1p00m 5 1
+e,e,e,e,e,e,e,NO3_2p00m 5 1

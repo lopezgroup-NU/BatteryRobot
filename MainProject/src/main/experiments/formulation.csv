@@ -1,7 +1,2 @@
 Experiment,Target_vial,Sources,Volumes_mL,Solids,Weights_g,Heat,Time_h
-AC_1p00m,A1,A3 B1,0.85 4.2,,,A1-1,0.5
-AC_2p00m,A2,A3 B1,1.64 3.36,,,A2-1,0.5
-AC_3p00m,A3,A3 B2,2.39 2.61,,,A3-1,0.5
-AC_4p00m,A4,A3 B2,3.10 1.90,,,B1-1,0.5
-NO3_1p00m,A5,A1 B2 B3,0.83 3.49 0.68,,,B2-1,0.5
-NO3_2p00m,A6,A1 B3,1.61 3.39,,,B3-1,0.5
+AC_4p00m,A4,D3 B1,3.10 1.90,,,A1-2,0.5
