@@ -192,6 +192,9 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}, save_t
     s_df = pd.concat([s_df, new_row], ignore_index=True)
     s_df.to_csv(s_df_file, index=False)  
 
+    if save_to_db_folder and not standard:
+        return db_path, zcurve
+
     return zcurve
 
 if __name__ == "__main__":

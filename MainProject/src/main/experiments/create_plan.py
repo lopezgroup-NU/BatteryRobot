@@ -20,7 +20,7 @@ def create_plan(plan_file, source_rack_file):
     formulation_df.set_index('Experiment', inplace=True)
 
     # initialize new experiments csv
-    exp_columns = ["Experiment","Target_vial","GEIS","GEIS_Conditions","CV","CV_Conditions","CE"]
+    exp_columns = ["Experiment","Target_vial","GEIS","GEIS_Conditions","CV","CV_Conditions","CE","SaveDB"]
     exp_df = pd.DataFrame(columns=exp_columns)
     exp_df.set_index('Experiment', inplace=True)
 
@@ -62,10 +62,10 @@ def create_plan(plan_file, source_rack_file):
     components = [tfsi_name, fsi_name, no3_name, clo4_name, so4_name, ac_name]
     # create our own disp_rack, initialize every cell to empty first
     disp_rack_curr = 0
-    disp_rack_max = 48
+    disp_rack_max = 14
     disp_rack = [["e" for _ in range(8)] for _ in range(6)]
     disp_rack[0][6] = "x"
-    # loop thrrough input file
+    # loop through input file
 
     heat_idx = 0
     max_heat_slots = 24
@@ -164,7 +164,8 @@ def create_plan(plan_file, source_rack_file):
             "GEIS_Conditions": "250000 1 0.00001",
             "CV": True,
             "CV_Conditions": "2 -2 0.020",
-            "CE": False 
+            "CE": False,
+            "SaveDB": True
         }
 
         exp_df.loc[experiment_name] = new_exp_row        

@@ -1,6 +1,7 @@
 import time
 import heapq
 import yaml
+import datetime
 import pandas as pd
 import tkinter as tk
 from GUI import *
@@ -67,7 +68,7 @@ class BatteryRobot(NorthC9):
         self.res1_vol = resources.get("res1_vol", 67.2)
         self.res2_vol = resources.get("res2_vol", 67.2)
         self.vol_purge = resources.get("vol_purge", 19)
-        self.water_start = resources.get("water_start", 15)
+        self.water_start = resources.get("water_start", 18)
         self.water_end = resources.get("water_end", 47)
 
         #home before we do anything
@@ -90,8 +91,13 @@ class BatteryRobot(NorthC9):
 
         #start spinner and heat
         t8 = T8('B', network = self.network)
+        
+        # turns on spinners and heaters
         self.spin_axis(6, 7000)
+        self.spin_axis(7, 7000)
         t8.set_temp(0, 50)
+        t8.set_temp(1, 50)
+
 
         log_file = open("experiments/formulation.log", "a")
         log_file.write("*" * 50 + "\n")
@@ -206,7 +212,9 @@ class BatteryRobot(NorthC9):
 
         #turn off spinner and heat
         self.spin_axis(6, 0)
+        self.spin_axis(7, 0)
         t8.set_temp(0, 10)
+        t8.set_temp(1, 10)
         print("Done running!")
 
     def run_test(self, run_file, standard = None):
@@ -241,12 +249,10 @@ class BatteryRobot(NorthC9):
                                 as what you provide to run_test()")
             
             #  add row before and after run file
-            import datetime
-
-            today = datetime.date.today()
-            formatted_date = today.strftime("%m%d%y")
+            today = datetime.datetime.now()
+            formatted_date = today.strftime("%Y%m%d_%H%M%S")  # YearMonthDay_HourMinuteSecond
             name = name + "_" + formatted_date
-            row = [name, pos, True, "250000 1 0.00001", True, "2 -2 0.020", False]
+            row = [name, pos, True, "250000 1 0.00001", True, "2 -2 0.020", False, False]
             new_row = pd.DataFrame([row], columns=df.columns)
             df = pd.concat([new_row, df, new_row], ignore_index=True)
 
@@ -265,7 +271,8 @@ class BatteryRobot(NorthC9):
                 CV = True if test.CV else False
                 CE = True if test.CE else False
                 output_file_name = test.Experiment
-
+                save_to_db = test.SaveDB
+                row_is_standard = run_standard and (i == 0 or i==len(df) - 1)
                 if GEIS and CV:
                     if len(test.GEIS_Conditions.split()) != 3:
                         raise ContinuableRuntimeError("GEIS_CONDITIONS must have 3 parameters!")
@@ -283,7 +290,8 @@ class BatteryRobot(NorthC9):
 
                     # this test is a standard test if we determine we're running a standard
                     # and this is the first or last row of the run
-                    row_is_standard = run_standard and (i ==0 or i==len(df) - 1)
+                    geis_files = []
+                    cv_files = []
                     # run test three times
                     for j in range(3):
                         self.move_vial(rack_disp_official[target_idx], vial_carousel)
@@ -293,10 +301,13 @@ class BatteryRobot(NorthC9):
                         self.set_output(7, False)
                         self.set_output(8, False)
 
-
                         run_geis(output_file_name=output_file_name + f"_geis{j}", 
                                 parameter_list=geis_parameter_list, 
+                                save_to_db_folder = save_to_db,
                                 standard=row_is_standard)
+                        
+                        # geis_files.append(geis_file)
+
                         self.draw_sensor1to2(target_idx, viscous=True)
                         self.set_output(6, True)
                         self.set_output(7, True)
@@ -309,15 +320,18 @@ class BatteryRobot(NorthC9):
                                         [0.05, 0.05, 0.05],
                                         1,
                                         0.1],
+                                save_to_db_folder = save_to_db,
                                 standard=row_is_standard)
+                        
+                        # cv_files.append(cv_file)
                         self.set_output(6, False)
                         self.set_output(7, False)
                         self.set_output(8, False)
 
-                #find a way to log the CV results in the summaries
+                    if save_to_db:
+                        pass
 
                 elif GEIS:
-                    self.move_vial(rack_disp_official[target_idx], vial_carousel)
                     if len(test.GEIS_Conditions.split()) != 3:
                         raise ContinuableRuntimeError("GEIS_CONDITIONS must have 3 parameters!")
                     init_freq, final_freq, amp = [float(i) for i in test.GEIS_Conditions.split()]
@@ -330,27 +344,37 @@ class BatteryRobot(NorthC9):
                     self.set_output(6, False)
                     self.set_output(7, False)
                     self.set_output(8, False)
-                    self.draw_to_sensor(target_idx, viscous=True, special=True)
-                    run_geis(output_file_name=output_file_name + \
-                                f"_geis{i}", parameter_list=geis_parameter_list)
+                    for j in range(3):
+                        self.move_vial(rack_disp_official[target_idx], vial_carousel)
+                        self.goto_safe(safe_zone)
+                        self.draw_to_sensor(target_idx, viscous=True, special=True)
+                        run_geis(output_file_name=output_file_name + f"_geis{j}", 
+                                 parameter_list=geis_parameter_list,
+                                save_to_db_folder = save_to_db,
+                                standard=row_is_standard)
+                        
                 elif CV:
-                    self.move_vial(rack_disp_official[target_idx], vial_carousel)
                     if len(test.CV_CONDITIONS.split()) != 3:
                         raise ContinuableRuntimeError("CV_CONDITIONS must have 3 parameters!")
-
-                    # pass point1, pooint2, rate to run_cv2 (cuz idk what theyre supposed to be)
+                    # pass point1, pooint2, rate to run_cv2 
                     point1, point2, rate = [float(i) for i in test.CV_Conditions.split()]
-                    self.draw_to_sensor(target_idx, second_sensor=True)
+
                     self.set_output(6, True)
                     self.set_output(7, True)
                     self.set_output(8, True)
-                    ocv = RunOCV_lastV()
-                    run_cv2(output_file_name=output_file_name + f"_cv{i}",
-                            values=[[ocv, point1, point2, 0],
-                                    [rate, rate, rate],
-                                    [0.05, 0.05, 0.05],
-                                    1,
-                                    0.1])
+                    for j in range(3):
+                        self.move_vial(rack_disp_official[target_idx], vial_carousel)
+                        self.draw_to_sensor(target_idx, second_sensor=True)
+                        ocv = RunOCV_lastV()
+                        run_cv2(output_file_name=output_file_name + f"_cv{i}",
+                                values=[[ocv, point1, point2, 0],
+                                        [rate, rate, rate],
+                                        [0.05, 0.05, 0.05],
+                                        1,
+                                        0.1],
+                                save_to_db_folder = save_to_db,
+                                standard=row_is_standard)
+                        
                     self.set_output(6, False)
                     self.set_output(7, False)
                     self.set_output(8, False)

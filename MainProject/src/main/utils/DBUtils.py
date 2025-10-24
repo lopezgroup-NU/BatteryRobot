@@ -227,12 +227,151 @@ class MongoQuery:
     def __init__(self, uri="mongodb://localhost:27017/", db_name="atomdb"):
         self.conn = MongoConn(uri=uri, db_name=db_name)
 
-    def add_cv_data_one(self, file, ignore_first=True):
-        pass
+    def add_cv_data_one(self, cv_file_list, ignore_first=True):
+        all_cv_diff = []
+        low_end_cv = []
+        high_end_cv = []
 
-    def add_geis_data_one(self, file, ignore_first=True):
-        pass
-    
+        all_cv_diff_rev = []
+        low_end_cv_rev = []
+        high_end_cv_rev = []
+        collection = self.conn.get_collection("data")
+
+        file_names = [path.name for path in cv_file_list]
+        file_named = file_names[0][:-4]
+        salts, salt_and_conc, salt_to_conc_list = parse_files(file_names, type="cv")
+        salt, conc, test_num = salt_and_conc[0]
+        
+        for i, path in enumerate(cv_file_list):
+            vf_diff,vf_max,vf_min = cv_interpret(path, reverse_peak=False)
+            all_cv_diff.append(vf_diff)
+            low_end_cv.append(vf_min)
+            high_end_cv.append(vf_max)
+
+            vf_diff_rev,vf_max_rev,vf_min_rev = cv_interpret(path, reverse_peak=True)
+            all_cv_diff_rev.append(vf_diff_rev)
+            low_end_cv_rev.append(vf_min_rev)
+            high_end_cv_rev.append(vf_max_rev)
+            
+            # overP, i0, alpha_c = kinetic_fit(path)
+            # all_overP.append(overP)
+            # all_i0.append(i0)
+            # all_alpha_c.append(alpha_c)
+
+            # get timestamp of latest file for specific run
+            # i.e. if two files, get timestamp of second
+            time_stamp = os.path.getctime(path)
+            time_stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_stamp))
+
+            #do the same, for temp
+            df = pd.read_csv(path)
+            if 'temp(C)' in df.columns:
+                temp = df['temp(C)'].iloc[0]
+            else:
+                temp = 20
+
+        if len(all_cv_diff) == 1:
+                avg_cv_diff = all_cv_diff[0]
+                avg_cv_low = low_end_cv[0]
+                avg_cv_high = high_end_cv[0]
+
+                avg_cv_diff_rev = all_cv_diff_rev[0]
+                avg_cv_low_rev= low_end_cv_rev[0]
+                avg_cv_high_rev = high_end_cv_rev[0]
+
+                # avg_overP = all_overP[0]
+                # avg_i0 = all_i0[0]
+                # avg_alpha_c = all_alpha_c[0]
+
+        elif ignore_first:
+            # ignore first value
+            def compute_avg_ignore(lst):
+                # Auto-cast all elements to float if possible
+                try:
+                    lst = [float(x) for x in lst]
+                except (ValueError, TypeError):
+                    raise ValueError("List contains non-numeric values that can't be converted.")
+                return sum(lst[1:]) / (len(lst) - 1)
+            avg_cv_diff = compute_avg_ignore(all_cv_diff)
+            avg_cv_low =  compute_avg_ignore(low_end_cv)
+            avg_cv_high =  compute_avg_ignore(high_end_cv)
+            
+            avg_cv_diff_rev = compute_avg_ignore(all_cv_diff_rev)
+            avg_cv_low_rev=  compute_avg_ignore(low_end_cv_rev)
+            avg_cv_high_rev =  compute_avg_ignore(high_end_cv_rev)
+            
+            # avg_overP =  compute_avg_ignore(all_overP)
+            # avg_i0 =  compute_avg_ignore(all_i0)
+            # avg_alpha_c =  compute_avg_ignore(all_alpha_c)
+
+        else:
+            def compute_avg(lst):
+                try:
+                    lst = [float(x) for x in lst]
+                except (ValueError, TypeError):
+                    raise ValueError("List contains non-numeric values that can't be converted.")
+                return sum(lst) / (len(lst))
+            avg_cv_diff = compute_avg(all_cv_diff)
+            avg_cv_low =  compute_avg(low_end_cv)
+            avg_cv_high =  compute_avg(high_end_cv)
+
+            avg_cv_diff_rev = compute_avg(all_cv_diff_rev)
+            avg_cv_low_rev=  compute_avg(low_end_cv_rev)
+            avg_cv_high_rev =  compute_avg(high_end_cv_rev)
+
+            # avg_overP =  compute_avg(all_overP)
+            # avg_i0 =  compute_avg(all_i0)
+            # avg_alpha_c =  compute_avg(all_alpha_c)
+
+        components_dict = {}
+        for i in range(len(salt)):
+            components_dict[salt[i]] = float(conc[i])
+        
+        water_weight = get_water_weight_from_components(components_dict)
+        valid_flag = True
+        if len(all_cv_diff) != 0:
+            collection.update_one(
+                {"name": file_named},
+                {"$set": {"avg_cv_diff": avg_cv_diff,
+                        "cv_diff": all_cv_diff,
+                        "avg_highV": avg_cv_high,
+                        "highV": high_end_cv,
+                        "avg_lowV": avg_cv_low,
+                        "lowV": low_end_cv,
+
+                        "avg_cv_diff_rev": avg_cv_diff_rev,
+                        "cv_diff_rev": all_cv_diff_rev,
+                        "avg_highV_rev": avg_cv_high_rev,
+                        "highV_rev": high_end_cv_rev,
+                        "avg_lowV_rev": avg_cv_low_rev,
+                        "lowV_rev": low_end_cv_rev,
+
+                        # "avg_overP": avg_overP,
+                        # "overP": all_overP,
+                        # "avg_i0": avg_i0,
+                        # "i0": all_i0,
+                        # "avg_alpha_c": avg_alpha_c,
+                        # "alpha_c": all_alpha_c,
+                        "ignore_first": ignore_first,
+                        "cv_date_uploaded": time_stamp,
+                        "components": components_dict,
+                        "water_weight": water_weight,
+                        "precipitated_out": False,
+                        "temp(C)": temp,
+                        "paths": [str(path) for path in cv_file_list],
+                        "valid_flag": valid_flag
+                        }}, 
+                upsert=True
+            )
+
+            if len(all_cv_diff) == 3:
+                collection.update_one(
+                {"name": file_named},
+                {"$set": {"cv_error": all_cv_diff[2] - all_cv_diff[1],
+                            "components": components_dict}}, 
+                upsert=True
+            )
+
     def add_cv_data(self, folder, ignore_first=True):
         """
         Set ignore_first to True if you want to ignore the first of the three values
@@ -268,10 +407,12 @@ class MongoQuery:
             all_overP = []
             all_i0 = []
             all_alpha_c = []
+            paths = []
             for i in range(3):
                 file_name = f"{file_named}_cv{str(i)}.csv"
                 path = folder / Path(file_name)
                 if os.path.exists(path):
+                    paths.append(str(path))
                     vf_diff,vf_max,vf_min = cv_interpret(path, reverse_peak=False)
                     all_cv_diff.append(vf_diff)
                     low_end_cv.append(vf_min)
@@ -357,6 +498,7 @@ class MongoQuery:
                 components_dict[salt[i]] = float(conc[i])
            
             water_weight = get_water_weight_from_components(components_dict)
+            valid_flag = True
             if len(all_cv_diff) != 0:
                 collection.update_one(
                     {"name": file_named},
@@ -385,7 +527,9 @@ class MongoQuery:
                             "components": components_dict,
                             "water_weight": water_weight,
                             "precipitated_out": False,
-                            "temp(C)": temp
+                            "temp(C)": temp,
+                            "paths": paths,
+                            "valid_flag": valid_flag
                             }}, 
                     upsert=True
                 )
@@ -397,6 +541,72 @@ class MongoQuery:
                               "components": components_dict}}, 
                     upsert=True
                 )
+
+    def add_geis_data_one(self, geis_file_list, ignore_first=True):
+        all_conductivity = []
+        collection = self.conn.get_collection("data")
+
+        file_names = [path.name for path in geis_file_list]
+        file_named = file_names[0][:-6]
+        salts, salt_and_conc, salt_to_conc_list = parse_files(file_names, type="cv")
+        salt, conc, test_num = salt_and_conc[0]
+        for i, path in enumerate(geis_file_list):
+            df = pd.read_csv(path, index_col='# point')
+            # extract zreal, compute conductivity
+            df_no_negatives = df[df.reflected_zimag >=0]
+            min_index = df_no_negatives['reflected_zimag'].idxmin()  # Get the index of the minimum value
+            zreal = df_no_negatives['zreal'].loc[min_index]  # Use .loc to get the value at that index
+            conductivity =  6.06007673/zreal  
+            all_conductivity.append(conductivity)
+
+            # get timestamp of latest file for specific run
+            time_stamp = os.path.getmtime(path)
+            time_stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_stamp))
+            #do the same, for temp
+            df = pd.read_csv(path)
+            if 'temp(C)' in df.columns:
+                temp = df['temp(C)'].iloc[0]
+            else:
+                temp = 20
+    
+        if len(all_conductivity) == 1:
+                avg_conductivity = all_conductivity[0]
+        elif ignore_first:
+            # ignore first value
+            avg_conductivity = sum(all_conductivity[1:]) / (len(all_conductivity) - 1) 
+        else:
+            avg_conductivity = sum(all_conductivity) / len(all_conductivity)
+
+        components_dict = {}
+        for i in range(len(salt)):
+            components_dict[salt[i]] = float(conc[i])
+
+        water_weight = get_water_weight_from_components(components_dict)
+        valid_flag = True
+        if len(all_conductivity) != 0:
+            collection.update_one(
+                {"name": file_named},
+                {"$set": {"avg_conductivity": avg_conductivity,
+                        "conductivity": all_conductivity,
+                        "ignore_first": ignore_first,
+                        "geis_date_uploaded": time_stamp,
+                        "components": components_dict,
+                        "water_weight": water_weight,
+                        "precipitated_out": False,
+                        "temp(C)": temp,
+                        "paths": [str(path) for path in geis_file_list],
+                        "valid_flag": valid_flag
+                        }}, 
+                upsert=True
+            )
+
+            if len(all_conductivity) == 3:
+                collection.update_one(
+                {"name": file_named},
+                {"$set": {"geis_error": all_conductivity[2] - all_conductivity[1],
+                        "components": components_dict}}, 
+                upsert=True
+            )
 
     def add_geis_data(self, folder, ignore_first=True):
         """
@@ -423,11 +633,13 @@ class MongoQuery:
             file_named = name.replace(".", "p")
 
             all_conductivity = []
+            paths = []
             for i in range(3):
                 file_name = f"{file_named}_geis{str(i)}.csv"
                 path = folder / Path(file_name)
 
                 if os.path.exists(path):
+                    paths.append(str(path))
                     df = pd.read_csv(path, index_col='# point')
                     # extract zreal, compute conductivity
                     df_no_negatives = df[df.reflected_zimag >=0]
@@ -459,7 +671,7 @@ class MongoQuery:
                 components_dict[salt[i]] = float(conc[i])
 
             water_weight = get_water_weight_from_components(components_dict)
-
+            valid_flag = True
             if len(all_conductivity) != 0:
                 collection.update_one(
                     {"name": file_named},
@@ -470,7 +682,9 @@ class MongoQuery:
                             "components": components_dict,
                             "water_weight": water_weight,
                             "precipitated_out": False,
-                            "temp(C)": temp
+                            "temp(C)": temp,
+                            "paths": paths,
+                            "valid_flag" : valid_flag
                             }}, 
                     upsert=True
                 )
@@ -482,12 +696,6 @@ class MongoQuery:
                               "components": components_dict}}, 
                     upsert=True
                 )
-
-    def add_cv_row(self, data):
-        pass
-
-    def add_geis_row(self, data):
-        pass
 
     def update_ignore(self, collection_name, ignore_first:bool):
         """

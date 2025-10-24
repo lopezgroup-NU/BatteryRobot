@@ -236,6 +236,9 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
     s_df = pd.concat([s_df, new_row], ignore_index=True)
     s_df.to_csv(s_df_file, index=False)   
 
+    if save_to_db_folder and not standard:
+        return db_path
+
 def cv_interpret(filename):
     df_file = filename
     df = pd.read_csv(df_file, index_col='# Point')

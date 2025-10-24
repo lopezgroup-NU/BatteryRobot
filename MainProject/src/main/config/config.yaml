@@ -21,15 +21,15 @@ hardware_states:
 
 # Deck configuration
 deck:
-  initialized: false
+  initialized: true
   
 # Resource volumes (in ml)
 resources:
-  res1_vol: 67.2
-  res2_vol: 67.2
+  res1_vol: 80
+  res2_vol: 80
   vol_purge: 19 # vol required per purge
   # water vials must be consecutive from start to end
-  water_start: 15
+  water_start: 18
   water_end: 47
 
 # CSV files for each rack
