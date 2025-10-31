@@ -13,15 +13,17 @@ paths = ['C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages','C:\\User
 for i in paths:
     sys.path.append(i)
 
-#setup_gui()
+# setup_gui()
 #create_plan("experiments/Hofmeister2.csv", "config/source_rack.csv")
 
-rob = BatteryRobot('A', network_serial='AU06EZ1P', home= True)
+rob = BatteryRobot('A', network_serial='AU06EZ1P', home= False)
 t8 = T8('B', network = rob.network)
 # p2 = PowderShaker('C', network = rob.network)
 # waters = list(range(10,48))
 standard = {"name": "p5m_NO3",
             "pos": "C6"}
+
+
 
 # rob.run_formulation('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/formulation.csv')
 #rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv', standard = standard)

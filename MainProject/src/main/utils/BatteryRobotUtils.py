@@ -437,6 +437,50 @@ class BatteryRobot(NorthC9):
         data["Time Taken(s)"] = t_taken
         return data
 
+    def run_demo_nov11(self):
+        """
+        Run a demo for the class which is visiting the lab on November 11th
+        """
+        print("")
+        #make sure that sourcerack(9) is full of water
+        #make sure that disp_rack(0) is an empty vial
+        #Print out any pre-reqs for running the program at the beginning, i.e. "Make sure that there are empty vials in positions 1, 2, and 3"        
+        
+        self.open_clamp()
+        self.open_gripper()
+        self.goto_safe(safe_zone)
+        self.goto_safe(rack_disp_official[0])
+        self.close_gripper()
+        self.delay(0.5)
+        self.goto_safe(vial_carousel)
+        self.close_clamp()
+        self.delay(0.25)
+        self.uncap()
+        self.goto_safe(cap_holder_1_approach)
+        self.cap(revs=3, torque_thresh=400)
+        self.delay(0.66)
+        self.open_gripper()
+        
+        self.goto_safe(rack_source_official_approach[9])
+        self.close_gripper()
+        self.uncap()
+        self.goto_safe(cap_holder_2_approach)
+        self.cap(revs=3, torque_thresh=400)
+        self.delay(0.66)
+        self.open_gripper()
+        self.get_pipette()
+
+        #self.aspirate_ml(3, 4)
+        #self.dispense_vol(0, 9, 3)
+
+        pass
+
+    def purge_with_air(self):
+        self.move_carousel(0,0)
+        for i in range(1, 10):
+            self.pump_helper(length=2500,v_in=10,v_out=5)
+            self.delay(1)
+
     def dispense_vol(self, dest_id, source_id, target_vol, collect=False, ret=True):
         """
         Dispense {target_vol} ml from vial with id {source_id} into vial with id {dest_id}
@@ -715,7 +759,7 @@ class BatteryRobot(NorthC9):
         Purge plumbing system using reservoir. 
         Purge 20ml worth
         Length 3000 (full pump) is about 
-
+        1250 = 0.4 ml
         """
         #can use reservoir
         if self.res1_vol > self.vol_purge or self.res2_vol > self.vol_purge:
