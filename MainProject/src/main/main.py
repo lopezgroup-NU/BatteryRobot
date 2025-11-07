@@ -23,8 +23,6 @@ t8 = T8('B', network = rob.network)
 standard = {"name": "p5m_NO3",
             "pos": "C6"}
 
-
-
 # rob.run_formulation('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/formulation.csv')
 #rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv', standard = standard)
 #rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv')

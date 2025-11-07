@@ -441,60 +441,113 @@ class BatteryRobot(NorthC9):
         """
         Run a demo for the class which is visiting the lab on November 11th
         """
-        print("")
-        #make sure that sourcerack(9) is full of water
-        #make sure that disp_rack(0) is an empty vial
-        #Print out any pre-reqs for running the program at the beginning, i.e. "Make sure that there are empty vials in positions 1, 2, and 3"        
-        
-        self.open_clamp()
-        self.open_gripper()
-        self.goto_safe(safe_zone)
-        self.goto_safe(rack_disp_official[0])
-        self.close_gripper()
-        self.delay(0.5)
-        self.goto_safe(vial_carousel)
-        self.close_clamp()
-        self.delay(0.25)
-        self.uncap()
-        self.goto_safe(cap_holder_1_approach)
-        self.cap(revs=3, torque_thresh=400)
-        self.delay(0.66)
-        self.open_gripper()
-        
-        self.goto_safe(rack_source_official_approach[9])
-        self.close_gripper()
-        self.uncap()
-        self.goto_safe(cap_holder_2_approach)
-        self.cap(revs=3, torque_thresh=400)
-        self.delay(0.66)
-        self.open_gripper()
-        self.get_pipette()
+        dispense_vial_prepared = input("Put a vial half-full of H2O, with a special cap (green w/ hole in middle) in the A1 position of the dispense rack. Type 1 once completed:  ")
+        source_vial_prepared = input("Put a vial full of H2O in the B4 position of the source rack. Type 1 once completed:  ")
+        carousel_is_empty = input("Remove any vial currently in the vial clamp.  Type 1 once completed:  ")
+        heat_rack_empty = input("Remove all vials from the heating rack. Type 1 once completed:  ")
 
-        #self.aspirate_ml(3, 4)
-        #self.dispense_vol(0, 9, 3)
+        if dispense_vial_prepared == '1' and source_vial_prepared == '1' and carousel_is_empty == '1' and heat_rack_empty  == '1':
+            print("All conditions are fulfilled. Starting the program now!")
+            self.delay(2.5)
+            
+        
+            
 
+
+            demo_velocity = 20
+            #make sure that sourcerack(9) is full of water
+            #make sure that disp_rack(0) is an empty vial
+            #Print out any pre-reqs for running the program at the beginning, i.e. "Make sure that there are empty vials in positions 1, 2, and 3"        
+            self.check_remove_pipette()
+            self.open_clamp()
+            self.open_gripper()
+            self.goto_safe(safe_zone)
+            self.goto_safe(rack_disp_official[0], vel=demo_velocity)
+            self.close_gripper()
+            self.delay(1)
+            self.goto_safe(vial_carousel, vel=demo_velocity)
+            
+            self.close_clamp()
+            self.delay(0.25)
+            self.open_gripper()
+
+            self.dispense_vol(0, 9, 1, ret=False, speed=12)
+
+            #self.move_carousel(33,80)
+            self.close_clamp()
+            self.pump_n_times([33,80], 5)
+            self.move_carousel(0,0)
+            self.open_clamp()
+            self.goto_safe(vial_carousel, vel=demo_velocity)
+            self.close_gripper()
+            self.delay(1)
+            self.goto_safe(safe_zone, vel=demo_velocity)
+            self.spin_axis(0, 5000)
+            self.goto_safe(heatplate_official2[0], vel=demo_velocity)
+            self.open_gripper()
+            self.spin_axis(6, 7000)
+            self.delay(1)
+            self.goto_safe(safe_zone, vel = demo_velocity)
+            self.delay(10)
+            self.spin_axis(0, 0)
+            self.spin_axis(6, 0)
+            self.spin_axis(7, 0)
+            self.goto_safe(heatplate_official2[0], vel=demo_velocity)
+            self.close_gripper()
+            self.delay(0.75)
+            self.goto_safe(rack_disp_official[0], vel = demo_velocity)
+            self.open_gripper()
+            self.delay(0.66)
+            self.goto_safe(safe_zone, vel = demo_velocity)
+
+            #t8.set_temp(0, 50)
+            #self.t8.set_temp(1, 40)
+            
+            #self.goto_safe(safe_zone, vel=demo_velocity)
+
+
+            """
+            self.uncap()
+            self.goto_safe(cap_holder_1_approach)
+            self.cap(revs=3, torque_thresh=400)
+            self.delay(0.66)
+            
+            self.goto_safe(rack_source_official_approach[9])
+            self.close_gripper()
+            self.delay(0.75)
+            self.uncap()
+            self.goto_safe(cap_holder_2_approach)
+            self.cap(revs=3, torque_thresh=400)
+            self.delay(0.66)
+            self.open_gripper()
+            self.get_pipette()
+            """
+            #self.aspirate_ml(3, 4)
+            #self.dispense_vol(0, 9, 3)
+        else:
+            print("Not all conditions are fulfilled. Please check that all of the vials are in the right place, then type '1' for each of the conditions")
         pass
 
-    def purge_with_air(self):
-        self.move_carousel(0,0)
-        for i in range(1, 10):
-            self.pump_helper(length=2500,v_in=10,v_out=5)
+    def pump_n_times(self, carousel_position, n_pumps):
+        self.move_carousel(carousel_position[0],carousel_position[1])
+        for i in range(1, n_pumps):
+            self.pump_helper(length=2500,v_in=10,v_out=5)#0.8 mL roughly
             self.delay(1)
 
-    def dispense_vol(self, dest_id, source_id, target_vol, collect=False, ret=True):
+    def dispense_vol(self, dest_id, source_id, target_vol, collect=False, ret=True, speed = 8):
         """
         Dispense {target_vol} ml from vial with id {source_id} into vial with id {dest_id}
         Destination vials are from rack_dispense_official while source_vials are from
         rack_pipette_aspirate respectively (see Locators)
         """
         self.check_remove_pipette()
-        self.goto_safe(rack_source_official[source_id])
+        self.goto_safe(rack_source_official[source_id], vel=speed)
         cap_holder_id = self.move_cap_to_holder()
 
         if collect:
             self.move_vial(rack_disp_official[dest_id], vial_carousel)
         else:
-            self.goto_safe(vial_carousel)
+            self.goto_safe(vial_carousel, vel=speed)
 
         self.uncap_vial_in_carousel()
         self.get_pipette()
@@ -519,10 +572,10 @@ class BatteryRobot(NorthC9):
             if amount < 1:
                 self.goto_xy_safe(rack[source_id])
                 self.aspirate_ml(3, 1 - amount)
-            self.goto_safe(rack[source_id])
+            self.goto_safe(rack[source_id], vel=speed)
             self.aspirate_ml(3, amount)
             self.delay(3)
-            self.goto_safe(carousel_dispense)
+            self.goto_safe(carousel_dispense, vel=speed)
             self.move_pump(3, 0)
             self.delay(3)
             remaining -= amount
@@ -530,14 +583,14 @@ class BatteryRobot(NorthC9):
         
         self.set_pump_speed(3, 15)
         dispensed = self.read_steady_scale()
-        self.goto_safe(safe_zone)
+        self.goto_safe(safe_zone, vel=speed)
         self.remove_pipette()
 
         if ret:
             self.cap_and_return_vial_to_rack(dest_id)
         else:
             self.close_clamp()
-            self.goto_safe(vial_carousel_approach)
+            self.goto_safe(vial_carousel_approach, vel=speed)
             self.cap(torque_thresh=500)
             self.open_gripper()
             self.open_clamp()
