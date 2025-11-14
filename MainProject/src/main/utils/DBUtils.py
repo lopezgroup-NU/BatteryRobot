@@ -332,6 +332,7 @@ class MongoQuery:
         if len(all_cv_diff) != 0:
             collection.update_one(
                 {"name": file_named},
+                
                 {"$set": {"avg_cv_diff": avg_cv_diff,
                         "cv_diff": all_cv_diff,
                         "avg_highV": avg_cv_high,
@@ -358,6 +359,7 @@ class MongoQuery:
                         "water_weight": water_weight,
                         "precipitated_out": False,
                         "temp(C)": temp,
+                        "electrode_used"
                         "paths": [str(path) for path in cv_file_list],
                         "valid_flag": valid_flag
                         }}, 

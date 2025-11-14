@@ -195,7 +195,7 @@ def find_peaks_and_zero_crossings(data):
     return positive_peak_index, zero_cross_index, negative_peak_index
 
 
-def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], save_to_db_folder = True, standard = False):
+def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], electrode_used = "Pt", save_to_db_folder = True, standard = False):
     tkp.toolkitpy_init("open_circuit_voltage.py")
     pstat = tkp.Pstat("PSTAT")
     cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)

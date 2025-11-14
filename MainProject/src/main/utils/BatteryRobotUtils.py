@@ -226,7 +226,8 @@ class BatteryRobot(NorthC9):
 
         standard = {
             "name": "standard",
-            "pos": "B5"
+            "pos": "B5",
+            "electrode_used": "Pt"
         }
 
         '''
@@ -252,7 +253,7 @@ class BatteryRobot(NorthC9):
             today = datetime.datetime.now()
             formatted_date = today.strftime("%Y%m%d_%H%M%S")  # YearMonthDay_HourMinuteSecond
             name = name + "_" + formatted_date
-            row = [name, pos, True, "250000 1 0.00001", True, "2 -2 0.020", False, False]
+            row = [name, pos, standard.get("electrode_used"),True, "250000 1 0.00001", True, "2 -2 0.020", False, False]
             new_row = pd.DataFrame([row], columns=df.columns)
             df = pd.concat([new_row, df, new_row], ignore_index=True)
 
@@ -263,6 +264,7 @@ class BatteryRobot(NorthC9):
         for i, test in enumerate(df.itertuples()):
             try:
                 target_pos = test.Target_vial
+                electrode_used=test.Electrode_Used
                 log_file.write(f"   Beginning tests for position {target_pos} at: \
                                {get_time_stamp()} \n")
 
@@ -319,7 +321,8 @@ class BatteryRobot(NorthC9):
                                         [rate, rate, rate],
                                         [0.05, 0.05, 0.05],
                                         1,
-                                        0.1],
+                                        0.1], 
+                                electrode_used = electrode_used,
                                 save_to_db_folder = save_to_db,
                                 standard=row_is_standard)
                         
@@ -372,6 +375,7 @@ class BatteryRobot(NorthC9):
                                         [0.05, 0.05, 0.05],
                                         1,
                                         0.1],
+                                electrode_used = electrode_used,
                                 save_to_db_folder = save_to_db,
                                 standard=row_is_standard)
                         

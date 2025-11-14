@@ -1,3 +1,3 @@
-Experiment,Target_vial,GEIS,GEIS_Conditions,CV,CV_Conditions,CE,SaveDB
-Sample_Validation_p5NO3,C5,TRUE,250000 1 0.00001,TRUE,2 -2 0.020,FALSE,TRUE
-Sample_Validation_p5NO3_2,C5,TRUE,250000 1 0.00001,TRUE,2 -2 0.020,FALSE,TRUE
+Experiment,Target_vial,Electrode_Used,GEIS,GEIS_Conditions,CV,CV_Conditions,CE,SaveDB
+2m_SO4_GC,A1,Pt,TRUE,250000 1 0.00001,TRUE,3 -2 0.020,FALSE,TRUE
+Nitrate_test,A2,Pt,TRUE,250000 1 0.00001,TRUE,3 -2 0.020,FALSE,TRUE
