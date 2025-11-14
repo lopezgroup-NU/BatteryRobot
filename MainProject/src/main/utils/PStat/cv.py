@@ -6,6 +6,7 @@ import time as Time
 import numpy as np
 from .experiment import Experiment
 from ..MathUtils import kinetic_fit
+from ..DBUtils import *
 from pathlib import Path
 
 #Statement of work
@@ -217,7 +218,7 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
     df.to_csv(out_path)
 
     if save_to_db_folder and not standard:
-        db_path = Path(r"c:\Users\llf1362\Desktop\DB\cv") / f"{output_file_name}.csv"
+        db_path = Path(r"c:\Users\llf1362\Desktop\DB\cv" + f"\{electrode_used}") / f"{output_file_name}.csv"
         df.to_csv(db_path)   
 
     if standard:
@@ -237,6 +238,7 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
     s_df.to_csv(s_df_file, index=False)   
 
     if save_to_db_folder and not standard:
+        
         return db_path
 
 def cv_interpret(filename):
@@ -255,6 +257,45 @@ def cv_interpret(filename):
     vf_col = df["Vf"]
     vf_colPositive = vf_col[0:positive]
     vf_colNegative = vf_col[zero:negative]
+
+    #get xmax
+    #translate column by target and get absolute values. find index of minimum (closest to 0)
+    im_col_translated_pos = (im_colPositive - targ_max).abs()
+    min_idx_pos = im_col_translated_pos.idxmin()
+    vf_max = vf_colPositive.loc[min_idx_pos]  # Use .loc to get the value at that index
+
+    #get xmin
+    im_col_translated_neg = (im_colNegative + targ_max).abs()
+    min_idx_neg = im_col_translated_neg.idxmin()
+    vf_min = vf_colNegative.loc[min_idx_neg]  # Use .loc to get the value at that index
+
+    vf_diff = vf_max-vf_min
+
+    return(vf_diff,vf_max,vf_min )
+
+def cv_interpret_2(filename, reverse_peak = False):
+    df_file = filename
+    df = pd.read_csv(df_file, index_col='# Point')
+
+    positive,zero,negative = find_peaks_and_zero_crossings(df)
+
+    targ_max = 0.000024
+    targ_min = -0.000024
+    im_col = df["Im"]
+    vf_col = df["Vf"]
+
+    if reverse_peak:
+        im_colPositive = im_col[positive:zero]
+        im_colNegative = im_col[negative:]
+
+        vf_colPositive = vf_col[positive:zero]
+        vf_colNegative = vf_col[negative:]
+    else:
+        im_colPositive = im_col[:positive]
+        im_colNegative = im_col[zero:negative]
+
+        vf_colPositive = vf_col[:positive]
+        vf_colNegative = vf_col[zero:negative]
 
     #get xmax
     #translate column by target and get absolute values. find index of minimum (closest to 0)

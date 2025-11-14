@@ -16,6 +16,7 @@ from .PowderShakerUtils import PowderShaker
 from .T8Utils import T8
 from .ExceptionUtils import *
 from .MathUtils import get_time_stamp
+from .DBUtils import *
 
 """
 Module for BatteryRobot operation
@@ -71,6 +72,7 @@ class BatteryRobot(NorthC9):
         self.water_start = resources.get("water_start", 18)
         self.water_end = resources.get("water_end", 47)
 
+        self.querier = MongoQuery(db_name=self.config.get("db_info").get("name"))
         #home before we do anything
         if home:
             self.home_robot() #Robot arm homing
@@ -303,20 +305,20 @@ class BatteryRobot(NorthC9):
                         self.set_output(7, False)
                         self.set_output(8, False)
 
-                        run_geis(output_file_name=output_file_name + f"_geis{j}", 
+                        geis_file = run_geis(output_file_name=output_file_name + f"_{electrode_used}" + f"_geis{j}", #keep track of the electrode which was used in each run; this doesn't actually affect the geis output but it may make for easier tracking of results
                                 parameter_list=geis_parameter_list, 
                                 save_to_db_folder = save_to_db,
                                 standard=row_is_standard)
                         
-                        # geis_files.append(geis_file)
+                        geis_files.append(geis_file)
 
                         self.draw_sensor1to2(target_idx, viscous=True)
                         self.set_output(6, True)
                         self.set_output(7, True)
                         self.set_output(8, True)
                         ocv = RunOCV_lastV()
-
-                        run_cv2(output_file_name=output_file_name + f"_cv{j}",
+                        
+                        cv_file_j = run_cv2(output_file_name=output_file_name + f"_{electrode_used}" + f"_cv{j}",
                                 values=[[ocv, point1, point2, 0],
                                         [rate, rate, rate],
                                         [0.05, 0.05, 0.05],
@@ -326,13 +328,16 @@ class BatteryRobot(NorthC9):
                                 save_to_db_folder = save_to_db,
                                 standard=row_is_standard)
                         
-                        # cv_files.append(cv_file)
+                        cv_files.append(cv_file_j)
+
                         self.set_output(6, False)
                         self.set_output(7, False)
                         self.set_output(8, False)
+                    
+                    
 
                     if save_to_db:
-                        pass
+                        self.querier.add_cv_data_one(cv_file_list=cv_files)
 
                 elif GEIS:
                     if len(test.GEIS_Conditions.split()) != 3:

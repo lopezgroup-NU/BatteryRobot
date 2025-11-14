@@ -238,7 +238,7 @@ class MongoQuery:
         collection = self.conn.get_collection("data")
 
         file_names = [path.name for path in cv_file_list]
-        file_named = file_names[0][:-4]
+        file_named = file_names[0][:-4] + f"_{time.time_ns()}" # adds absolute time in nanoseconds
         salts, salt_and_conc, salt_to_conc_list = parse_files(file_names, type="cv")
         salt, conc, test_num = salt_and_conc[0]
         

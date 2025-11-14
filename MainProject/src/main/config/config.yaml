@@ -38,3 +38,6 @@ racks:
   source_rack: config/source_rack.csv 
   heat_rack:  config/heat_rack.csv
   heat_rack2:  config/heat_rack2.csv
+
+db_info:
+  name: "test_db"
