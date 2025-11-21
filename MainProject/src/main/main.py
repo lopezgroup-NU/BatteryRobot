@@ -4,6 +4,7 @@ from Locator import *
 from config import powder_protocols, SourceRack, HeatRack
 from utils.PStat.geis import *
 from utils.PStat.cv import *
+from utils.PStat.ca import *
 from utils.PStat.ocv import *
 from temper_windows import TemperWindows
 import numpy as np
@@ -16,7 +17,7 @@ for i in paths:
 # setup_gui()
 #create_plan("experiments/Hofmeister2.csv", "config/source_rack.csv")
 
-rob = BatteryRobot('A', network_serial='AU06EZ1P', home= True)
+rob = BatteryRobot('A', network_serial='AU06EZ1P', home=False)
 t8 = T8('B', network = rob.network)
 # p2 = PowderShaker('C', network = rob.network)
 # waters = list(range(10,48))
@@ -32,7 +33,7 @@ def on_and_off():
         rob.set_output(6, True)
         rob.set_output(7, True)
         rob.set_output(8, True)
-        rob.delay(10)
+        rob.delay(300)
         rob.set_output(6, False)
         rob.set_output(7, False)
         rob.set_output(8, False)

@@ -3,7 +3,7 @@ import heapq
 import yaml
 import datetime
 import pandas as pd
-import tkinter as tk
+from tkinter import *
 from GUI import *
 from north import NorthC9
 from molmass import Formula
@@ -82,6 +82,18 @@ class BatteryRobot(NorthC9):
             self.home_pump(0) #Pump system sensing homing
             self.set_pump_valve(3, 0) #Set pump system valve at input position
 
+    def start_gui(self, df=pd.DataFrame([])):
+        
+
+        root = Tk()
+        root.configure(bg="white")
+        root.title("Run Formulations GUI")
+        root.geometry("800x600")
+
+        display = StringVar()
+        entry = Entry(root, textvariable=display)
+        entry.grid(columnspan=4, ipadx=70)
+
     def run_formulation(self, run_file):
         """
         Takes input file path to a csv containing test details.
@@ -90,6 +102,8 @@ class BatteryRobot(NorthC9):
         heating_tasks = []
         heapq.heapify(heating_tasks)
         df = pd.read_csv(run_file)
+
+
 
         #start spinner and heat
         t8 = T8('B', network = self.network)
@@ -318,7 +332,7 @@ class BatteryRobot(NorthC9):
                         self.set_output(8, True)
                         ocv = RunOCV_lastV()
                         
-                        cv_file_j = run_cv2(output_file_name=output_file_name + f"_{electrode_used}" + f"_cv{j}",
+                        cv_file_j = run_save_cv(output_file_name=output_file_name + f"_{electrode_used}" + f"_cv{j}",
                                 values=[[ocv, point1, point2, 0],
                                         [rate, rate, rate],
                                         [0.05, 0.05, 0.05],
@@ -364,7 +378,7 @@ class BatteryRobot(NorthC9):
                 elif CV:
                     if len(test.CV_CONDITIONS.split()) != 3:
                         raise ContinuableRuntimeError("CV_CONDITIONS must have 3 parameters!")
-                    # pass point1, pooint2, rate to run_cv2 
+                    # pass point1, pooint2, rate to run_save_cv 
                     point1, point2, rate = [float(i) for i in test.CV_Conditions.split()]
 
                     self.set_output(6, True)
@@ -374,7 +388,7 @@ class BatteryRobot(NorthC9):
                         self.move_vial(rack_disp_official[target_idx], vial_carousel)
                         self.draw_to_sensor(target_idx, second_sensor=True)
                         ocv = RunOCV_lastV()
-                        run_cv2(output_file_name=output_file_name + f"_cv{i}",
+                        run_save_cv(output_file_name=output_file_name + f"_cv{i}",
                                 values=[[ocv, point1, point2, 0],
                                         [rate, rate, rate],
                                         [0.05, 0.05, 0.05],
@@ -542,6 +556,21 @@ class BatteryRobot(NorthC9):
         for i in range(1, n_pumps):
             self.pump_helper(length=2500,v_in=10,v_out=5)#0.8 mL roughly
             self.delay(1)
+    def pump_mL(self, mL, forward):
+
+        if mL < 5.1:
+
+            n_pumps = round(mL/0.8)
+            print(n_pumps)
+            last_pump = (mL%0.8)*2500
+            print(last_pump)
+
+            for i in range(0, n_pumps):
+                self.pump_helper(length=2500,v_in=10,v_out=10, draw=forward)#0.8 mL roughly
+                self.delay(1)
+            self.pump_helper(length=last_pump,v_in=10,v_out=10, draw=forward)#0.8 mL roughly
+        else:
+            print("This is more than the capacity of the tube!")
 
     def dispense_vol(self, dest_id, source_id, target_vol, collect=False, ret=True, speed = 8):
         """
