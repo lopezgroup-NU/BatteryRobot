@@ -17,7 +17,7 @@ for i in paths:
 # setup_gui()
 #create_plan("experiments/Hofmeister2.csv", "config/source_rack.csv")
 
-rob = BatteryRobot('A', network_serial='AU06EZ1P', home=False)
+rob = BatteryRobot('A', network_serial='AU06EZ1P', home=True)
 t8 = T8('B', network = rob.network)
 # p2 = PowderShaker('C', network = rob.network)
 # waters = list(range(10,48))
@@ -25,17 +25,6 @@ standard = {"name": "p5m_NO3",
             "pos": "C6"}
 
 # rob.run_formulation('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/formulation.csv')
-#rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv', standard = standard)
-#rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv')
+rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv', standard = standard)
 
-def on_and_off():
-    for i in range(10000):
-        rob.set_output(6, True)
-        rob.set_output(7, True)
-        rob.set_output(8, True)
-        rob.delay(300)
-        rob.set_output(6, False)
-        rob.set_output(7, False)
-        rob.set_output(8, False)
-        rob.delay(0.001)
-    return
+#rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv')

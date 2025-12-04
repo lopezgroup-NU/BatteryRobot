@@ -251,7 +251,8 @@ class BatteryRobot(NorthC9):
         run_standard = standard is not None
         if run_standard:
             # perform checks on disp rack and ensure vial has been added. 
-            name = standard.get("name", "standard")
+            name0 = standard.get("name", "standard") + "Initial"
+            name1 = standard.get("name", "standard") + "Final"
             try:
                 pos = standard.get("pos")
             except:
@@ -261,17 +262,20 @@ class BatteryRobot(NorthC9):
             if tup is None:
                 raise Exception("Add standard vial to disp_rack.csv first!")
 
-            if tup[0] != name:
+            if tup[0] != standard.get("name", "standard"):
                 raise Exception(f"Make sure vial name at {pos} on disp_rack.csv is the same \
                                 as what you provide to run_test()")
             
             #  add row before and after run file
             today = datetime.datetime.now()
             formatted_date = today.strftime("%Y%m%d_%H%M%S")  # YearMonthDay_HourMinuteSecond
-            name = name + "_" + formatted_date
-            row = [name, pos, standard.get("electrode_used"),True, "250000 1 0.00001", True, "2 -2 0.020", False, False]
-            new_row = pd.DataFrame([row], columns=df.columns)
-            df = pd.concat([new_row, df, new_row], ignore_index=True)
+            name0 = name0 + "_" + formatted_date
+            name1 = name1 + "_" + formatted_date
+            row0 = [name0, pos, standard.get("electrode_used"),True, "250000 1 0.00001", True, "2 -2 0.020", False, False]
+            row1 = [name1, pos, standard.get("electrode_used"),True, "250000 1 0.00001", True, "2 -2 0.020", False, False]
+            #new_row = pd.DataFrame([row], columns=df.columns)
+            df = pd.concat([pd.DataFrame([row0], columns=df.columns), df, pd.DataFrame([row1], columns=df.columns)], ignore_index=True)
+
 
         log_file = open("experiments/experiments.log", "a")
         log_file.write("*" * 50 + "\n")
@@ -314,7 +318,7 @@ class BatteryRobot(NorthC9):
                     for j in range(3):
                         self.move_vial(rack_disp_official[target_idx], vial_carousel)
                         self.goto_safe(safe_zone)
-                        self.draw_to_sensor(target_idx, viscous=True, special=True)
+                        self.draw_to_sensor(target_idx, viscous=True, pierceable_cap=True)
                         self.set_output(6, False)
                         self.set_output(7, False)
                         self.set_output(8, False)
@@ -369,7 +373,7 @@ class BatteryRobot(NorthC9):
                     for j in range(3):
                         self.move_vial(rack_disp_official[target_idx], vial_carousel)
                         self.goto_safe(safe_zone)
-                        self.draw_to_sensor(target_idx, viscous=True, special=True)
+                        self.draw_to_sensor(target_idx, viscous=True, pierceable_cap=True)
                         run_geis(output_file_name=output_file_name + f"_geis{j}", 
                                  parameter_list=geis_parameter_list,
                                 save_to_db_folder = save_to_db,
@@ -772,7 +776,7 @@ class BatteryRobot(NorthC9):
         self.reset_pump()
 
     def draw_to_sensor(self, id, second_sensor=False, length=1300,
-                       purge=False, viscous=False, light=False, special=False):
+                       purge=False, viscous=False, light=False, pierceable_cap=False):
         """
         Assume open vial placed between clamps. Draws 5 pumps of electrolyte,
         and moves it to the first sensor by default.
@@ -809,7 +813,7 @@ class BatteryRobot(NorthC9):
         self.disp_rack.set_vial_by_pos(pos, current_vol - vol)
 
         self.move_carousel(0, 0)
-        if special:
+        if pierceable_cap:
             self.open_clamp()
             self.move_vial(vial_carousel, rack_disp_official[id])
         else:

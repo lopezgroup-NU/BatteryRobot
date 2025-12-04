@@ -1,5 +1,7 @@
 {
     "python.analysis.extraPaths": [
         "./MainProject/src/main/utils/PStat"
-    ]
+    ],
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python-envs.pythonProjects": []
 }

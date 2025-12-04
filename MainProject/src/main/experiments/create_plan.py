@@ -37,6 +37,9 @@ def create_plan(plan_file, source_rack_file):
 
     # read plan and extract match column names to reagent
     in_df = pd.read_csv(plan_file)
+    #OPTIMIZE THE SORTING HERE
+   # in_df.sort_values(in_df[:][1:], key=lambda x: sum(x), ascending=False)
+    #in_df = sorted(in_df, key=lambda x: sum(x))
     sources = tuple(in_df.columns)
     tfsi_name = ""
     fsi_name = ""

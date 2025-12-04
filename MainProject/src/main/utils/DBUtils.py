@@ -240,7 +240,11 @@ class MongoQuery:
         file_names = [path.name for path in cv_file_list]
         file_named = file_names[0][:-4] + f"_{time.time_ns()}" # adds absolute time in nanoseconds
         salts, salt_and_conc, salt_to_conc_list = parse_files(file_names, type="cv")
-        salt, conc, test_num = salt_and_conc[0]
+        
+        for element in salt_and_conc:
+            if element[2] == 0:
+                salt, conc, test_num = element
+
         
         for i, path in enumerate(cv_file_list):
             vf_diff,vf_max,vf_min = cv_interpret(path, reverse_peak=False)
