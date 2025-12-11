@@ -399,23 +399,24 @@ class BatteryRobot(NorthC9):
         log_file.write("*" * 50 + "\n")
         log_file.close()
 
-    def dispense_powder_and_scale(self, protocol, dest_id, mass, collect=False, ret=True):
+    def dispense_powder_and_scale(self, protocol, dest_id, mass, container_index=0, collect=False, ret=True):
         """
         dispense powder into specified vial (dest_id)
         """
-        self.check_remove_pipette()
+        #self.check_remove_pipette()
 
-        if collect:
-            self.move_vial(rack_disp_official[dest_id], vial_carousel)
-        else:
+        #if collect:
+        #    self.move_vial(rack_disp_official[dest_id], vial_carousel)
+        #else:
             #assumes already holding vial
-            self.goto_safe(vial_carousel)
-
-        self.uncap_vial_in_carousel()
-        self.move_carousel(68, 77) # carousel moves 68 degrees, 77 mm down
+        #    self.goto_safe(vial_carousel)
+        self.move_carousel(0,0)
+        #self.uncap_vial_in_carousel()
+        self.move_carousel(68, 74) # carousel moves 68 degrees, 77 mm down
 
         start = time.time()
         p2 = PowderShaker('C', network=self.network)
+        p2.init(container_index)
         dispensed = p2.cl_pow_dispense(robot=self, mg_target=mass, protocol=protocol)
         t_taken = time.time() - start
 
