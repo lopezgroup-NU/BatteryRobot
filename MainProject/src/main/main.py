@@ -18,14 +18,15 @@ for i in paths:
 
 
 
-rob = BatteryRobot('A', network_serial='AU06EZ1P', home= False)
+rob = BatteryRobot('A', network_serial='AU06EZ1P', home= True)
 t8 = T8('B', network = rob.network)
 p2 = PowderShaker('C', network = rob.network)
 # waters = list(range(10,48))
 standard = {"name": "p5m_NO3",
             "pos": "C6"}
 
+#rob.purge()
 # rob.run_formulation('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/formulation.csv')
 #rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv', standard = standard)
-#rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv')
+rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv')
 

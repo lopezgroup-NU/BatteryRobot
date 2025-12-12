@@ -142,20 +142,37 @@ class PowderShaker(NorthC9):
     #    self.home_OL_stepper(0, 300)
 
     def init(self, n=None):
+        """
+        Initiates the powderShaker objects by activating the correct channel to operate each of the servos which open 
+        and close the powder dispensers. The way these operate is that each channel controls two servo positions, with 
+        3 channels = 6 servos in total on the carousel. Once a channel is activated, all action commands sent to the powder
+        shaker default to being performed by the active channel servo/s. I'm not 100% sure how to control the second servo of
+        each of the channels yet, but it is clear that the first servo is the default one
+        """
         if n is not None:
             self.activate_powder_channel(n)
+        #this home_OL_stepper command does a "buzz" action which may be helpful to emulate for future advances in powder dispensation. Check north_c9.py
         #self.home_OL_stepper(0, 300)
 
     def set_opening(self, deg):
+        """
+        Opens the powder dispenser chute by deg degrees. When powder clumps, it may not dispense even with the chute open
+        """
         self.move_axis(0, deg*(1000/360.0), accel=5000)
 
     def shake(self, t, f=120, a=100, wait=True):
+        """
+        This seems not to do anything. Test after winter break
+        """
         #t in ms
         #f in hz [40, 80, 100, 120]
         #a in %
+        
         return self.amc_pwm(int(f), int(t), int(a), wait=wait)
     
     def shake_mk2(self, t, f=100, a=10, wait=True):
+        #TODO The timing on this shake will be off quite a bit because it doesn't account for time spent opening and closing the chute. Investigating this may lead to more accurate dispensing
+        """A manual shake"""
         #t in ms
         #f in hz [40, 80, 100, 120]
         #a in %
@@ -164,6 +181,7 @@ class PowderShaker(NorthC9):
         num_cycles = round(t/(2*1000*t_between_toggles))
 
         for cycle in range(0,num_cycles):
+            #opens and closes at max speed.
             self.move_axis(0, (a/2)*(1000/360.0), vel=100, accel=1000)
             time.sleep(t_between_toggles)
             self.move_axis(0, 0, vel=100, accel=1000)
@@ -195,18 +213,18 @@ class PowderShaker(NorthC9):
         tare = robot.read_steady_scale() * 1000
         
         count = 0
-        while mg_togo > protocol.tol:  # should have a max count condition? other timeout?
+        while mg_togo > protocol.tol:  #TODO should have a max count condition? other timeout?
             count += 1                
-            #todo: rewrite below:
+            #TODO: rewrite below:
             #if write_file:
                 #file.record(shake_t, delta_mass, iter_target, mg_togo)
             self.set_opening(ps.opening_deg)  
-            print(shake_t)
-            print(ps.freq)
-            print(ps.amplitude)
+            #print(shake_t)
+            #print(ps.freq)
+            #print(ps.amplitude)
 
 
-            self.shake_mk2(shake_t, ps.freq, ps.amplitude)
+            self.shake_mk2(shake_t, ps.freq, ps.opening_deg)
             if ps.shut_valve:
                 self.set_opening(0)
             robot.delay(0.5)
@@ -225,6 +243,7 @@ class PowderShaker(NorthC9):
             elif mg_togo <= protocol.fast_settings.thresh:
                 ps = protocol.fast_settings
 
+            #TODO Ultra slow settings don't yet exist. Add them? Maybe uses the amc_pwm command if that shakes it
             """
             if mg_togo <= protocol.ultra_slow_settings.thresh:
                 ps = protocol.ultra_slow_settings

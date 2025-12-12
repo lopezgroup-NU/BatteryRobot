@@ -80,6 +80,46 @@ class BatteryRobot(NorthC9):
             self.home_pump(0) #Pump system sensing homing
             self.set_pump_valve(3, 0) #Set pump system valve at input position
 
+    def prompt_user_check_conditions(self, conditions):
+        """
+        Run a demo for the class which is visiting the lab on November 11th
+        """
+
+        print("Enter a '1' for each of the following if true, and a '0' if false")
+
+        count_conditions_fulfilled = 0
+        all_conditions_fulfilled = False
+        failed_conditions = []
+
+        while not all_conditions_fulfilled:
+
+            for condition in conditions:
+                cond = input(conditions[condition])
+                if cond == '1':
+                    count_conditions_fulfilled += 1
+                elif cond == '0':
+                    failed_conditions.append(conditions[condition])
+                else:
+                    print("That isn't a valid response. Make sure there are no spaces or anything, then press enter")
+                    condition -= 1
+
+            if count_conditions_fulfilled == len(conditions):
+                all_conditions_fulfilled = True
+            else:
+                print("Not all condiitons are fulfilled. Please ensure that everything is in order and try again")
+                print("")
+        print("All conditions are fulfilled. Starting the program in 1 second!")
+        self.delay(1)
+
+        dispense_vial_prepared = input("Put a vial half-full of H2O, with a special cap (green w/ hole in middle) in the A1 position of the dispense rack. Type 1 once completed:  ")
+        source_vial_prepared = input("Put a vial full of H2O in the B4 position of the source rack. Type 1 once completed:  ")
+        carousel_is_empty = input("Remove any vial currently in the vial clamp.  Type 1 once completed:  ")
+        heat_rack_empty = input("Remove all vials from the heating rack. Type 1 once completed:  ")
+
+        if dispense_vial_prepared == '1' and source_vial_prepared == '1' and carousel_is_empty == '1' and heat_rack_empty  == '1':
+            print("All conditions are fulfilled. Starting the program now!")
+            self.delay(2.5)
+
     def run_formulation(self, run_file):
         """
         Takes input file path to a csv containing test details.
@@ -231,6 +271,8 @@ class BatteryRobot(NorthC9):
         }
 
         '''
+
+        
         df = pd.read_csv(run_file)
         run_standard = standard is not None
         if run_standard:
