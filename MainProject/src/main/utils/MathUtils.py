@@ -35,6 +35,8 @@ def get_water_weight_from_components(components_dict):
 
     return get_wweights(tfsic, fsic, no3c, clo4c, so4c, acc)
 
+
+# This function needs to change in the future to become more modular for greater # of potential chemicals
 def get_weights(tfsic=0, fsic=0, no3c=0, clo4c=0, so4c=0, acc=0):
     """
     Solve for weights, does not return water

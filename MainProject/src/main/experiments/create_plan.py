@@ -44,7 +44,7 @@ def create_plan(plan_file, source_rack_file):
     clo4_name = ""
     so4_name = ""
     ac_name = ""
-
+    
     for source in sources:
         if "TFSI" in source.upper():
             tfsi_name = source
@@ -78,8 +78,10 @@ def create_plan(plan_file, source_rack_file):
             float(getattr(row, so4_name)),
             float(getattr(row, ac_name)),
         )
+        print(vols)
         vols = [round(vol, 2) for vol in vols]
         if (sum(vols) > 5)  or any(vol < 0 for vol in vols):
+            print("vols")
             cannot_rows.append(i)
             continue
 
@@ -125,6 +127,8 @@ def create_plan(plan_file, source_rack_file):
         temp_source_vols = {} # Store used volumes temporarily
         for name, desired_v in zip(components + ["H2O"], vols):
             if desired_v > 0.0:
+                print(f"{desired_v}")
+                
                 result = rack_checker(source_rack, name, desired_v)
                 if not result:
                     drop = True
@@ -157,9 +161,10 @@ def create_plan(plan_file, source_rack_file):
 
         formulation_df.loc[experiment_name] = new_row
         
-        # add new entry to expriments df
+        # add new entry to experiments df
         new_exp_row = {
             "Target_vial": DispRack.index_to_pos(disp_rack_curr),
+            "Electrode_used": "Pt",
             "GEIS": True,
             "GEIS_Conditions": "250000 1 0.00001",
             "CV": True,
@@ -219,6 +224,7 @@ def rack_checker(rack, source_name, desired_vol):
 
         _, vol, _ = rack.get_vial_by_pos(pos)
         vol = round(vol, 2)
+        print(f"volume: {vol}")
 
         # Available volume is whatever is above 2 mL
         available_vol = max(0, vol - 2) 
