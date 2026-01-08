@@ -1,6 +1,6 @@
-e,e,H2O_4 8 0,H2O_1 8 0,LiNO3_1 7 0
-e,e,H2O_5 8 0,H2O_2 8 0,LiNO3_2 7 0
-e,LiOAc_1 8 0,H2O_6 8 0,H2O_3 8 0,e
-e,e,LiClO4_1 8 5,Li2SO4_1 8 7,x
+e,e,H2O_4 8 8,LiClO4_2 8 8,e
+e,e,H2O_5 8 8,e,e
+e,e,LiOAc_1 8 8,e,e
+e,e,ClO4_1 8 8,e,x
 e,e,e,x,x
 e,x,x,x,x

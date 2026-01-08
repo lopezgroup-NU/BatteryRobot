@@ -117,9 +117,16 @@ def create_plan(plan_file, source_rack_file):
             continue
 
         # must make sure names on source rack.csv is equal to what henry's is
-        # e.g. if Henry say's "LiTFSI", we have to use "LiTFSI_x" as well where x is the
+        # e.g. if Henry say's "LiTFSI", we have to use "LiTFSI_x" as well where x is thetttttttttttt
         # id of that vial, e.g. LiTFSI_1, LiTFSI_2 etc
-        # check sources
+    # check sources25.68 [C]    2@%>^* {c}@@>&%2.75[C]   25.68 [C]    22.75 [C]   4S
+
+
+
+
+
+
+        25.68 
         source_list = ""
         vol_list = ""
 
@@ -127,7 +134,7 @@ def create_plan(plan_file, source_rack_file):
         temp_source_vols = {} # Store used volumes temporarily
         for name, desired_v in zip(components + ["H2O"], vols):
             if desired_v > 0.0:
-                print(f"{desired_v}")
+                print(f"{name}___{desired_v}")
                 
                 result = rack_checker(source_rack, name, desired_v)
                 if not result:
@@ -147,6 +154,7 @@ def create_plan(plan_file, source_rack_file):
                 current_vol = source_rack.get_vial_by_pos(source)[1]
                 source_rack.set_vial_by_pos(source, round(current_vol + vol, 2))
             continue
+            
 
         # add new entry to formulation df
         new_row = {

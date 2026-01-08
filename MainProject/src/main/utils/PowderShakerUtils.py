@@ -135,6 +135,57 @@ fumed_silica = PowderProtocol(tol = 0.2,
                             )
 
 
+manganese_oxide = PowderProtocol(tol = 0.2,
+                            fast_settings = PowderSettings(
+                                opening_deg = 45,
+                                percent_target = 0.5,
+                                max_growth = 2,
+                                shut_valve = True
+                                ),
+                            med_settings = PowderSettings(
+                                thresh = 10,
+                                opening_deg = 40,
+                                percent_target = 0.50,
+                                max_growth = 1.25,
+                                shut_valve = True
+                                ),
+                            slow_settings = PowderSettings(
+                                thresh = 2,
+                                opening_deg = 30,
+                                percent_target = 0.25,
+                                max_growth = 1.1,
+                                shut_valve = True
+                                ),
+                             scale_delay=2.5
+                            )
+
+
+manganese_oxybromide = PowderProtocol(tol = 0.2,
+                            fast_settings = PowderSettings(
+                                opening_deg = 45,
+                                percent_target = 0.5,
+                                max_growth = 2,
+                                shut_valve = True
+                                ),
+                            med_settings = PowderSettings(
+                                thresh = 10,
+                                opening_deg = 40,
+                                percent_target = 0.50,
+                                max_growth = 1.25,
+                                shut_valve = True
+                                ),
+                            slow_settings = PowderSettings(
+                                thresh = 2,
+                                opening_deg = 30,
+                                percent_target = 0.25,
+                                max_growth = 1.1,
+                                shut_valve = True
+                                ),
+                             scale_delay=2.5
+                            )
+
+
+
 
 class PowderShaker(NorthC9):
     
@@ -170,7 +221,7 @@ class PowderShaker(NorthC9):
         
         return self.amc_pwm(int(f), int(t), int(a), wait=wait)
     
-    def shake_mk2(self, t, f=100, a=10, wait=True):
+    def shake_mk2(self, t=50, f=100, a=40, wait=True):
         #TODO The timing on this shake will be off quite a bit because it doesn't account for time spent opening and closing the chute. Investigating this may lead to more accurate dispensing
         """A manual shake"""
         #t in ms
@@ -181,10 +232,14 @@ class PowderShaker(NorthC9):
         num_cycles = round(t/(2*1000*t_between_toggles))
 
         for cycle in range(0,num_cycles):
+            print(f"{t_between_toggles}___{a/2}")
+            
             #opens and closes at max speed.
-            self.move_axis(0, (a/2)*(1000/360.0), vel=100, accel=1000)
+            self.set_opening((a/2))
+            #self.move_axis(0, (a/2)*(1000/360.0), vel=100, accel=1000)
             time.sleep(t_between_toggles)
-            self.move_axis(0, 0, vel=100, accel=1000)
+            self.set_opening(0)
+            #self.move_axis(0, 0, vel=100, accel=1000)
             time.sleep(t_between_toggles)
 
         #return self.amc_pwm(int(f), int(t), int(a), wait=wait)
@@ -268,8 +323,8 @@ class PowderShaker(NorthC9):
             print(f'\tNext target:     {iter_target:.1f} mg')
             print(f'\tNext time:       {int(shake_t)} ms')
             print('')
-        self.set_opening(100)
-        self.set_opening(0)
+        #self.set_opening(100)
+        #self.set_opening(0)
      
         print(f'Result:')
         print(f'\tLast iter:  {delta_mass:.1f} mg')
