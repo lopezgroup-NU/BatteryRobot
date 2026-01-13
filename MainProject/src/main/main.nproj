@@ -737,6 +737,71 @@
         28,
         0.0
       ]
+    },
+    "board_transfer": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -347,
+        11749,
+        21285,
+        20314
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "board_1": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -107,
+        12069,
+        27989,
+        23089
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "board_1_lift": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -107,
+        12069,
+        27989,
+        21891
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "board_0": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -759,
+        16618,
+        20527,
+        23402
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "board_0_lift": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -759,
+        16618,
+        20527,
+        22285
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
     }
   },
   "sim_inputs": {

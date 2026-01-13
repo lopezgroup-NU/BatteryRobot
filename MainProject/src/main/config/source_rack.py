@@ -69,7 +69,7 @@ class SourceRack():
         self.path = Path(csv_path)
         self.update_path = self.path.with_name(self.path.stem + "_updated.csv")
         self.invalid_index = set()
-        vials = set()
+        self.vials = set()
 
         i = 0 #track index
         df = df.iloc[:, ::-1]
@@ -88,18 +88,21 @@ class SourceRack():
 
                     vial, vol, conc = el.split()
 
-                    if vial in vials:
+                    if vial in self.vials:
                         print(vial)
                         raise InitializationError(f"{self.name}: No duplicate vial names!")
+                    print(f"attributes: {vial} {vol} {conc}")
 
                     # map vial name to pos 
+                    #print(vial)
                     setattr(self, vial, self.index_to_pos(i))
-
+                    
                     #map vial volumes
                     setattr(self, vial + "_vol", float(vol))
 
                     #map vial concentrations
                     setattr(self, vial + "_conc", float(conc))
+                    # print(f"attributes: {getattr(self, vial + "_vol")} {getattr(self, vial+"_conc")} {getattr(self, vial)}")
 
                     try:
                         #map pos to vial name. convert index to pos, then match to vial name 
@@ -111,7 +114,7 @@ class SourceRack():
                     except Exception as e:
                         raise InitializationError(f"{self.name}: Error when mapping. Ensure csv is formatted correctly. {e}")
 
-                    vials.add(vial)
+                    self.vials.add((vial, vol, conc))
 
                 i += 1
     
@@ -188,11 +191,22 @@ class SourceRack():
         """
         Returns vial pos if vial exists 
         """
-        if not hasattr(self, name):
+        #print(self.vials)
+        try:
+            for vial in self.vials:
+                #print(f"vial: {str(vial[0])[0:vial[0].rfind('_')]}   {str(name)[0:name.rfind('_')]}")
+                if str(vial[0])[0:vial[0].rfind('_')] == str(name)[0:name.rfind('_')]:
+                    #for both vial[0] and name, it strips everything including and after the final underscore in the chemical name
+                    #this converts "LiClO4_3" to "LiClO4"
+                    return getattr(self, name)
+        except AttributeError:
             return None
+        return None
+        # if not hasattr(self, name):
+        #     return None
         
-        # returns pos
-        return getattr(self, name)
+        # # returns pos
+        # return getattr(self, name)
 
     def get_vial_by_pos(self, pos):
         """
@@ -264,3 +278,6 @@ class SourceRack():
                     self.sol_vols[pos] = vol
 
         return self.sol_vols
+
+    def print_self(self):
+        print(self.df)

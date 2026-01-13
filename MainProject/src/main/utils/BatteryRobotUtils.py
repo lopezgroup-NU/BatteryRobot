@@ -575,6 +575,38 @@ class BatteryRobot(NorthC9):
             print("Not all conditions are fulfilled. Please check that all of the vials are in the right place, then type '1' for each of the conditions")
         pass
 
+    def transfer_board_to(self, position):
+        """
+        Docstring for transfer_board_to
+        
+        :param self: Description
+        :param position: the position you'd like to transfer to. 1 = on the test stand (position closer to the right side), 0 = in the holding stand
+        """
+        #position 0 = off of the testing stand, pos 1 = on the testing stand
+        #in the future perhaps store the position somewhere and choose which procedure to do based on that, but for now it's ok to manually define it
+        if position == 0:
+            self.goto_safe(board_1)
+            self.close_gripper()
+            self.delay(0.5)
+            self.goto(board_1_lift, vel=1)
+        else:
+            self.goto_safe(board_0)
+            self.close_gripper()
+            self.delay(0.5)
+            self.goto(board_0_lift, vel=1)
+
+        self.goto(board_transfer)
+
+        if position == 0:
+            self.goto(board_0_lift)
+            self.goto(board_0, vel=1)
+            self.open_gripper()
+        else:
+            self.goto(board_1_lift)
+            self.goto(board_1, vel=1)
+            self.open_gripper()
+
+
     def pump_n_times(self, carousel_position, n_pumps):
         self.move_carousel(carousel_position[0],carousel_position[1])
         for i in range(1, n_pumps):

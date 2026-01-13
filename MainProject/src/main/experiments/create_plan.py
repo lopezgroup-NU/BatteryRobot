@@ -34,6 +34,7 @@ def create_plan(plan_file, source_rack_file):
 
     # assume sources are already on source rack and source_rack.csv configured accordingly
     source_rack = SourceRack(source_rack_file)
+    source_rack.print_self()
 
     # read plan and extract match column names to reagent
     in_df = pd.read_csv(plan_file)
@@ -60,6 +61,7 @@ def create_plan(plan_file, source_rack_file):
             ac_name = source
 
     components = [tfsi_name, fsi_name, no3_name, clo4_name, so4_name, ac_name]
+    #print(components)
     # create our own disp_rack, initialize every cell to empty first
     disp_rack_curr = 0
     disp_rack_max = 14
@@ -69,8 +71,8 @@ def create_plan(plan_file, source_rack_file):
 
     heat_idx = 0
     max_heat_slots = 24
-    for i, row in enumerate(in_df.itertuples(), start=1):
-        vols = get_weights(
+    for i, row in enumerate(in_df.itertuples(), start=1):#loops through plan file to check if the volumes of each proposed formulation will work
+        vols = get_weights(#volumes of each chemical that we want to add to our formulation
             float(getattr(row, tfsi_name)),
             float(getattr(row, fsi_name)),
             float(getattr(row, no3_name)),
@@ -78,14 +80,14 @@ def create_plan(plan_file, source_rack_file):
             float(getattr(row, so4_name)),
             float(getattr(row, ac_name)),
         )
-        print(vols)
-        vols = [round(vol, 2) for vol in vols]
-        if (sum(vols) > 5)  or any(vol < 0 for vol in vols):
-            print("vols")
-            cannot_rows.append(i)
+        #print(vols)
+        vols = [round(vol, 2) for vol in vols]#rounds each volume value to 2 decimals
+        if (sum(vols) > 5)  or any(vol < 0 for vol in vols):#if the sum of volumes is too big to fit in a vial, or there are any negative volumes, discard the row's test and...
+            print(f"Formulation number {row} couldn't be made because it's volume violatedd da physical constraint (bigger than vial or vol < 0)") 
+            cannot_rows.append(i) #...put it into the "cannot_rows" variable
             continue
 
-        water_vol = round(5 - sum(vols), 2)
+        water_vol = round(5 - sum(vols), 2) #we fill the rest of each vial with water, so add a water volume to each set of volumes so that the vial ends up being full
         vols.append(water_vol)
         # do the volume_concentration thing for the experiment_name
         comps = ["TFSI", "FSI", "NO3", "CLO4", "SO4", "AC"]
@@ -97,11 +99,12 @@ def create_plan(plan_file, source_rack_file):
             str(getattr(row, so4_name)),
             str(getattr(row, ac_name)),
         ]
+        #print(f"concs: {concs}")
 
         experiment_name = ""
         for comp, conc in zip(comps, concs):
             if float(conc) > 0:
-                if experiment_name:
+                if experiment_name: #adds an underscore to the name of the experiment to be followed by the concentration
                     experiment_name += "_"
 
                 conc_val = float(conc)
@@ -110,6 +113,7 @@ def create_plan(plan_file, source_rack_file):
                 formatted_conc = f"{whole_part}p{decimal_part:02d}m"
 
                 experiment_name += f"{comp}_{formatted_conc}"
+                print(experiment_name)
 
         # check space on disp_rack first
         if disp_rack_curr == disp_rack_max or heat_idx == max_heat_slots:
@@ -117,16 +121,9 @@ def create_plan(plan_file, source_rack_file):
             continue
 
         # must make sure names on source rack.csv is equal to what henry's is
-        # e.g. if Henry say's "LiTFSI", we have to use "LiTFSI_x" as well where x is thetttttttttttt
+        # e.g. if Henry say's "LiTFSI", we have to use "LiTFSI_x" as well where x is the
         # id of that vial, e.g. LiTFSI_1, LiTFSI_2 etc
-    # check sources25.68 [C]    2@%>^* {c}@@>&%2.75[C]   25.68 [C]    22.75 [C]   4S
-
-
-
-
-
-
-        25.68 
+    # check sources
         source_list = ""
         vol_list = ""
 
@@ -137,11 +134,14 @@ def create_plan(plan_file, source_rack_file):
                 print(f"{name}___{desired_v}")
                 
                 result = rack_checker(source_rack, name, desired_v)
+                print(f"rack check inputs: {source_rack}, {name}, {desired_v}")
+                print(result)
                 if not result:
                     drop = True
                     break
                 for source, vol in result.items():
                     source_list += f"{source} "
+                    print(f"sources: {source_list}")
                     vol_list += f"{round(vol, 2)} "
                     if source not in temp_source_vols:
                         temp_source_vols[source] = 0
@@ -221,12 +221,15 @@ def rack_checker(rack, source_name, desired_vol):
     """
     num = 1
     sources_used = {}
+    #volume which hasn't yet been extracted; i.e, target volume when initialized and a running count of how much volume must be removed to reach the target volume at later points
     remaining_vol = round(desired_vol, 2)
-
-    # loop through all vials with the same base name (e.g., water1, water2, etc.)
+    print(remaining_vol)
+    # loop through all vials with the same base name (e.g., water_1, water_2, etc.)
     while remaining_vol > 0:
         reagent_name = f"{source_name}_{str(num)}"
+        print(reagent_name)
         pos = rack.get_vial_by_name(reagent_name)
+        print(f"position: {pos}")
         if not pos:
             break
 
