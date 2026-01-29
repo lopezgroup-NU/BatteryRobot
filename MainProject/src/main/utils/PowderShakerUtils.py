@@ -137,7 +137,7 @@ fumed_silica = PowderProtocol(tol = 0.2,
 
 manganese_oxide = PowderProtocol(tol = 0.2,
                             fast_settings = PowderSettings(
-                                opening_deg = 45,
+                                opening_deg = 75,
                                 percent_target = 0.5,
                                 max_growth = 2,
                                 shut_valve = True
@@ -218,7 +218,7 @@ class PowderShaker(NorthC9):
         #t in ms
         #f in hz [40, 80, 100, 120]
         #a in %
-        
+
         return self.amc_pwm(int(f), int(t), int(a), wait=wait)
     
     def shake_mk2(self, t=50, f=100, a=40, wait=True):
@@ -253,7 +253,9 @@ class PowderShaker(NorthC9):
         start_t = perf_counter()
         mg_togo = mg_target
         if protocol is None:
-            protocol = default_ps 
+            protocol = manganese_oxide 
+        else:
+            protocol = eval(protocol)
         ps = protocol.fast_settings
             
         #intialize
@@ -279,7 +281,7 @@ class PowderShaker(NorthC9):
             #print(ps.amplitude)
 
 
-            self.shake_mk2(shake_t, ps.freq, ps.opening_deg)
+            self.shake_mk2(shake_t, ps.freq, ps.opening_deg*2)
             if ps.shut_valve:
                 self.set_opening(0)
             robot.delay(0.5)

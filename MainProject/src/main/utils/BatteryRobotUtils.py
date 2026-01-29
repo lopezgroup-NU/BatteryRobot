@@ -314,7 +314,7 @@ class BatteryRobot(NorthC9):
                 GEIS = True if test.GEIS else False
                 CV = True if test.CV else False
                 CE = True if test.CE else False
-                output_file_name = f"{test.Experiment}_{formatted_date}"
+                output_file_name = f"{test.Experiment}_{electrode_used}_{formatted_date}"
                 save_to_db = test.SaveDB
                 row_is_standard = run_standard and (i == 0 or i==len(df) - 1)
                 if GEIS and CV:
