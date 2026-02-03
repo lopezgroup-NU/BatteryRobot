@@ -305,8 +305,9 @@ class BatteryRobot(NorthC9):
 
         for i, test in enumerate(df.itertuples()):
             try:
+                print(test)
                 target_pos = test.Target_vial
-                electrode_used=test.Electrode_Used
+                electrode_used=test.electrode_used
                 log_file.write(f"   Beginning tests for position {target_pos} at: \
                                {get_time_stamp()} \n")
 
