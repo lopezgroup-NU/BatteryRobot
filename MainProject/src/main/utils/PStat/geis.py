@@ -170,9 +170,9 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}, save_t
     df.insert(2, 'reflected_zimag', reflected_zimag)
     df['temp(C)'] = temperature
     df.to_csv(out_path)
-
+    #"C:\AttomRobotFiles\Data\DB_Missaka\eis"
     if save_to_db_folder and not standard:
-        db_path = Path(r"c:\Users\llf1362\Desktop\DB\eis") / f"{output_file_name}.csv"
+        db_path = Path(r"C:\AttomRobotFiles\Data\DB_Missaka\eis") / f"{output_file_name}.csv"
         df.to_csv(db_path) 
 
     # extract minima
