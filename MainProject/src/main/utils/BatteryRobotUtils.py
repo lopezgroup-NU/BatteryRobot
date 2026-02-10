@@ -272,7 +272,11 @@ class BatteryRobot(NorthC9):
 
         '''
 
+        today = datetime.datetime.now()
+        formatted_date = today.strftime("%Y%m%d_%H%M%S")  # YearMonthDay_HourMinuteSecond
         
+        granular_log_file = open(f"C:/AttomRobotFiles/Software/BatteryRobot/MainProject/src/main/granular_logs/test_{formatted_date}.txt", "a")        
+
         df = pd.read_csv(run_file)
         run_standard = standard is not None
         if run_standard:
@@ -292,8 +296,7 @@ class BatteryRobot(NorthC9):
                                 as what you provide to run_test()")
             
             #  add row before and after run file
-            today = datetime.datetime.now()
-            formatted_date = today.strftime("%Y%m%d_%H%M%S")  # YearMonthDay_HourMinuteSecond
+            
             name = name + "_" + formatted_date
             row = [name, pos, standard.get("electrode_used"),True, "250000 1 0.00001", True, "2 -2 0.020", False, False]
             new_row = pd.DataFrame([row], columns=df.columns)
@@ -338,27 +341,32 @@ class BatteryRobot(NorthC9):
                     geis_files = []
                     cv_files = []
                     # run test three times
-                    for j in range(3):
+                    for j in range(3): #TODO MAKE range(3) AGAIN ONCE DONE TESTING
+                        
                         self.move_vial(rack_disp_official[target_idx], vial_carousel)
+                        granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
                         self.goto_safe(safe_zone)
+                        granular_log_file.write(f"\n * moved arm to safe zone" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
                         self.draw_to_sensor(target_idx, viscous=True, special=True)
+                        granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
                         self.set_output(6, False)
                         self.set_output(7, False)
                         self.set_output(8, False)
-
+                        
                         run_geis(output_file_name=output_file_name + f"_geis{j}", 
                                 parameter_list=geis_parameter_list, 
                                 save_to_db_folder = save_to_db,
                                 standard=row_is_standard)
-                        
+                        granular_log_file.write(f"\n * ran geis test" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
                         # geis_files.append(geis_file)
 
                         self.draw_sensor1to2(target_idx, viscous=True)
+                        granular_log_file.write(f"\n * drew from carousel vial to sensor 2 (from sensor 1)" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
                         self.set_output(6, True)
                         self.set_output(7, True)
                         self.set_output(8, True)
                         ocv = RunOCV_lastV()
-
+                        print("running cv test")
                         run_cv2(output_file_name=output_file_name + f"_cv{j}",
                                 values=[[ocv, point1, point2, 0],
                                         [rate, rate, rate],
@@ -368,7 +376,7 @@ class BatteryRobot(NorthC9):
                                 electrode_used = electrode_used,
                                 save_to_db_folder = save_to_db,
                                 standard=row_is_standard)
-                        
+                        granular_log_file.write(f"\n * ran cv test" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
                         # cv_files.append(cv_file)
                         self.set_output(6, False)
                         self.set_output(7, False)
@@ -392,13 +400,16 @@ class BatteryRobot(NorthC9):
                     self.set_output(8, False)
                     for j in range(3):
                         self.move_vial(rack_disp_official[target_idx], vial_carousel)
+                        granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
                         self.goto_safe(safe_zone)
+                        granular_log_file.write(f"\n * moved arm to safe zone" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
                         self.draw_to_sensor(target_idx, viscous=True, special=True)
+                        granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
                         run_geis(output_file_name=output_file_name + f"_geis{j}", 
                                  parameter_list=geis_parameter_list,
                                 save_to_db_folder = save_to_db,
                                 standard=row_is_standard)
-                        
+                        granular_log_file.write(f"\n * ran geis test" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
                 elif CV:
                     if len(test.CV_CONDITIONS.split()) != 3:
                         raise ContinuableRuntimeError("CV_CONDITIONS must have 3 parameters!")
@@ -410,7 +421,9 @@ class BatteryRobot(NorthC9):
                     self.set_output(8, True)
                     for j in range(3):
                         self.move_vial(rack_disp_official[target_idx], vial_carousel)
+                        granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
                         self.draw_to_sensor(target_idx, second_sensor=True)
+                        granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
                         ocv = RunOCV_lastV()
                         run_cv2(output_file_name=output_file_name + f"_cv{i}",
                                 values=[[ocv, point1, point2, 0],
@@ -421,7 +434,7 @@ class BatteryRobot(NorthC9):
                                 electrode_used = electrode_used,
                                 save_to_db_folder = save_to_db,
                                 standard=row_is_standard)
-                        
+                        granular_log_file.write(f"\n * ran cv test" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
                     self.set_output(6, False)
                     self.set_output(7, False)
                     self.set_output(8, False)

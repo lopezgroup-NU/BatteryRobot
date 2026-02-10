@@ -3,6 +3,7 @@ from temper_windows import TemperWindows
 import time 
 import toolkitpy as tkp
 import time as Time
+import datetime
 import numpy as np
 from .experiment import Experiment
 from ..MathUtils import kinetic_fit
@@ -115,6 +116,7 @@ class CV(Experiment):
             Returns an ND array with the data of the experiment
         """
 
+
         pstat.set_ctrl_mode(self.PSTATMODE)
         self.initialize_pstat(pstat)
         max_size = max_size
@@ -196,6 +198,9 @@ def find_peaks_and_zero_crossings(data):
 
 
 def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], electrode_used = "Pt", save_to_db_folder = True, standard = False):
+    
+    
+    
     tkp.toolkitpy_init("open_circuit_voltage.py")
     pstat = tkp.Pstat("PSTAT")
     cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
@@ -208,7 +213,7 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
     else:
         out_path = "res/cv/" + output_file_name + ".csv"
     np.savetxt(out_path, data, delimiter = ',', header = 'Point,time,Vf,Vu,Im,Ach,vsig,temp,Cycle,ie_range,overload,stop_test', fmt = '%s') 
-
+    print("getting temp")
     temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
     temperature = temper.get_temperature()[1]
     
@@ -217,7 +222,8 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
     df.to_csv(out_path)
 
     if save_to_db_folder and not standard:
-        db_path = Path(r"c:\Users\llf1362\Desktop\DB\cv") / f"{output_file_name}.csv"
+        #C:\AttomRobotFiles\Data\DB_Missaka\eis
+        db_path = Path(r"C:\AttomRobotFiles\Data\DB_Missaka\cv") / f"{output_file_name}.csv"
         df.to_csv(db_path)   
 
     if standard:
