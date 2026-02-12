@@ -344,11 +344,11 @@ class BatteryRobot(NorthC9):
                     for j in range(3): #TODO MAKE range(3) AGAIN ONCE DONE TESTING
                         
                         self.move_vial(rack_disp_official[target_idx], vial_carousel)
-                        granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
+                        granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {get_time_stamp()}")
                         self.goto_safe(safe_zone)
-                        granular_log_file.write(f"\n * moved arm to safe zone" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
+                        granular_log_file.write(f"\n * moved arm to safe zone" + f" *** {get_time_stamp()}")
                         self.draw_to_sensor(target_idx, viscous=True, special=True)
-                        granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
+                        granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {get_time_stamp()}")
                         self.set_output(6, False)
                         self.set_output(7, False)
                         self.set_output(8, False)
@@ -357,11 +357,11 @@ class BatteryRobot(NorthC9):
                                 parameter_list=geis_parameter_list, 
                                 save_to_db_folder = save_to_db,
                                 standard=row_is_standard)
-                        granular_log_file.write(f"\n * ran geis test" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
+                        granular_log_file.write(f"\n * ran geis test" + f" *** {get_time_stamp()}")
                         # geis_files.append(geis_file)
 
                         self.draw_sensor1to2(target_idx, viscous=True)
-                        granular_log_file.write(f"\n * drew from carousel vial to sensor 2 (from sensor 1)" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
+                        granular_log_file.write(f"\n * drew from carousel vial to sensor 2 (from sensor 1)" + f" *** {get_time_stamp()}")
                         self.set_output(6, True)
                         self.set_output(7, True)
                         self.set_output(8, True)
@@ -376,7 +376,7 @@ class BatteryRobot(NorthC9):
                                 electrode_used = electrode_used,
                                 save_to_db_folder = save_to_db,
                                 standard=row_is_standard)
-                        granular_log_file.write(f"\n * ran cv test" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
+                        granular_log_file.write(f"\n * ran cv test" + f" *** {get_time_stamp()}")
                         # cv_files.append(cv_file)
                         self.set_output(6, False)
                         self.set_output(7, False)
@@ -400,16 +400,16 @@ class BatteryRobot(NorthC9):
                     self.set_output(8, False)
                     for j in range(3):
                         self.move_vial(rack_disp_official[target_idx], vial_carousel)
-                        granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
+                        granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {get_time_stamp()}")
                         self.goto_safe(safe_zone)
-                        granular_log_file.write(f"\n * moved arm to safe zone" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
+                        granular_log_file.write(f"\n * moved arm to safe zone" + f" *** {get_time_stamp()}")
                         self.draw_to_sensor(target_idx, viscous=True, special=True)
-                        granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
+                        granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {get_time_stamp()}")
                         run_geis(output_file_name=output_file_name + f"_geis{j}", 
                                  parameter_list=geis_parameter_list,
                                 save_to_db_folder = save_to_db,
                                 standard=row_is_standard)
-                        granular_log_file.write(f"\n * ran geis test" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
+                        granular_log_file.write(f"\n * ran geis test" + f" *** {get_time_stamp()}")
                 elif CV:
                     if len(test.CV_CONDITIONS.split()) != 3:
                         raise ContinuableRuntimeError("CV_CONDITIONS must have 3 parameters!")
@@ -421,9 +421,9 @@ class BatteryRobot(NorthC9):
                     self.set_output(8, True)
                     for j in range(3):
                         self.move_vial(rack_disp_official[target_idx], vial_carousel)
-                        granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
+                        granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {get_time_stamp()}")
                         self.draw_to_sensor(target_idx, second_sensor=True)
-                        granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
+                        granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {get_time_stamp()}")
                         ocv = RunOCV_lastV()
                         run_cv2(output_file_name=output_file_name + f"_cv{i}",
                                 values=[[ocv, point1, point2, 0],
@@ -434,7 +434,7 @@ class BatteryRobot(NorthC9):
                                 electrode_used = electrode_used,
                                 save_to_db_folder = save_to_db,
                                 standard=row_is_standard)
-                        granular_log_file.write(f"\n * ran cv test" + f" *** {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}")
+                        granular_log_file.write(f"\n * ran cv test" + f" *** {get_time_stamp()}")
                     self.set_output(6, False)
                     self.set_output(7, False)
                     self.set_output(8, False)
@@ -589,6 +589,24 @@ class BatteryRobot(NorthC9):
             print("Not all conditions are fulfilled. Please check that all of the vials are in the right place, then type '1' for each of the conditions")
         pass
 
+
+    def screw_setup(self, screw=0):
+            if screw == 0:
+                self.goto_safe(microplate_screwgrab_r)
+                self.close_gripper()
+                self.delay(0.5)
+                self.goto_safe(e_cell_screw_r_approach)
+                self.goto(e_cell_screw_r, vel = 1)
+
+    def screw_with_thresh_only(self, threshold, num_tries = 1):
+        for i in range(0, num_tries):
+            try:
+                self.cap(revs=0, torque_thresh=threshold, vel=2500)
+            except:
+                pass
+            finally:
+                pass
+
     def transfer_board_to(self, position):
         """
         Docstring for transfer_board_to
@@ -598,28 +616,32 @@ class BatteryRobot(NorthC9):
         """
         #position 0 = off of the testing stand, pos 1 = on the testing stand
         #in the future perhaps store the position somewhere and choose which procedure to do based on that, but for now it's ok to manually define it
-        if position == 0:
-            self.goto_safe(board_1)
+        self.open_gripper()
+        if position == 0: #transfer to holding stand
+            self.goto_safe(microplate_test_approach) #begin at test stand approach
+            self.goto(microplate_test) 
             self.close_gripper()
             self.delay(0.5)
-            self.goto(board_1_lift, vel=1)
-        else:
-            self.goto_safe(board_0)
+            self.goto(microplate_test_approach)
+            self.goto(microplate_holder_approach)
+            self.goto(microplate_holder, vel=1)
+        else: #transfer to test stand
+            self.goto_safe(microplate_holder_approach) #begin at holding stand approach
+            self.goto(microplate_holder) 
             self.close_gripper()
             self.delay(0.5)
-            self.goto(board_0_lift, vel=1)
-
-        self.goto(board_transfer)
-
-        if position == 0:
-            self.goto(board_0_lift)
-            self.goto(board_0, vel=1)
+            self.goto(microplate_holder_approach)
+            self.goto(microplate_test_approach)
+            self.goto(microplate_test, vel=1)
+            self.delay(1)
+            #once board is transfered, screw it in!
             self.open_gripper()
-        else:
-            self.goto(board_1_lift)
-            self.goto(board_1, vel=1)
-            self.open_gripper()
+            self.delay(1)
+            self.screw_setup()
+            self.screw_with_thresh_only(800, 3)
 
+
+    
 
     def pump_n_times(self, carousel_position, n_pumps):
         self.move_carousel(carousel_position[0],carousel_position[1])
