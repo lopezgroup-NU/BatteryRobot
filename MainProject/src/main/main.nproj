@@ -186,32 +186,6 @@
         0.0
       ]
     },
-    "e_cell_screw_left": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        542,
-        26833,
-        37203,
-        23872
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "e_cell_screw_right": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        1266,
-        15628,
-        30158,
-        23856
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
     "p_remover_capture": {
       "type": "Location",
       "tool": 1,
@@ -325,19 +299,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "microplate_holder_approach": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        479,
-        12056,
-        28031,
-        21200
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
     "lidholder_holder": {
       "type": "Location",
       "tool": 0,
@@ -346,45 +307,6 @@
         26408,
         30213,
         23501
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "microplate_holder": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -4486,
-        12061,
-        28014,
-        23085
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "microplate_screw_approach_1": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -4235,
-        16072,
-        26584,
-        23078
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
-    "microplate_screw_approach_2": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        -4650,
-        15995,
-        30517,
-        22998
       ],
       "ik_soln": 0,
       "reference": false,
@@ -738,66 +660,131 @@
         0.0
       ]
     },
-    "board_transfer": {
+    "microplate_holder": {
       "type": "Location",
       "tool": 0,
       "counts": [
-        -347,
-        11749,
-        21285,
-        20314
+        4559,
+        17976,
+        20859,
+        22948
       ],
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null
     },
-    "board_1": {
+    "microplate_holder_approach": {
       "type": "Location",
       "tool": 0,
       "counts": [
-        -107,
-        12069,
-        27989,
-        23089
+        4559,
+        17976,
+        20859,
+        21723
       ],
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null
     },
-    "board_1_lift": {
+    "microplate_test": {
       "type": "Location",
       "tool": 0,
       "counts": [
-        -107,
-        12069,
-        27989,
-        21891
+        5286,
+        11454,
+        26236,
+        22579
       ],
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null
     },
-    "board_0": {
+    "microplate_test_approach": {
       "type": "Location",
       "tool": 0,
       "counts": [
-        -759,
-        16618,
-        20527,
-        23402
+        5286,
+        11454,
+        26236,
+        21189
       ],
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null
     },
-    "board_0_lift": {
+    "e_cell_screw_r_approach": {
       "type": "Location",
       "tool": 0,
       "counts": [
-        -759,
-        16618,
-        20527,
-        22285
+        -2104,
+        26685,
+        41091,
+        22888
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "microplate_screwgrab_r": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -1939,
+        30733,
+        30995,
+        22066
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "e_cell_screw_r": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -140,
+        26685,
+        41090,
+        23430
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "microplate_screwgrab_l": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -3752,
+        29088,
+        28377,
+        22058
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "e_cell_screw_l_approach": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -3751,
+        26679,
+        37078,
+        22874
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "e_cell_screw_l": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        -3753,
+        26679,
+        37078,
+        23428
       ],
       "ik_soln": 0,
       "reference": false,

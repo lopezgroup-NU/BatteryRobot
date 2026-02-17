@@ -597,11 +597,25 @@ class BatteryRobot(NorthC9):
                 self.delay(0.5)
                 self.goto_safe(e_cell_screw_r_approach)
                 self.goto(e_cell_screw_r, vel = 1)
+            else:
+                self.goto_safe(microplate_screwgrab_l)
+                self.close_gripper()
+                self.delay(0.5)
+                self.goto_safe(e_cell_screw_l_approach)
+                self.goto(e_cell_screw_l, vel = 1)
 
     def screw_with_thresh_only(self, threshold, num_tries = 1):
+        """
+        Docstring for screw_with_thresh_only
+        
+        :param self: Description
+        :param threshold: threshold, in mA. Usually ~1000 is good for screwing until any resistance is felt, below 750 it usually ends immediately
+        :param num_tries: number of "RuntimeError: Sequence: CAPPING FAULT: Torque threshold not reached" errors we should go through. 
+        Corresponds to like 2 rotations each. If you want you could probably just set this number to like 100 or something and it will skip through everything after you reach torque threshold
+        """
         for i in range(0, num_tries):
             try:
-                self.cap(revs=0, torque_thresh=threshold, vel=2500)
+                self.cap(pitch=2, revs=0, torque_thresh=threshold, vel=2500)
             except:
                 pass
             finally:
@@ -621,7 +635,7 @@ class BatteryRobot(NorthC9):
             self.goto_safe(microplate_test_approach) #begin at test stand approach
             self.goto(microplate_test) 
             self.close_gripper()
-            self.delay(0.5)
+            self.delay(1)
             self.goto(microplate_test_approach)
             self.goto(microplate_holder_approach)
             self.goto(microplate_holder, vel=1)
@@ -629,7 +643,7 @@ class BatteryRobot(NorthC9):
             self.goto_safe(microplate_holder_approach) #begin at holding stand approach
             self.goto(microplate_holder) 
             self.close_gripper()
-            self.delay(0.5)
+            self.delay(1)
             self.goto(microplate_holder_approach)
             self.goto(microplate_test_approach)
             self.goto(microplate_test, vel=1)
@@ -637,10 +651,12 @@ class BatteryRobot(NorthC9):
             #once board is transfered, screw it in!
             self.open_gripper()
             self.delay(1)
-            self.screw_setup()
-            self.screw_with_thresh_only(800, 3)
-
-
+            self.screw_setup(0)#right side
+            self.screw_with_thresh_only(1200, 8)
+            self.open_gripper()
+            self.goto_safe(safe_zone)
+            self.screw_setup(1)#left side
+            self.screw_with_thresh_only(1300, 8)
     
 
     def pump_n_times(self, carousel_position, n_pumps):
@@ -648,6 +664,11 @@ class BatteryRobot(NorthC9):
         for i in range(1, n_pumps):
             self.pump_helper(length=2500,v_in=10,v_out=5)#0.8 mL roughly
             self.delay(1)
+    
+    def goto_microplate(self, position):
+        self.goto_safe([position[0], position[1]-250, position[2]-200, position[3]-150])
+
+
 
     def dispense_vol(self, dest_id, source_id, target_vol, collect=False, ret=True, speed = 8):
         """
