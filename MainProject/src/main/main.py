@@ -1,4 +1,4 @@
-from utils import BatteryRobot,PowderShaker,T8
+from utils import BatteryRobot,PowderShaker,T8, MongoQuery
 from experiments import create_plan
 from Locator import *
 from config import powder_protocols, SourceRack, HeatRack
@@ -21,6 +21,7 @@ for i in paths:
 rob = BatteryRobot('A', network_serial='AU06EZ1P', home= False)
 t8 = T8('B', network = rob.network)
 p2 = PowderShaker('C', network = rob.network)
+db = MongoQuery()
 # waters = list(range(10,48))
 standard = {"name": "p5m_NO3",
             "pos": "C6",
