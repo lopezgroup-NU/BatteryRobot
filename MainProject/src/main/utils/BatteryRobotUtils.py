@@ -652,10 +652,12 @@ class BatteryRobot(NorthC9):
             self.open_gripper()
             self.delay(1)
             self.screw_setup(0)#right side
-            self.screw_with_thresh_only(1200, 8)
+            self.cap(revs=1.5,torque_thresh = 0)
+            self.screw_with_thresh_only(1300, 8)
             self.open_gripper()
             self.goto_safe(safe_zone)
             self.screw_setup(1)#left side
+            self.cap(revs=1.5,torque_thresh = 0)
             self.screw_with_thresh_only(1300, 8)
     
 
@@ -664,12 +666,40 @@ class BatteryRobot(NorthC9):
         for i in range(1, n_pumps):
             self.pump_helper(length=2500,v_in=10,v_out=5)#0.8 mL roughly
             self.delay(1)
+
+            
+    def goto_microplate_safe(self, position):
+        self.goto_safe([position[0], position[1], position[2], position[3]-50])
+        self.goto([position[0], position[1]-300, position[2]-200, position[3]-50])
+
+    def goto_microplate_dangerous(self, position):
+        self.goto([position[0], position[1], position[2], position[3]-1000])
+        self.goto([position[0], position[1], position[2], position[3]-50])
+        self.goto([position[0], position[1]-300, position[2]-200, position[3]-50])
+
+    def retreat_from_microplate(self, position):
+        self.goto([position[0], position[1], position[2], position[3]-1000])
     
-    def goto_microplate(self, position):
-        self.goto_safe([position[0], position[1]-250, position[2]-200, position[3]-150])
+    def CE_fill_wells(self, wells_to_fill, mL_to_fill):
+        """
+        function assumes that vial is already in the clamp and uncapped
+        
+        :param self: Description
+        :param wells_to_fill: list of the wells to fill (just pass in a list of numbers)
+        :param mL_to_fill: mL to dispense into each well
+        """
 
-
-
+        #self.goto_microplate(microplate_official[wells_to_fill[0]])
+        self.goto_safe(safe_zone)
+        for well in wells_to_fill:
+            
+            pos = microplate_official[well]
+            self.goto_microplate_dangerous(pos)
+            self.dispense_ml(3, mL_to_fill)
+            #self.pump_helper(length = mL_to_fill*3000, v_in=13, v_out=13, draw = False, pump_address=1)
+            self.retreat_from_microplate(pos)
+    
+        
     def dispense_vol(self, dest_id, source_id, target_vol, collect=False, ret=True, speed = 8):
         """
         Dispense {target_vol} ml from vial with id {source_id} into vial with id {dest_id}
@@ -806,21 +836,21 @@ class BatteryRobot(NorthC9):
         data["Real(g)"] = dispensed
         return data
 
-    def reset_pump(self):
-        self.set_pump_speed(0, 15)
-        self.set_pump_valve(0, 0)
-        self.move_pump(0, 0)
+    def reset_pump(self, pump_address = 0):
+        self.set_pump_speed(pump_address, 15)
+        self.set_pump_valve(pump_address, 0)
+        self.move_pump(pump_address, 0)
 
-    def pump_helper(self, length=1300, v_in=13, v_out=0, draw=True):
+    def pump_helper(self, length=1300, v_in=13, v_out=0, draw=True, pump_address = 0):
         """
         Helper function to be used when pumping liquids from carousel.
         """
-        self.set_pump_speed(0, v_out)
-        self.set_pump_valve(0, int(not draw))
-        self.move_pump(0, 0)
-        self.set_pump_speed(0, v_in)
-        self.set_pump_valve(0, int(draw))
-        self.move_pump(0, length)
+        self.set_pump_speed(pump_address, v_out)
+        self.set_pump_valve(pump_address, int(not draw))
+        self.move_pump(pump_address, 0)
+        self.set_pump_speed(pump_address, v_in)
+        self.set_pump_valve(pump_address, int(draw))
+        self.move_pump(pump_address, length)
         print("pumped")
 
     #viscous (29 speed)
@@ -1023,35 +1053,65 @@ class BatteryRobot(NorthC9):
 
         self.purge(id)
 
-    def run_ce(self, source, target, target_vol):
+    def run_ce(self, source_list, wells_to_fill_list, mL_per_well_list):
         """
         Run CE
 
         (G_insert_CE_Stuff_here)
 
         source - position of source vial on disp_rack
-        target - ID of target slot on microplate
-        target_vol - volume to draw
+        wells_to_fill - list containing IDs of target wells on microplate
+        mL_per_well
         """
 
-        #move vial to the carousel and uncap it
-        self.move_carousel(0,0)
-        self.move_vial(rack_disp_official[source], vial_carousel)
-        self.uncap_vial_in_carousel()
-        self.get_pipette()
-        self.zero_scale()
+        #print(wells_to_fill)
+        self.open_gripper()
+        self.reset_pump()
 
-        # draw from the vial in the carousel and dispense it at the microplate
-        self.goto_safe(carousel_aspirate)
-        self.aspirate_ml(target_vol)
-        self.goto_safe(microplate_official[target])
-        self.dispense_ml(target_vol)
+        for electrolyte in range(0,len(source_list)):
 
-        # remove pipette and cap and return vial
-        self.remove_pipette()
-        self.cap_and_return_vial_to_rack(source)
+            source = source_list[electrolyte]
+            wells_to_fill = wells_to_fill_list[electrolyte]
+            mL_per_well = mL_per_well_list[electrolyte]
 
-        #do whatever you want...
+            #move vial to the carousel and uncap it
+            self.move_carousel(0,0)
+            self.move_vial(rack_disp_official[source], vial_carousel)
+            self.uncap_vial_in_carousel()
+            self.get_pipette()
+            self.zero_scale()
+
+            # draw from the vial in the carousel and dispense it at the microplate
+            total_mL_used = mL_per_well * len(wells_to_fill)
+            mL_remaining = total_mL_used
+            for refill in range(0, math.ceil(total_mL_used)): # if we need to dispense more than 1 ml cumulatively, allow for refills
+                print(f"refill #{refill} of {math.ceil(total_mL_used)}")
+                dispense_events_this_refill = round(min(mL_remaining, 1)/mL_per_well) # total # of wells to dispense into this cycle. We round to avoid floating point errors
+                print(f"will dispense {dispense_events_this_refill} time(s)")
+
+                print("going from index:")
+                print((round(1/mL_per_well)*refill))
+                print((round(1/mL_per_well)*refill)+dispense_events_this_refill)
+
+                print(wells_to_fill[(round(1/mL_per_well)*refill):(round(1/mL_per_well)*refill)+dispense_events_this_refill])
+
+                self.goto_safe(carousel_aspirate)
+                self.aspirate_ml(3, min(1, mL_remaining))
+                print(f"Aspirated {min(1, mL_remaining)} ml, {mL_remaining} left")
+
+                
+
+                self.CE_fill_wells(wells_to_fill[(round(1/mL_per_well)*refill):(round(1/mL_per_well)*refill)+dispense_events_this_refill], mL_per_well)
+                mL_remaining -= mL_per_well*dispense_events_this_refill
+                print(mL_remaining)
+                #self.goto_safe(microplate_official[target])
+                #self.dispense_ml(target_vol)
+
+            # remove pipette and cap and return vial
+            self.remove_pipette()
+            self.cap_and_return_vial_to_rack(source)
+
+        self.transfer_board_to(1)
 
     def get_needle_height(self, pos):
         vol = self.disp_rack.sol_vols[pos]
