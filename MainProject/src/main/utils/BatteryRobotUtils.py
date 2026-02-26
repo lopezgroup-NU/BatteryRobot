@@ -12,10 +12,13 @@ from config import SourceRack, HeatRack, DispRack, PowderProtocol
 from utils.PStat.geis import *
 from utils.PStat.cv import *
 from utils.PStat.ocv import *
+from utils.mouseUtils import *
+from utils.PAGUtils import *
 from .PowderShakerUtils import PowderShaker
 from .T8Utils import T8
 from .ExceptionUtils import *
 from .MathUtils import get_time_stamp
+
 
 """
 Module for BatteryRobot operation
@@ -620,6 +623,9 @@ class BatteryRobot(NorthC9):
                 pass
             finally:
                 pass
+    
+    def mouse_around(self):
+        start_all_cells()
 
     def transfer_board_to(self, position):
         """
@@ -649,16 +655,19 @@ class BatteryRobot(NorthC9):
             self.goto(microplate_test, vel=1)
             self.delay(1)
             #once board is transfered, screw it in!
-            self.open_gripper()
+            self.open_gripper() 
+            self.goto_safe(push_microplate_approach)
+            self.goto(push_microplate, vel = 1)
             self.delay(1)
             self.screw_setup(0)#right side
             self.cap(revs=1.5,torque_thresh = 0)
-            self.screw_with_thresh_only(1300, 8)
+            self.screw_with_thresh_only(1300, 10)
             self.open_gripper()
             self.goto_safe(safe_zone)
             self.screw_setup(1)#left side
-            self.cap(revs=1.5,torque_thresh = 0)
-            self.screw_with_thresh_only(1300, 8)
+            self.cap(pitch = 1.5, revs=2,torque_thresh = 0)
+            self.screw_with_thresh_only(1300, 9)
+            self.open_gripper()
     
 
     def pump_n_times(self, carousel_position, n_pumps):
@@ -1112,6 +1121,8 @@ class BatteryRobot(NorthC9):
             self.cap_and_return_vial_to_rack(source)
 
         self.transfer_board_to(1)
+
+        start_all_cells()
 
     def get_needle_height(self, pos):
         vol = self.disp_rack.sol_vols[pos]

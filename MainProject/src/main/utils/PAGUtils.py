@@ -13,7 +13,7 @@ def is_app_running(app_name="LAND Battery Testing System - Monitor Software V7.4
     except:
         return False
 
-def ensure_app_visible(app_path=Path(r"C:\Users\llf1362\Desktop\LANDMon V7.lnk"),
+def ensure_app_visible(app_path=Path(r"c:\Users\llf1362\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\LAND\LANDMon V7.lnk"),
                      app_name="LAND Battery Testing System - Monitor Software V7.4",
                      timeout=15):
     """Simply ensures app is visible (launches if not running)"""
@@ -46,7 +46,7 @@ def run_battery_cycler():
     dragTo(1250, 570, 1)
     click(button="right")
     moveTo(1300, 550, 1)
-    click(button="left")
+    #click(button="left")
     
 if __name__ == "__main__":
     run_battery_cycler()
