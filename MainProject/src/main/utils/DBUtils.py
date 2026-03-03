@@ -182,12 +182,12 @@ class MongoConn:
     A class to manage a MongoDB connection using PyMongo.
     """
 
-    def __init__(self, uri="mongodb://localhost:27018/", db_name="test_db"):
+    def __init__(self, uri="mongodb://localhost:27018/", db_name="test_db_zee_mk0"):
         """
         Initialize the MongoDBConnection with a MongoDB URI and a default database name.
 
         :param uri: MongoDB connection URI (default: "mongodb://localhost:27018/")
-        :param db_name: Database name to use (default: "test_db")
+        :param db_name: Database name to use (default: "test_db_zee_mk0")
         """
         self.uri = uri
         self.db_name = db_name
@@ -224,7 +224,7 @@ class MongoQuery:
     Current collections - data (contains both eis and cv data)
     """
 
-    def __init__(self, uri="mongodb://localhost:27017/", db_name="test_db"):
+    def __init__(self, uri="mongodb://localhost:27017/", db_name="test_db_zee_mk0"):
         self.conn = MongoConn(uri=uri, db_name=db_name)
 
     def listify(self, a, order = 1):
@@ -245,6 +245,126 @@ class MongoQuery:
             return [a]
         else:
             return a
+        
+
+    def default_option(self, doc, value, defaultVal = "N/A"):
+            try:
+                return doc[value]
+            except:
+                return defaultVal
+            
+    def default_option_dict(self, dict, value, defaultVal = "N/A"):
+            try:
+                return dict[value]
+            except:
+                return defaultVal
+            
+    def change_name_to_new_format(self):
+        collection = self.conn.get_collection("data")
+        docs = list(collection.find({}))
+
+        for doc in docs:
+            comps = doc["test_constants"][0]["components"]
+            #format {"AC":0, "FSI": 0, "ClO4": 0, "SO4": 0, "NO3": 0, "TFSI": 0}
+            ac = self.default_option(comps, "AC", 0)
+            fsi = self.default_option(comps, "FSI", 0)
+            clo4 = self.default_option(comps, "ClO4", 0)
+            so4 = self.default_option(comps, "SO4", 0)
+            no3 = self.default_option(comps, "NO3", 0)
+            tfsi = self.default_option(comps, "TFSI", 0)
+            new_name = f"{ac}_{fsi}_{clo4}_{so4}_{no3}_{tfsi}"
+            collection.update_one(
+                        {"name": doc["name"]},
+                        {"$set": {"name": new_name}}, 
+                        upsert=True
+                    )
+            
+
+    def change_all_of_property(self, propertyToChange, initVal, newVal):
+        """
+        THIS FUNCTION IS DANGEROUS!
+        It will go through every single entry of the database, find the property you enter, and change ALL old values to the new value. 
+        This will erase data if you for example, change all "20"s of temp(C) to another already-existing value, as you won't be able to tell what changed to what afterwards.
+        For the sake of fixability in case of error, the program prints out all of the data that gets changed 
+        
+        :param propertyToChange: String with the name of the property being changed
+        :param initVal: value which gets changed
+        :param newVal: value being written
+        """
+        collection = self.conn.get_collection("data")
+        docs = list(collection.find({}))
+
+        for doc in docs:
+            try:
+                if doc[propertyToChange] == initVal:
+                    name = doc["name"]
+                    print(f"changed test {name} from {initVal} to {newVal}")
+                    collection.update_one(
+                        {"name": doc["name"]},
+                        {"$set": {"temp(C)": newVal}}, 
+                        upsert=True
+                    )
+            except KeyError:
+                print("threw key error")
+                pass
+    
+    
+
+    def convert_datapoints_to_trackable_format(self):
+        collection = self.conn.get_collection("data")
+        docs = list(collection.find({}))
+
+        for doc in docs:
+            print(doc["name"])
+            constant_values = {
+                "components" : doc["components"], #components 14
+                "precipitated_out" : doc["precipitated_out"],
+                "water_weight" : doc["water_weight"]
+            }
+            update_vals = {
+                    
+                        "cv_diff" : self.default_option(doc, "cv_diff"), #cv_diff 01
+                        "avg_cv_diff" : self.default_option(doc, "avg_cv_diff"), #avg_cv_diff 00
+                        "avg_highV" : self.default_option(doc, "avg_highV"), #avg_highV 02
+                        "highV" : self.default_option(doc, "highV"), #highV 03
+                        "avg_lowV" : self.default_option(doc, "avg_lowV"), #avg_lowV 04
+                        "lowV" : self.default_option(doc, "lowV"), #lowV 05
+
+                        "avg_cv_diff_rev" : self.default_option(doc, "avg_cv_diff_rev"), #avg_cv_diff_rev 06
+                        "cv_diff_rev" : self.default_option(doc, "cv_diff_rev"), #cv_diff_rev 07
+                        "avg_highV_rev" : self.default_option(doc, "avg_highV_rev"), #avg_highV_rev 08
+                        "highV_rev" : self.default_option(doc, "highV_rev"), #highV_rev 09
+                        "avg_lowV_rev" : self.default_option(doc, "avg_lowV_rev"), #avg_lowV_rev 10
+                        "lowV_rev" : self.default_option(doc, "lowV_rev"), #lowV_rev 11
+
+                        "ignore_first" : self.default_option(doc, "ignore_first"), #ignore_first 12
+                        "cv_date_uploaded" : self.default_option(doc, "cv_date_uploaded"), #cv_date_uploaded 13
+                        #"components" : self.default_option(doc["components"]), #components 14
+                        #"water_weight" : self.default_option(doc["water_weight"]), #water_weight 15
+                        #"precipitated_out" : self.default_option(doc["precipitated_out"]), #precipitated_out 16
+                        "temp(C)" : self.default_option(doc, "temp(C)"), #temp(C) 17
+                        "electrode_used" : "Pt", #electrode_used 18
+                        "paths" : self.default_option(doc, "paths"), #paths 19
+                        "valid_flag" : self.default_option(doc, "valid_flag"), #valid_flag 20
+                        "cv_error" : self.default_option(doc, "cv_error"), #cv_error 21
+                        "avg_conductivity" : self.default_option(doc, "avg_conductivity"),
+                        "conductivity" : self.default_option(doc, "conductivity"),
+                        "geis_date_uploaded" : self.default_option(doc, "geis_date_uploaded"),
+                        "geis_error" : self.default_option(doc, "geis_error")
+            }
+
+            
+            collection.replace_one(
+                {"name": doc["name"]},
+                {   "_id": doc["_id"],
+                    "name": doc["name"],
+                    "test_constants" : [constant_values],
+                    "tests" : [update_vals]}, 
+                upsert=True
+            )
+            print("successfully changed format")
+            
+
 
     def add_same_cv_data_once(self, cv_file_list, ignore_first=True, components = {"AC":0, "FSI": 0, "ClO4": 0, "SO4": 0, "NO3": 0, "TFSI": 0}):
         
@@ -273,6 +393,13 @@ class MongoQuery:
         file_names = [path.name for path in cv_file_list]
         file_named = file_names[0][:-4]
         salts, salt_and_conc, salt_to_conc_list = parse_files(file_names, type="cv")
+        salts = list(salts)
+        salt_and_conc = list(salt_and_conc)
+        salt_to_conc_list = list(salt_to_conc_list)
+        print(salts)
+        print(salt_and_conc)
+        print(salt_to_conc_list)
+
         salt, conc, test_num = salt_and_conc[0]
         
         for i, path in enumerate(cv_file_list):
@@ -363,6 +490,7 @@ class MongoQuery:
         water_weight = get_water_weight_from_components(components_dict)
         valid_flag = True
         if len(all_cv_diff) != 0:
+            print("setting update vals")
             update_vals = [
                         avg_cv_diff, #avg_cv_diff 0
                         all_cv_diff, #cv_diff 1
@@ -424,12 +552,13 @@ class MongoQuery:
                 {"$set": {"cv_error": all_cv_diff[2] - all_cv_diff[1],
                             "components": components_dict}}, 
                 upsert=True
-            )
+                )
 
         #SECOND: we go through all of the entries, check to find an exact match of components, then convert each element of the data to a list. 
 
         for entry in docs:
             if entry["components"] == components:
+                print("found a match!")
                 collection.update_one(
 
                     {"name": entry["name"]},
@@ -459,7 +588,7 @@ class MongoQuery:
                         # "alpha_c": all_alpha_c,
                         "ignore_first": [*self.listify(entry["ignore_first"]), update_vals[12]],
                         "cv_date_uploaded": [*self.listify(entry["cv_date_uploaded"]), update_vals[13]],
-                        #"components": [*self.listify(entry["components"], 2), update_vals[14]],         # components should be identical; if not, uncomment this
+                        "components": [*self.listify(entry["components"], 2), update_vals[14]],         # components should be identical; if not, uncomment this
                         "water_weight": [*self.listify(entry["water_weight"]), update_vals[15]],
                         "precipitated_out": [*self.listify(entry["precipitated_out"]), update_vals[16]],
                         "temp(C)": [*self.listify(entry["temp(C)"]), update_vals[17]],

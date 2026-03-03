@@ -627,6 +627,11 @@ class BatteryRobot(NorthC9):
     def mouse_around(self):
         start_all_cells()
 
+    def mouse_cells(self, cells):
+        start_wells(cells)
+    def open_landt(self):
+        guarantee_app_start()
+        
     def transfer_board_to(self, position):
         """
         Docstring for transfer_board_to
