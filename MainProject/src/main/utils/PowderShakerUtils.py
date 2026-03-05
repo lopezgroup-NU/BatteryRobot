@@ -151,7 +151,7 @@ manganese_oxide = PowderProtocol(tol = 0.2,
                                 ),
                             slow_settings = PowderSettings(
                                 thresh = 2,
-                                opening_deg = 30,
+                                opening_deg = 60,
                                 percent_target = 0.25,
                                 max_growth = 1.1,
                                 shut_valve = True
@@ -205,11 +205,11 @@ class PowderShaker(NorthC9):
         #this home_OL_stepper command does a "buzz" action which may be helpful to emulate for future advances in powder dispensation. Check north_c9.py
         #self.home_OL_stepper(0, 300)
 
-    def set_opening(self, deg):
+    def set_opening(self, deg, axis = 0):
         """
         Opens the powder dispenser chute by deg degrees. When powder clumps, it may not dispense even with the chute open
         """
-        self.move_axis(0, deg*(1000/360.0), accel=5000)
+        self.move_axis(axis, deg*(1000/360.0), vel=100000, accel=500000)
 
     def shake(self, t, f=120, a=100, wait=True):
         """
@@ -221,7 +221,7 @@ class PowderShaker(NorthC9):
 
         return self.amc_pwm(int(f), int(t), int(a), wait=wait)
     
-    def shake_mk2(self, t=50, f=100, a=40, wait=True):
+    def shake_mk2(self, t=100, f=100, a=40, wait=True):
         #TODO The timing on this shake will be off quite a bit because it doesn't account for time spent opening and closing the chute. Investigating this may lead to more accurate dispensing
         """A manual shake"""
         #t in ms
@@ -237,10 +237,10 @@ class PowderShaker(NorthC9):
             #opens and closes at max speed.
             self.set_opening((a/2))
             #self.move_axis(0, (a/2)*(1000/360.0), vel=100, accel=1000)
-            time.sleep(t_between_toggles)
+            ##time.sleep(t_between_toggles)
             self.set_opening(0)
             #self.move_axis(0, 0, vel=100, accel=1000)
-            time.sleep(t_between_toggles)
+            ##time.sleep(t_between_toggles)
 
         #return self.amc_pwm(int(f), int(t), int(a), wait=wait)
     
@@ -256,13 +256,13 @@ class PowderShaker(NorthC9):
             protocol = manganese_oxide 
         else:
             protocol = eval(protocol)
-        ps = protocol.fast_settings
+        ps = protocol.slow_settings
             
         #intialize
 
         prev_mass = 0
         delta_mass = 0
-        shake_t = ps.min_shake_t
+        
         
         if zero_scale:
             robot.zero_scale()
@@ -272,6 +272,14 @@ class PowderShaker(NorthC9):
         count = 0
         while mg_togo > protocol.tol:  #TODO should have a max count condition? other timeout?
             count += 1                
+            
+            if mg_togo <= protocol.slow_settings.thresh:
+                ps = protocol.slow_settings
+            elif mg_togo <= protocol.med_settings.thresh:
+                ps = protocol.med_settings
+            elif mg_togo <= protocol.fast_settings.thresh:
+                ps = protocol.fast_settings
+            shake_t = ps.min_shake_t
             #TODO: rewrite below:
             #if write_file:
                 #file.record(shake_t, delta_mass, iter_target, mg_togo)
@@ -293,12 +301,7 @@ class PowderShaker(NorthC9):
             delta_mass = meas_mass - prev_mass
             prev_mass = meas_mass
             
-            if mg_togo <= protocol.slow_settings.thresh:
-                ps = protocol.slow_settings
-            elif mg_togo <= protocol.med_settings.thresh:
-                ps = protocol.med_settings
-            elif mg_togo <= protocol.fast_settings.thresh:
-                ps = protocol.fast_settings
+            
 
             #TODO Ultra slow settings don't yet exist. Add them? Maybe uses the amc_pwm command if that shakes it
             """

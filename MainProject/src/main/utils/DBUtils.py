@@ -278,7 +278,16 @@ class MongoQuery:
                         {"$set": {"name": new_name}}, 
                         upsert=True
                     )
-            
+    
+    def get_namestring_from_components(self, components):
+        ac = self.default_option(components, "AC", 0)
+        fsi = self.default_option(components, "FSI", 0)
+        clo4 = self.default_option(components, "ClO4", 0)
+        so4 = self.default_option(components, "SO4", 0)
+        no3 = self.default_option(components, "NO3", 0)
+        tfsi = self.default_option(components, "TFSI", 0)
+        new_name = f"{ac}_{fsi}_{clo4}_{so4}_{no3}_{tfsi}"
+        return new_name
 
     def change_all_of_property(self, propertyToChange, initVal, newVal):
         """
@@ -543,6 +552,9 @@ class MongoQuery:
             paths
             valid_flag
             """
+
+            """
+
             if len(all_cv_diff) == 3:
                 update_vals[21] = all_cv_diff[2] - all_cv_diff[1] #cv_error
                 
@@ -553,11 +565,59 @@ class MongoQuery:
                             "components": components_dict}}, 
                 upsert=True
                 )
+            """
+
+        constant_vals = {
+                "components" : components, #components 14
+                "precipitated_out" : False,
+                "water_weight" : water_weight
+            }
+        test_vals = { #TODO FINISH ADDING ALL OF THE PROPER VALUES FOR THINGS HERE
+                
+                "avg_cv_diff" : avg_cv_diff, #avg_cv_diff 00
+                "cv_diff" : all_cv_diff, #cv_diff 01
+                "avg_highV" : avg_cv_high_rev, #avg_highV 02
+                "highV" : self.default_option(doc, "highV"), #highV 03
+                "avg_lowV" : self.default_option(doc, "avg_lowV"), #avg_lowV 04
+                "lowV" : self.default_option(doc, "lowV"), #lowV 05
+
+                "avg_cv_diff_rev" : self.default_option(doc, "avg_cv_diff_rev"), #avg_cv_diff_rev 06
+                "cv_diff_rev" : self.default_option(doc, "cv_diff_rev"), #cv_diff_rev 07
+                "avg_highV_rev" : self.default_option(doc, "avg_highV_rev"), #avg_highV_rev 08
+                "highV_rev" : self.default_option(doc, "highV_rev"), #highV_rev 09
+                "avg_lowV_rev" : self.default_option(doc, "avg_lowV_rev"), #avg_lowV_rev 10
+                "lowV_rev" : self.default_option(doc, "lowV_rev"), #lowV_rev 11
+
+                "ignore_first" : self.default_option(doc, "ignore_first"), #ignore_first 12
+                "cv_date_uploaded" : self.default_option(doc, "cv_date_uploaded"), #cv_date_uploaded 13
+                #"components" : self.default_option(doc["components"]), #components 14
+                #"water_weight" : self.default_option(doc["water_weight"]), #water_weight 15
+                #"precipitated_out" : self.default_option(doc["precipitated_out"]), #precipitated_out 16
+                "temp(C)" : self.default_option(doc, "temp(C)"), #temp(C) 17
+                "electrode_used" : "Pt", #electrode_used 18
+                "paths" : self.default_option(doc, "paths"), #paths 19
+                "valid_flag" : self.default_option(doc, "valid_flag"), #valid_flag 20
+                "cv_error" : self.default_option(doc, "cv_error"), #cv_error 21
+                "avg_conductivity" : self.default_option(doc, "avg_conductivity"),
+                "conductivity" : self.default_option(doc, "conductivity"),
+                "geis_date_uploaded" : self.default_option(doc, "geis_date_uploaded"),
+                "geis_error" : self.default_option(doc, "geis_error")
+            }
 
         #SECOND: we go through all of the entries, check to find an exact match of components, then convert each element of the data to a list. 
 
+        for doc in docs:
+            if doc["name"] == self.get_namestring_from_components(components):
+                collection.update_one(
+                    {"name": doc["name"]}, 
+                    {"$push": {
+                        "test_constants": constant_vals,
+                        "tests": test_vals
+                    }}
+                )
+
         for entry in docs:
-            if entry["components"] == components:
+            if entry["test_constants"][0]["components"] == components:
                 print("found a match!")
                 collection.update_one(
 
