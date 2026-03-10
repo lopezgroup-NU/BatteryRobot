@@ -370,7 +370,7 @@ class BatteryRobot(NorthC9):
                         self.set_output(8, True)
                         ocv = RunOCV_lastV()
                         print("running cv test")
-                        run_cv2(output_file_name=output_file_name + f"_cv{j}",
+                        run_cv_output(output_file_name=output_file_name + f"_cv{j}",
                                 values=[[ocv, point1, point2, 0],
                                         [rate, rate, rate],
                                         [0.05, 0.05, 0.05],
@@ -416,7 +416,7 @@ class BatteryRobot(NorthC9):
                 elif CV:
                     if len(test.CV_CONDITIONS.split()) != 3:
                         raise ContinuableRuntimeError("CV_CONDITIONS must have 3 parameters!")
-                    # pass point1, pooint2, rate to run_cv2 
+                    # pass point1, pooint2, rate to run_cv_output 
                     point1, point2, rate = [float(i) for i in test.CV_Conditions.split()]
 
                     self.set_output(6, True)
@@ -428,7 +428,7 @@ class BatteryRobot(NorthC9):
                         self.draw_to_sensor(target_idx, second_sensor=True)
                         granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {get_time_stamp()}")
                         ocv = RunOCV_lastV()
-                        run_cv2(output_file_name=output_file_name + f"_cv{i}",
+                        run_cv_output(output_file_name=output_file_name + f"_cv{i}",
                                 values=[[ocv, point1, point2, 0],
                                         [rate, rate, rate],
                                         [0.05, 0.05, 0.05],
@@ -458,6 +458,9 @@ class BatteryRobot(NorthC9):
         log_file.write("*" * 50 + "\n")
         log_file.close()
 
+    def cell_test_24(self, cells):
+        pass
+
     def dispense_powder_and_scale(self, protocol, dest_id, mass, container_index=0, collect=False, ret=True):
         """
         dispense powder into specified vial (dest_id)
@@ -471,7 +474,7 @@ class BatteryRobot(NorthC9):
         #    self.goto_safe(vial_carousel)
         self.move_carousel(0,0)
         #self.uncap_vial_in_carousel()
-        self.move_carousel(68, 74) # carousel moves 68 degrees, 77 mm down
+        self.move_carousel(68, 78) # carousel moves 68 degrees, 78 mm down
 
         start = time.time()
         p2 = PowderShaker('C', network=self.network)
@@ -500,6 +503,9 @@ class BatteryRobot(NorthC9):
         data["Real"] = dispensed
         data["Time Taken(s)"] = t_taken
         return data
+
+    def ink_prep(self):
+        pass
 
     def run_demo_nov11(self):
         """
@@ -592,7 +598,6 @@ class BatteryRobot(NorthC9):
             print("Not all conditions are fulfilled. Please check that all of the vials are in the right place, then type '1' for each of the conditions")
         pass
 
-
     def screw_setup(self, screw=0):
             if screw == 0:
                 self.goto_safe(microplate_screwgrab_r)
@@ -629,9 +634,10 @@ class BatteryRobot(NorthC9):
 
     def mouse_cells(self, cells):
         start_wells(cells)
+    
     def open_landt(self):
         guarantee_app_start()
-        
+
     def transfer_board_to(self, position):
         """
         Docstring for transfer_board_to
@@ -1155,7 +1161,7 @@ class BatteryRobot(NorthC9):
         self.goto_safe(active_cartridge)
         self.close_gripper()
         self.delay(1)
-        self.goto_safe(cartridge_holder)
+        self.goto_safe(powder_4)
         self.open_gripper()
 
         if new.name not in self.cartridge_pos:
@@ -1177,7 +1183,7 @@ class BatteryRobot(NorthC9):
         self.cartridge_pos[self.cartridge_on_carousel.name] = new_pos
         self.cartridge_on_carousel = new
 
-        self.goto_safe(cartridge_holder)
+        self.goto_safe(powder_4)
         self.close_gripper()
         self.delay(1)
         if new_pos == 1:
@@ -1189,6 +1195,8 @@ class BatteryRobot(NorthC9):
         self.open_gripper()
         self.goto_safe(safe_zone)
         self.move_carousel(0, 0)
+
+    
 
     def get_pip_height(self, vial):
         """

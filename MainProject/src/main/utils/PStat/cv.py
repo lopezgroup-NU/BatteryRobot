@@ -99,7 +99,7 @@ class CV(Experiment):
         SignalPoints5 = int((self.holdtimes[2] / self.sample_time) + 0.5)  # Hold 3 
         return round(SignalPoints0 + SignalPoints1 + SignalPoints2 + SignalPoints3 + SignalPoints4 + SignalPoints5)
     
-    def run_cv(self, pstat, max_size = 100000):
+    def run_cv_test(self, pstat, max_size = 100000):
         """Runs the triangle wave experiment. A Cyclic voltammagram if in pstatmode, otherwise a galvanodynamic triangle wave
         
         Parameters
@@ -197,9 +197,7 @@ def find_peaks_and_zero_crossings(data):
     return positive_peak_index, zero_cross_index, negative_peak_index
 
 
-def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], electrode_used = "Pt", save_to_db_folder = True, standard = False):
-    
-    
+def run_cv_output(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], electrode_used = "Pt", save_to_db_folder = True, standard = False):
     
     tkp.toolkitpy_init("open_circuit_voltage.py")
     pstat = tkp.Pstat("PSTAT")
@@ -244,6 +242,62 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
 
     if save_to_db_folder and not standard:
         return db_path
+
+
+def run_cv_cell(output_file_name, pstat_index = 0, cell = 0, values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], electrode_used = "Pt", save_to_db_folder = True, standard = False):
+    
+    
+    tkp.toolkitpy_init("open_circuit_voltage.py")
+    pstat_list = tkp.enum_sections()
+    pstat = tkp.Pstat(pstat_list[pstat_index])
+
+    mux = tkp.IMX("mux1")
+    mux.open()
+
+    mux.set_cell(cell)
+
+    cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
+    data = cv.run_cv(pstat, max_size = 100000)
+    #TODO  
+    #add the new columns to the actual CSV file
+
+    if standard:
+        out_path = "res/standard/cv/" + output_file_name+ ".csv"
+    else:
+        out_path = "res/cv/" + output_file_name + ".csv"
+    np.savetxt(out_path, data, delimiter = ',', header = 'Point,time,Vf,Vu,Im,Ach,vsig,temp,Cycle,ie_range,overload,stop_test', fmt = '%s') 
+    print("getting temp")
+    temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
+    temperature = temper.get_temperature()[1]
+    
+    df = pd.read_csv(out_path, index_col='# Point')
+    df['temp(C)'] = temperature
+    df.to_csv(out_path)
+
+    if save_to_db_folder and not standard:
+        #C:\AttomRobotFiles\Data\DB_Missaka\eis
+        db_path = Path(r"C:\AttomRobotFiles\Data\DB_Missaka\cv") / f"{output_file_name}.csv"
+        df.to_csv(db_path)   
+
+    if standard:
+        s_df_file = "res/standard/std_cv_test_summaries.csv"
+    else:
+        s_df_file = "res/cv_test_summaries.csv"
+
+    s_df = pd.read_csv(s_df_file)
+
+    s = time.localtime(time.time())
+    curr_time = time.strftime("%Y-%m-%d %H:%M:%S", s)
+
+    vf_diff,vf_max,vf_min  = cv_interpret(out_path)
+    # overP, i0, alpha_c = kinetic_fit(out_path)
+    new_row = pd.DataFrame([[output_file_name, vf_max, vf_min, vf_diff, None, None, None, temperature, curr_time]], columns=['test name', 'vf_max', 'vf_min', 'vf_diff',  "overP", "i0", "alpha_c", 'temp', 'time'])
+    s_df = pd.concat([s_df, new_row], ignore_index=True)
+    s_df.to_csv(s_df_file, index=False)
+
+    if save_to_db_folder and not standard:
+        return db_path
+
 
 def cv_interpret(filename):
     df_file = filename
