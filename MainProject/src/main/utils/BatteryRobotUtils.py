@@ -458,7 +458,28 @@ class BatteryRobot(NorthC9):
         log_file.write("*" * 50 + "\n")
         log_file.close()
 
-    def cell_test_24(self, cells):
+    def cell_test_cp(self, cells, channels, set_voltages):
+        """
+        Docstring for cell_test_24
+        
+        :param self: Description
+        :param cells: takes in a list with the indices of cells to run tests on
+        """
+        channel = channels[0]
+        volts = set_voltages[0]
+        tkp.toolkitpy_init("open_circuit_voltage.py")
+        
+        mux = tkp.IMX("mux1")
+        mux.open()
+        mux.set_off_mode(channel, volts)
+
+        for cell in range(0,len(cells)):
+            index = cells[cell]
+            run_cv_cell("test", 0, channel)
+            mux.setDAC(channel, 1)
+
+            
+
         pass
 
     def dispense_powder_and_scale(self, protocol, dest_id, mass, container_index=0, collect=False, ret=True):
