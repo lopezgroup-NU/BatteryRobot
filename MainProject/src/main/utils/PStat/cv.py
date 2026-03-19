@@ -202,7 +202,7 @@ def run_cv_output(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.
     tkp.toolkitpy_init("open_circuit_voltage.py")
     pstat = tkp.Pstat("PSTAT")
     cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
-    data = cv.run_cv(pstat, max_size = 100000)
+    data = cv.run_cv_test(pstat, max_size = 100000)
     #TODO  
     #add the new columns to the actual CSV file
 
@@ -257,7 +257,7 @@ def run_cv_cell(output_file_name, pstat_index = 0, cell = 0, values = [[0, 2, -2
     mux.set_cell(cell)
 
     cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
-    data = cv.run_cv(pstat, max_size = 100000)
+    data = cv.run_cv_test(pstat, max_size = 100000)
     #TODO  
     #add the new columns to the actual CSV file
 

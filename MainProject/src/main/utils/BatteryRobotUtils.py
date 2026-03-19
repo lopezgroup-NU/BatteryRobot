@@ -344,7 +344,7 @@ class BatteryRobot(NorthC9):
                     geis_files = []
                     cv_files = []
                     # run test three times
-                    for j in range(3): #TODO MAKE range(3) AGAIN ONCE DONE TESTING
+                    for j in range(3):
                         
                         self.move_vial(rack_disp_official[target_idx], vial_carousel)
                         granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {get_time_stamp()}")
@@ -458,6 +458,85 @@ class BatteryRobot(NorthC9):
         log_file.write("*" * 50 + "\n")
         log_file.close()
 
+    def pstat_multi_test(self):
+        tkp.toolkitpy_init("open_circuit_voltage.py")
+        pstat_list_names = tkp.enum_sections()
+        print(pstat_list_names)
+        pstat_iter = 0
+        while pstat_iter < len(pstat_list_names):
+            print(pstat_list_names[pstat_iter][0:3])
+            if pstat_list_names[pstat_iter][0:3] == 'IMX':
+                pstat_list_names.pop(pstat_iter)
+                pstat_iter = 0
+            pstat_iter+=1
+        print(pstat_list_names)
+
+        pstat_list = []
+        ps1 = tkp.Pstat()
+        ps1.set_ctrl_mode(tkp.PSTATMODE)#for some reason unable to connect to pstats?
+        print(ps1.label())
+        for i in range(0,len(pstat_list_names)):
+            pstat_list[i] = tkp.Pstat(pstat_list_names[i])
+            print(pstat_list_names[i])
+
+        values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1]
+        cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
+        data = cv.run_cv(pstat_list[0], max_size = 10)
+        print(data)
+
+
+        """
+        df = pd.read_csv(run_file)
+        run_standard = standard is not None
+        if run_standard:
+            # perform checks on disp rack and ensure vial has been added. 
+            name = standard.get("name", "standard")
+            try:
+                pos = standard.get("pos")
+            except:
+                raise Exception("Need to provide a pos for standard!")
+            
+            tup = self.disp_rack.get_vial_by_pos(pos)
+            if tup is None:
+                raise Exception("Add standard vial to disp_rack.csv first!")
+
+            if tup[0] != name:
+                raise Exception(f"Make sure vial name at {pos} on disp_rack.csv is the same \
+                                as what you provide to run_test()")
+            
+            #  add row before and after run file
+            
+            name = name + "_" + formatted_date
+            row = [name, pos, standard.get("electrode_used"),True, "250000 1 0.00001", True, "2 -2 0.020", False, False]
+            new_row = pd.DataFrame([row], columns=df.columns)
+            df = pd.concat([new_row, df, new_row], ignore_index=True)
+
+
+
+        # pass point1, pooint2, rate to run_cv_output 
+        point1, point2, rate = [float(i) for i in test.CV_Conditions.split()]
+
+        self.set_output(6, True)
+        self.set_output(7, True)
+        self.set_output(8, True)
+        for j in range(3):
+            self.move_vial(rack_disp_official[target_idx], vial_carousel)
+            self.draw_to_sensor(target_idx, second_sensor=True)
+            ocv = RunOCV_lastV()
+            run_cv_output(output_file_name=output_file_name + f"_cv{i}",
+                    values=[[ocv, point1, point2, 0],
+                            [rate, rate, rate],
+                            [0.05, 0.05, 0.05],
+                            1,
+                            0.1],
+                    electrode_used = electrode_used,
+                    save_to_db_folder = save_to_db,
+                    standard=row_is_standard)
+        self.set_output(6, False)
+        self.set_output(7, False)
+        self.set_output(8, False)
+        """
+
     def cell_test_cp(self, cells, channels, set_voltages):
         """
         Docstring for cell_test_24
@@ -472,11 +551,21 @@ class BatteryRobot(NorthC9):
         mux = tkp.IMX("mux1")
         mux.open()
         mux.set_off_mode(channel, volts)
-
-        for cell in range(0,len(cells)):
+        #mux.close()
+        mux.setDAC(channel, 1)
+        run_cv_cell("test_cv", 0, channel)
+        run_geis_cell("test_geis", 0, channel)
+        cells_tested = []
+        for cell in range(1,len(cells)):
             index = cells[cell]
-            run_cv_cell("test", 0, channel)
-            mux.setDAC(channel, 1)
+            cells_tested.append(index)
+            for c in range(0,len(cells_tested)):
+                pass
+
+
+            
+            
+
 
             
 
