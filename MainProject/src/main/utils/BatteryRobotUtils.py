@@ -4,13 +4,17 @@ import yaml
 import datetime
 import pandas as pd
 import tkinter as tk
+import threading
 from GUI import *
 from north import NorthC9
 from molmass import Formula
 from Locator import *
 from config import SourceRack, HeatRack, DispRack, PowderProtocol
+
 from utils.PStat.geis import *
 from utils.PStat.cv import *
+from utils.PStat.cp import *
+
 from utils.PStat.ocv import *
 from utils.mouseUtils import *
 from utils.PAGUtils import *
@@ -458,31 +462,145 @@ class BatteryRobot(NorthC9):
         log_file.write("*" * 50 + "\n")
         log_file.close()
 
-    def pstat_multi_test(self):
-        tkp.toolkitpy_init("open_circuit_voltage.py")
+    def dispense_into_well(self, reservoir_id, well, mL_to_fill):
+        self.open_gripper()
+        self.reset_pump()
+
+
+        #source = disp_rack_id
+        #wells_to_fill = well
+        mL_remaining = mL_to_fill
+
+        #move vial to the carousel, uncap it, and get pipette
+        self.get_pipette()
+        self.zero_scale()
+
+        while mL_remaining > 0:
+        # draw from the vial in the carousel and dispense it at the microplate
+            self.goto_safe(carousel_aspirate)
+            mL_to_dispense_this_cycle = min(1, mL_remaining)
+            self.aspirate_ml(3, mL_to_dispense_this_cycle)
+            mL_remaining -= mL_to_dispense_this_cycle
+
+            #TODO Enter code in here to go to the "well" position in ciara's microplate thing
+            
+            self.dispense_ml(3, mL_to_dispense_this_cycle)
+            
+            #TODO Enter code in here to leave the microplate. maybe a goto_safe(safe_zone)
+
+    def put_vial_back_from_carousel(self, original_position):
+
+        # remove pipette and cap and return vial
+        self.remove_pipette()
+        self.cap_and_return_vial_to_rack(original_position)
+
+    def run_cell_tests(self, cell_triplet_seeds, source, mL_to_dispense, cp_amps):
+        """
+        Docstring for run_cell_tests
+        
+        :param self: Description
+        :param cell_triplet_seeds: list of well indices; each index acts as a seed to generate a triplet so that a list like [0,1,2] would create a larger
+         list with the form [[0,8,16],[1,9,17],[2,10,18]]
+        :param source: reservoir index which can be drawn from
+        :param mL_to_dispense: mL to dispense into each cell
+        """
+
+        cell_triplets = []
+
+        for seed in cell_triplet_seeds:
+            cell_triplets.append([seed, seed+8, seed+16])
+
+        past_cell_triplets = []
+        for triplet_index in range(source,len(cell_triplets)): #for each triplet
+            for subindex in [0,1,2]: # for the first (dispensing) action with the triplets, begin running test 1 (geis) immediately
+                self.dispense_into_well(source, cell_triplets[triplet_index][subindex], mL_to_dispense)
+                
+                eval(f"t{subindex}") = threading.Thread(target=run_geis_cell, args=(cell_triplets[triplet_index][subindex]))
+                eval(f"t{subindex}.start()")
+            #join the threads started in the eval statements above
+            t0.join()
+            t1.join()
+            t2.join()
+
+            #run cv
+            t0 = threading.Thread(target=run_cv_cell, args=(cell_triplets[triplet_index][0]))
+            t0.start()
+            t1 = threading.Thread(target=run_cv_cell, args=(cell_triplets[triplet_index][1]))
+            t1.start()
+            t2 = threading.Thread(target=run_cv_cell, args=(cell_triplets[triplet_index][2])) #run_cp_cell(cell=cell, 10 minutes) #TODO uncomment once CP is done
+            t2.start()
+
+            t0.join()
+            t1.join()
+            t2.join()
+            
+            #run cp, but the function doesn't exist yet
+            
+            t0 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][0], cp_amps, 600))
+            t0.start()
+
+            t1 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][1], cp_amps, 600))
+            t1.start()
+
+            t2 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][2], cp_amps, 600)) #run_cp_cell(cell=cell, 10 minutes) #TODO uncomment once CP is done
+            t2.start()
+
+            t0.join()
+            t1.join()
+            t2.join()
+            
+            
+            for past_cell_triplet in past_cell_triplets:
+                
+                t1 = threading.Thread(target=run_cp_cell, args=(source_triplets[triplet_index][0], cp_amps, 60))
+                t1.start()
+
+                t2 = threading.Thread(target=run_cp_cell, args=(source_triplets[triplet_index][1], cp_amps, 60))
+                t2.start()
+
+                t3 = threading.Thread(target=run_cp_cell, args=(source_triplets[triplet_index][2], cp_amps, 60)) #run_cp_cell(cell=cell, 10 minutes) #TODO uncomment once CP is done
+                t3.start()
+
+                t1.join()
+                t2.join()
+                t3.join()
+                 
+                pass
+                
+
+            past_cell_triplets.append(cell_triplets[triplet_index])
+
+
+
+    def pstat_mux_test(self):
+        tkp.toolkitpy_init('chrono.py')
         pstat_list_names = tkp.enum_sections()
         print(pstat_list_names)
         pstat_iter = 0
         while pstat_iter < len(pstat_list_names):
             print(pstat_list_names[pstat_iter][0:3])
-            if pstat_list_names[pstat_iter][0:3] == 'IMX':
+            if pstat_list_names[pstat_iter][0:3] == 'IFC':
                 pstat_list_names.pop(pstat_iter)
                 pstat_iter = 0
             pstat_iter+=1
         print(pstat_list_names)
 
+
+        """
         pstat_list = []
-        ps1 = tkp.Pstat()
+        ps1 = tkp.Pstat("PSTAT")
         ps1.set_ctrl_mode(tkp.PSTATMODE)#for some reason unable to connect to pstats?
         print(ps1.label())
         for i in range(0,len(pstat_list_names)):
             pstat_list[i] = tkp.Pstat(pstat_list_names[i])
             print(pstat_list_names[i])
-
-        values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1]
-        cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
-        data = cv.run_cv(pstat_list[0], max_size = 10)
-        print(data)
+        """
+        #values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1]
+        #cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
+        data = run_cv_cell("dummycelltest1", pstat_index=1)
+        data2 = run_geis_cell("dummygeistest1", pstat_index=1)
+        #print(data)
+        print(data2)
 
 
         """
@@ -1189,11 +1307,12 @@ class BatteryRobot(NorthC9):
 
         (G_insert_CE_Stuff_here)
 
-        source - position of source vial on disp_rack
+        source_list - list of sources for each position of source vial on disp_rack
         wells_to_fill - list containing IDs of target wells on microplate
         mL_per_well
         """
-
+        #TODO I believe that currently this will return the vial to the dispense rack after every dispensing action; 
+        # that should not happen if we want to dispense the same vial into many wells.
         #print(wells_to_fill)
         self.open_gripper()
         self.reset_pump()

@@ -198,15 +198,36 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}, save_t
     return zcurve
 
 
-def run_geis_cell(output_file_name = "galvanostatic_eis", pstat_index = 0, cell = 0, parameter_list = {}, save_to_db_folder = True, standard = False):
+def run_geis_cell(cell, output_file_name = "galvanostatic_eis",  parameter_list = {}, path_to_save_to = r"C:\AttomRobotFiles\Data\DB_Missaka\eis", save_to_db_folder = True, standard = False):
     tkp.toolkitpy_init("galvanostatic_eis.py")
 
-    pstat_list = tkp.enum_sections()
-    mux = tkp.IMX("mux1")
-    mux.open()
-    mux.set_cell(cell)
 
-    pstat = tkp.Pstat(pstat_list[pstat_index])
+    device_list = tkp.enum_sections()
+
+    #pstat_list_names = tkp.enum_sections()
+    #print(pstat_list_names)
+   
+    imx_list = []
+    pstat_list = []
+
+    for device_name in device_list:
+        tag = device_name[0:3]
+        if tag == 'IMX':
+            imx_list.append(device_name)
+        elif tag == 'IFC':
+            pstat_list.append(device_name)
+        else:
+            print(f"!!!!! Found a non-IMX or IFC type device. It is called: {device_name}")
+
+    #TODO update so that only a cell number goes in, and the pstat index and imx index are calculated from that
+
+    mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+    pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+
+    mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
+    mux.open()
+
+    mux.set_cell(cell-mux_pstat_index*8)
     #Parameters
     #------------------------------------------------------------------
     initial_freq = parameter_list.get("initial_freq", 250000)
@@ -314,7 +335,7 @@ def run_geis_cell(output_file_name = "galvanostatic_eis", pstat_index = 0, cell 
     df.to_csv(out_path)
     #"C:\AttomRobotFiles\Data\DB_Missaka\eis"
     if save_to_db_folder and not standard:
-        db_path = Path(r"C:\AttomRobotFiles\Data\DB_Missaka\eis") / f"{output_file_name}.csv"
+        db_path = Path(path_to_save_to) / f"{output_file_name}.csv"
         df.to_csv(db_path) 
 
     # extract minima

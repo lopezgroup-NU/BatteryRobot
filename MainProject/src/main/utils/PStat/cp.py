@@ -11,38 +11,38 @@ from pathlib import Path
 
 #Statement of work
 #A modular rerunnable experiment according to given parameters. The resulting 
-class CV(Experiment): 
-    def __init__(self, voltage_list : list, scanrates : list, holdtimes : list, maxcycles : int,sample_period : float, PSTATMODE : tkp.CTRLMODE, **kwargs):
+class CP(Experiment): 
+    def __init__(self, amperage_list : list, scanrates : list, holdtimes : list, maxcycles : int,sample_period : float, PSTATMODE : tkp.CTRLMODE, **kwargs):
         """This class creates a Cylic voltammatry experiment
 
         Parameters
         ------------
 
-        voltage_list : list(float)
-             List of voltages to be used in the CV [Vinit,V1,V2,Vfinal]
+        amperage_list : list(float)
+             List of voltages to be used in the CP [Vinit,V1,V2,Vfinal]
 
         scanrates : list(float)
-            List of scan rates to be used in the CV [Vinit -> V1,V1 -> V2,V2 -> Vfinal]
+            List of scan rates to be used in the CP [Vinit -> V1,V1 -> V2,V2 -> Vfinal]
 
         holdtimes : list(float) 
-            List of hold times to be used in the CV [Apex1, Apex2, Final]
+            List of hold times to be used in the CP [Apex1, Apex2, Final]
 
         Sample Period : float 
             Time between data-acquisition steps in seconds
 
         Max Cycle(int): 
-            Number of cycles for the CV
+            Number of cycles for the CP
 
         CtrlMode(Enumeration:CTRLMODE):
              Potentiostat control mode. GSTATMODE or PSTATMODE
         
         **kwargs 
-            As of right now Kwargs are the stop at conditions for each curve. The compatible stop ats for CV experiments are:
+            As of right now Kwargs are the stop at conditions for each curve. The compatible stop ats for CP experiments are:
                 "vmax"
                 "vmin"
             """
 
-        self.voltage_list = voltage_list
+        self.amperage_list = amperage_list
         self.scanrates = scanrates
         self.holdtimes = holdtimes
         self.sample_time = sample_period
@@ -90,16 +90,16 @@ class CV(Experiment):
         return self.estimated_point_count() * self.sample_time        
 
     def estimated_point_count(self):
-        """This function returns the total number of data points for the CV"""
-        SignalPoints0 = int(abs(self.voltage_list[1] - self.voltage_list[0])/(self.sample_time * self.scanrates[0]) + .5)
+        """This function returns the total number of data points for the CP"""
+        SignalPoints0 = int(abs(self.amperage_list[1] - self.amperage_list[0])/(self.sample_time * self.scanrates[0]) + .5)
         SignalPoints1 = int((self.holdtimes[0]/(self.sample_time) ) +0.5)
-        SignalPoints2 = int(abs(self.voltage_list[2] - self.voltage_list[1])/(self.sample_time * self.scanrates[0]) + .5)
+        SignalPoints2 = int(abs(self.amperage_list[2] - self.amperage_list[1])/(self.sample_time * self.scanrates[0]) + .5)
         SignalPoints3 = int(abs(self.holdtimes[1] / self.sample_time) + 0.5)  # Hold 2
-        SignalPoints4 = int(abs((self.voltage_list[3] - self.voltage_list[2]) / (self.sample_time * self.scanrates[0])) + 0.5)  # V2 to Vfinal
+        SignalPoints4 = int(abs((self.amperage_list[3] - self.amperage_list[2]) / (self.sample_time * self.scanrates[0])) + 0.5)  # V2 to Vfinal
         SignalPoints5 = int((self.holdtimes[2] / self.sample_time) + 0.5)  # Hold 3 
         return round(SignalPoints0 + SignalPoints1 + SignalPoints2 + SignalPoints3 + SignalPoints4 + SignalPoints5)
     
-    def run_cv_test(self, pstat, max_size = 100000):
+    def run_cp_test(self, pstat, max_size = 100000):
         """Runs the triangle wave experiment. A Cyclic voltammagram if in pstatmode, otherwise a galvanodynamic triangle wave
         
         Parameters
@@ -124,7 +124,7 @@ class CV(Experiment):
         
         self.filter_stop_ats(curve, self.PSTATMODE)
         self.set_stop_ats(curve)
-        signal = pstat.signal_r_up_dn_new(self.voltage_list, self.scanrates, self.holdtimes, self.sample_time,self.maxcycles, self.PSTATMODE)
+        signal = pstat.signal_r_up_dn_new(self.amperage_list, self.scanrates, self.holdtimes, self.sample_time,self.maxcycles, self.PSTATMODE)
         pstat.set_signal_r_up_dn(signal)
         self.set_stop_ats(curve)
         pstat.set_cell(True)
@@ -133,7 +133,7 @@ class CV(Experiment):
         curve.set_stop_i_min(True, -.000075)  #new
         curve.set_stop_i_max(True, .000075)   #new
         
-        tkp.log.info(f"Running CV experiment there will be ~{points} rows of data and the experiment will take {total_time} seconds")
+        tkp.log.info(f"Running CP experiment there will be ~{points} rows of data and the experiment will take {total_time} seconds")
         curve.run(True)
         while curve.running():
             Time.sleep(1)
@@ -197,19 +197,19 @@ def find_peaks_and_zero_crossings(data):
     return positive_peak_index, zero_cross_index, negative_peak_index
 
 
-def run_cv_output(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], electrode_used = "Pt", save_to_db_folder = True, standard = False):
+def run_cp_output(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], electrode_used = "Pt", save_to_db_folder = True, standard = False):
     
     tkp.toolkitpy_init("open_circuit_voltage.py")
     pstat = tkp.Pstat("PSTAT")
-    cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
-    data = cv.run_cv_test(pstat, max_size = 100000)
+    cp = CP(values[0],values[1],values[2],values[3],values[4], tkp.GSTATMODE, imax = 10)
+    data = cp.run_cp_test(pstat, max_size = 100000)
     #TODO  
     #add the new columns to the actual CSV file
 
     if standard:
-        out_path = "res/standard/cv/" + output_file_name+ ".csv"
+        out_path = "res/standard/cp/" + output_file_name+ ".csv"
     else:
-        out_path = "res/cv/" + output_file_name + ".csv"
+        out_path = "res/cp/" + output_file_name + ".csv"
     np.savetxt(out_path, data, delimiter = ',', header = 'Point,time,Vf,Vu,Im,Ach,vsig,temp,Cycle,ie_range,overload,stop_test', fmt = '%s') 
     print("getting temp")
     temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
@@ -221,20 +221,20 @@ def run_cv_output(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.
 
     if save_to_db_folder and not standard:
         #C:\AttomRobotFiles\Data\DB_Missaka\eis
-        db_path = Path(r"C:\AttomRobotFiles\Data\DB_Missaka\cv") / f"{output_file_name}.csv"
+        db_path = Path(r"C:\AttomRobotFiles\Data\DB_Missaka\cp") / f"{output_file_name}.csv"
         df.to_csv(db_path)   
 
     if standard:
-        s_df_file = "res/standard/std_cv_test_summaries.csv"
+        s_df_file = "res/standard/std_cp_test_summaries.csv"
     else:
-        s_df_file = "res/cv_test_summaries.csv"
+        s_df_file = "res/cp_test_summaries.csv"
 
     s_df = pd.read_csv(s_df_file)
 
     s = time.localtime(time.time())
     curr_time = time.strftime("%Y-%m-%d %H:%M:%S", s)
 
-    vf_diff,vf_max,vf_min  = cv_interpret(out_path)
+    vf_diff,vf_max,vf_min  = cp_interpret(out_path)
     # overP, i0, alpha_c = kinetic_fit(out_path)
     new_row = pd.DataFrame([[output_file_name, vf_max, vf_min, vf_diff, None, None, None, temperature, curr_time]], columns=['test name', 'vf_max', 'vf_min', 'vf_diff',  "overP", "i0", "alpha_c", 'temp', 'time'])
     s_df = pd.concat([s_df, new_row], ignore_index=True)
@@ -244,9 +244,19 @@ def run_cv_output(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.
         return db_path
 
 
-def run_cv_cell(cell, output_file_name = "chronovoltometry",  values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], electrode_used = "Pt", path_to_save_to = r"C:\AttomRobotFiles\Data\DB_Missaka\cv", save_to_db_folder = True, standard = False):
-    
-    
+def run_cp_cell(cell, current, time, output_file_name = "chronopotentiometry", electrode_used = "Pt", path_to_save_to = r"C:\AttomRobotFiles\Data\DB_Missaka\cp", save_to_db_folder = True, standard = False):
+    values = [[0, current, current, 0], [0.1, 0.1, 0.1], [time/2, time/2, 0.05], 1, 0.1]
+    """
+    values:
+        amperage_list : list(float)
+             List of amperages to be used in the CP [Iinit,I1,I2,Ifinal]
+
+        scanrates : list(float)
+            List of scan rates to be used in the CP [Iinit -> I1,I1 -> I2,I2 -> Ifinal]
+
+        holdtimes : list(float) 
+            List of hold times to be used in the CP [Apex1, Apex2, Final]
+    """
     tkp.toolkitpy_init("open_circuit_voltage.py")
     device_list = tkp.enum_sections()
 
@@ -275,15 +285,15 @@ def run_cv_cell(cell, output_file_name = "chronovoltometry",  values = [[0, 2, -
 
     mux.set_cell(cell-mux_pstat_index*8)
 
-    cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
-    data = cv.run_cv_test(pstat, max_size = 100000)
+    cp = CP(values[0],values[1],values[2],values[3],values[4], tkp.GSTATMODE, imax = 10)
+    data = cp.run_cp_test(pstat, max_size = 100000)
     #TODO  
     #add the new columns to the actual CSV file
 
     if standard:
-        out_path = "res/standard/cv/" + output_file_name+ ".csv"
+        out_path = "res/standard/cp/" + output_file_name+ ".csv"
     else:
-        out_path = "res/cv/" + output_file_name + ".csv"
+        out_path = "res/cp/" + output_file_name + ".csv"
     np.savetxt(out_path, data, delimiter = ',', header = 'Point,time,Vf,Vu,Im,Ach,vsig,temp,Cycle,ie_range,overload,stop_test', fmt = '%s') 
     print("getting temp")
     temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
@@ -299,16 +309,16 @@ def run_cv_cell(cell, output_file_name = "chronovoltometry",  values = [[0, 2, -
         df.to_csv(db_path)   
 
     if standard:
-        s_df_file = "res/standard/std_cv_test_summaries.csv"
+        s_df_file = "res/standard/std_cp_test_summaries.csv"
     else:
-        s_df_file = "res/cv_test_summaries.csv"
+        s_df_file = "res/cp_test_summaries.csv"
 
     s_df = pd.read_csv(s_df_file)
 
     s = time.localtime(time.time())
     curr_time = time.strftime("%Y-%m-%d %H:%M:%S", s)
 
-    vf_diff,vf_max,vf_min  = cv_interpret(out_path)
+    vf_diff,vf_max,vf_min  = cp_interpret(out_path)
     # overP, i0, alpha_c = kinetic_fit(out_path)
     new_row = pd.DataFrame([[output_file_name, vf_max, vf_min, vf_diff, None, None, None, temperature, curr_time]], columns=['test name', 'vf_max', 'vf_min', 'vf_diff',  "overP", "i0", "alpha_c", 'temp', 'time'])
     s_df = pd.concat([s_df, new_row], ignore_index=True)
@@ -318,7 +328,7 @@ def run_cv_cell(cell, output_file_name = "chronovoltometry",  values = [[0, 2, -
         return db_path
 
 
-def cv_interpret(filename):
+def cp_interpret(filename):
     df_file = filename
     df = pd.read_csv(df_file, index_col='# Point')
 
