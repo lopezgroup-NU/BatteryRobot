@@ -130,8 +130,9 @@ class CV(Experiment):
         pstat.set_cell(True)
         points = self.estimated_point_count()
         total_time = self.estimated_total_time()
-        curve.set_stop_i_min(True, -.000075)  #new
-        curve.set_stop_i_max(True, .000075)   #new
+        i_limit = 0.005#0.000075
+        curve.set_stop_i_min(True, -1*i_limit)  #new
+        curve.set_stop_i_max(True, i_limit)   #new
         
         tkp.log.info(f"Running CV experiment there will be ~{points} rows of data and the experiment will take {total_time} seconds")
         curve.run(True)
@@ -265,10 +266,9 @@ def run_cv_cell(cell, output_file_name = "chronovoltometry",  values = [[0, 2, -
         else:
             print(f"!!!!! Found a non IMX or IFC type device. It is called: {device_name}")
 
-    #TODO update so that only a cell number goes in, and the pstat index and imx index are calculated from that
 
     mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
-    pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+    pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])#change 1 back to mux_pstat_index #TODO
 
     mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
     mux.open()
@@ -278,7 +278,7 @@ def run_cv_cell(cell, output_file_name = "chronovoltometry",  values = [[0, 2, -
     cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
     data = cv.run_cv_test(pstat, max_size = 100000)
     #TODO  
-    #add the new columns to the actual CSV file
+    #add the new columns (electrode i think) to the actual CSV file
 
     if standard:
         out_path = "res/standard/cv/" + output_file_name+ ".csv"
@@ -316,6 +316,9 @@ def run_cv_cell(cell, output_file_name = "chronovoltometry",  values = [[0, 2, -
 
     if save_to_db_folder and not standard:
         return db_path
+
+
+
 
 
 def cv_interpret(filename):

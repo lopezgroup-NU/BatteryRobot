@@ -51,7 +51,7 @@ class CP(Experiment):
         super().__init__(kwargs)
         print(kwargs)
         
-    def dc_105_initialize_pstat(pstat, sampling_rate):
+    def dc_105_initialize_pstat(self, pstat, sampling_rate):
             """This function is the standard initialization for DC experiments
 
             Parameters

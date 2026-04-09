@@ -67,7 +67,7 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}, save_t
     pstat = tkp.Pstat("PSTAT")
     #Parameters
     #------------------------------------------------------------------
-    initial_freq = parameter_list.get("initial_freq", 250000)
+    initial_freq = parameter_list.get("initial_freq", 100000)
     final_freq = parameter_list.get("final_freq", 1)
     ac_current = parameter_list.get("ac_current", 0.00001) 
     dc_current = parameter_list.get("dc_current", 0.00)
@@ -219,8 +219,6 @@ def run_geis_cell(cell, output_file_name = "galvanostatic_eis",  parameter_list 
         else:
             print(f"!!!!! Found a non-IMX or IFC type device. It is called: {device_name}")
 
-    #TODO update so that only a cell number goes in, and the pstat index and imx index are calculated from that
-
     mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
     pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
 
@@ -230,7 +228,7 @@ def run_geis_cell(cell, output_file_name = "galvanostatic_eis",  parameter_list 
     mux.set_cell(cell-mux_pstat_index*8)
     #Parameters
     #------------------------------------------------------------------
-    initial_freq = parameter_list.get("initial_freq", 250000)
+    initial_freq = parameter_list.get("initial_freq", 100000)#TODO changed from 250000 to 100000, the manual says 1MHz max and 2MHz if external sine wave gen is used. Unsure of how G made it go to 2.5MHz ever
     final_freq = parameter_list.get("final_freq", 1)
     ac_current = parameter_list.get("ac_current", 0.00001) 
     dc_current = parameter_list.get("dc_current", 0.00)
@@ -249,6 +247,8 @@ def run_geis_cell(cell, output_file_name = "galvanostatic_eis",  parameter_list 
 
     freq_lim_lower = pstat.freq_limit_lower()
     freq_lim_upper = pstat.freq_limit_upper()
+    print(freq_lim_upper)
+    print(initial_freq)
     if(initial_freq > freq_lim_upper):
         print("Initial frequency exceeds upper frequency limit")
         initial_freq = freq_lim_upper

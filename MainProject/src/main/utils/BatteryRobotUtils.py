@@ -494,28 +494,27 @@ class BatteryRobot(NorthC9):
         self.remove_pipette()
         self.cap_and_return_vial_to_rack(original_position)
 
-    def run_cell_tests(self, cell_triplet_seeds, source, mL_to_dispense, cp_amps):
+    def run_cell_tests(self, cell_triplets, source, mL_to_dispense, cp_amps):
         """
         Docstring for run_cell_tests
         
         :param self: Description
-        :param cell_triplet_seeds: list of well indices; each index acts as a seed to generate a triplet so that a list like [0,1,2] would create a larger
-         list with the form [[0,8,16],[1,9,17],[2,10,18]]
+        :param cell_triplet_seeds: list of well indices; enter a list of triplets with the form [[0,8,16],[1,9,17],[2,10,18]]
         :param source: reservoir index which can be drawn from
         :param mL_to_dispense: mL to dispense into each cell
         """
 
         cell_triplets = []
 
-        for seed in cell_triplet_seeds:
-            cell_triplets.append([seed, seed+8, seed+16])
+        #for seed in cell_triplet_seeds:
+        #    cell_triplets.append([seed, seed+8, seed+16])
 
         past_cell_triplets = []
         for triplet_index in range(source,len(cell_triplets)): #for each triplet
             for subindex in [0,1,2]: # for the first (dispensing) action with the triplets, begin running test 1 (geis) immediately
                 self.dispense_into_well(source, cell_triplets[triplet_index][subindex], mL_to_dispense)
                 
-                eval(f"t{subindex}") = threading.Thread(target=run_geis_cell, args=(cell_triplets[triplet_index][subindex]))
+                eval(f"t{subindex} = threading.Thread(target={run_geis_cell}, args={(cell_triplets[triplet_index][subindex])})")
                 eval(f"t{subindex}.start()")
             #join the threads started in the eval statements above
             t0.join()
@@ -527,38 +526,33 @@ class BatteryRobot(NorthC9):
             t0.start()
             t1 = threading.Thread(target=run_cv_cell, args=(cell_triplets[triplet_index][1]))
             t1.start()
-            t2 = threading.Thread(target=run_cv_cell, args=(cell_triplets[triplet_index][2])) #run_cp_cell(cell=cell, 10 minutes) #TODO uncomment once CP is done
+            t2 = threading.Thread(target=run_cv_cell, args=(cell_triplets[triplet_index][2]))
             t2.start()
-
             t0.join()
             t1.join()
             t2.join()
             
-            #run cp, but the function doesn't exist yet
-            
+            #run cp
             t0 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][0], cp_amps, 600))
             t0.start()
-
             t1 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][1], cp_amps, 600))
             t1.start()
-
-            t2 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][2], cp_amps, 600)) #run_cp_cell(cell=cell, 10 minutes) #TODO uncomment once CP is done
+            t2 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][2], cp_amps, 600)) 
             t2.start()
-
             t0.join()
             t1.join()
             t2.join()
             
             
             for past_cell_triplet in past_cell_triplets:
-                
-                t1 = threading.Thread(target=run_cp_cell, args=(source_triplets[triplet_index][0], cp_amps, 60))
+                #run cp again on all 3 for 1 minute/60 seconds
+                t1 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[0], cp_amps, 60))
                 t1.start()
 
-                t2 = threading.Thread(target=run_cp_cell, args=(source_triplets[triplet_index][1], cp_amps, 60))
+                t2 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[1], cp_amps, 60))
                 t2.start()
 
-                t3 = threading.Thread(target=run_cp_cell, args=(source_triplets[triplet_index][2], cp_amps, 60)) #run_cp_cell(cell=cell, 10 minutes) #TODO uncomment once CP is done
+                t3 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[2], cp_amps, 60))
                 t3.start()
 
                 t1.join()
@@ -573,9 +567,13 @@ class BatteryRobot(NorthC9):
 
 
     def pstat_mux_test(self):
+
+        cell = 0
+
         tkp.toolkitpy_init('chrono.py')
         pstat_list_names = tkp.enum_sections()
         print(pstat_list_names)
+        """
         pstat_iter = 0
         while pstat_iter < len(pstat_list_names):
             print(pstat_list_names[pstat_iter][0:3])
@@ -584,7 +582,72 @@ class BatteryRobot(NorthC9):
                 pstat_iter = 0
             pstat_iter+=1
         print(pstat_list_names)
+"""
+        imx_list = []
+        pstat_list = []
+        
 
+        for device_name in pstat_list_names:
+            tag = device_name[0:3]
+            if tag == 'IMX':
+                imx_list.append(device_name)
+            elif tag == 'IFC':
+                pstat_list.append(device_name)
+            else:
+                print(f"!!!!! Found a non IMX or IFC type device. It is called: {device_name}")
+
+
+        mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+        #pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+        print(imx_list)
+        print(mux_pstat_index)
+
+        time.sleep(1)
+        #mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
+        #mux.open()
+
+        #mux.set_cell(0)
+        #run_cv_cell(0, "simultest0",  [[0, 3, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1])
+        """ THIS WORKS
+        t0 = threading.Thread(target=run_cv_cell, args=(0, f"simul_chronovoltometrycycledummy0",  [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1]))
+        t0.start()
+        t1 = threading.Thread(target=run_cv_cell, args=(8, f"simul_chronovoltometrycycledummy1",  [[0, -2, 2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1]))
+        t1.start()
+        t0.join()
+        t1.join()
+        """
+
+        #run_geis_cell(8, "dummygeistest1")
+        """ WORKS
+        t0 = threading.Thread(target=run_geis_cell, args=(0, "dummy_geis_0"))
+        t0.start()
+        t1 = threading.Thread(target=run_geis_cell, args=(8, "dummy_geis_1"))
+        t1.start()
+        #join the threads started in the eval statements above
+        t0.join()
+        t1.join()
+        """
+        
+        t0 = threading.Thread(target=run_cp_cell, args=(0, 1.5, 60))
+        t0.start()
+        t1 = threading.Thread(target=run_cp_cell, args=(8, 1.5, 60))
+        t1.start()
+        t0.join()
+        t1.join()
+        #run_cv_cell(8, "simultest1",  [[0, 3, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1])
+        
+        #for i in range(0,3):
+
+            #data0 = run_cv_cell(0, mux, f"dummycelltest0c{i}",  [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1])
+            
+
+            #mux.set_dac(0, 0.5)
+            #data1 = run_cv_cell(1, mux, f"dummycelltest1c{i}",  [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1])
+            # t1 = threading.Thread(target=run_cv_cell, args=(1, f"chronovoltometrycycledummy1c{i}",  [[0, 2, -2, 0], [0.1, 0.1, 0.1], [1, 1, 1], 1, 0.1]))
+            # t1.start()
+            # t1.join()
+            #mux.set_dac(1, 0.5)
+        
 
         """
         pstat_list = []
@@ -597,10 +660,10 @@ class BatteryRobot(NorthC9):
         """
         #values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1]
         #cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
-        data = run_cv_cell("dummycelltest1", pstat_index=1)
-        data2 = run_geis_cell("dummygeistest1", pstat_index=1)
+        #data = run_cv_cell("dummycelltest1", 0)
+        #data2 = run_geis_cell("dummygeistest1", pstat_index=1)
         #print(data)
-        print(data2)
+        #print(data)
 
 
         """
