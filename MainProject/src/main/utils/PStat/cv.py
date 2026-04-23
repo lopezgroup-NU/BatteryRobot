@@ -12,7 +12,7 @@ from pathlib import Path
 #Statement of work
 #A modular rerunnable experiment according to given parameters. The resulting 
 class CV(Experiment): 
-    def __init__(self, voltage_list : list, scanrates : list, holdtimes : list, maxcycles : int,sample_period : float, PSTATMODE : tkp.CTRLMODE, **kwargs):
+    def __init__(self, voltage_list : list, scanrates : list, holdtimes : list, maxcycles : int,sample_period : float, PSTATMODE : tkp.CTRLMODE, guilherme_mode = False, **kwargs):
         """This class creates a Cylic voltammatry experiment
 
         Parameters
@@ -48,10 +48,11 @@ class CV(Experiment):
         self.sample_time = sample_period
         self.maxcycles = maxcycles
         self.PSTATMODE = PSTATMODE
+        self.guilherme_mode = guilherme_mode
         super().__init__(kwargs)
         print(kwargs)
         
-    def dc_105_initialize_pstat(pstat, sampling_rate):
+    def dc_105_initialize_pstat(self, pstat, sampling_rate):
             """This function is the standard initialization for DC experiments
 
             Parameters
@@ -130,7 +131,7 @@ class CV(Experiment):
         pstat.set_cell(True)
         points = self.estimated_point_count()
         total_time = self.estimated_total_time()
-        i_limit = 0.005#0.000075
+        i_limit = 0.000075 if self.guilherme_mode else 0.0075#0.005, 0.000075
         curve.set_stop_i_min(True, -1*i_limit)  #new
         curve.set_stop_i_max(True, i_limit)   #new
         
@@ -198,11 +199,11 @@ def find_peaks_and_zero_crossings(data):
     return positive_peak_index, zero_cross_index, negative_peak_index
 
 
-def run_cv_output(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], electrode_used = "Pt", save_to_db_folder = True, standard = False):
+def run_cv_output(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], electrode_used = "Pt", save_to_db_folder = True, standard = False, guilherme_mode = True):
     
     tkp.toolkitpy_init("open_circuit_voltage.py")
     pstat = tkp.Pstat("PSTAT")
-    cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
+    cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10, guilherme_mode=guilherme_mode)
     data = cv.run_cv_test(pstat, max_size = 100000)
     #TODO  
     #add the new columns to the actual CSV file
@@ -245,8 +246,8 @@ def run_cv_output(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.
         return db_path
 
 
-def run_cv_cell(cell, output_file_name = "chronovoltometry",  values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], electrode_used = "Pt", path_to_save_to = r"C:\AttomRobotFiles\Data\DB_Missaka\cv", save_to_db_folder = True, standard = False):
-    
+def run_cv_cell(cell, output_file_name = "chronovoltometry",  values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], electrode_used = "Pt", path_to_save_to = r"C:\AttomRobotFiles\Data\DB_Missaka\cv", save_to_db_folder = True, standard = False, potentials_to_hold = [[0,0]]):
+                                                                    #  [[voltagelist],[  scanrates  ], [    holdtimes   ], maxcycles, sample_period]
     
     tkp.toolkitpy_init("open_circuit_voltage.py")
     device_list = tkp.enum_sections()
@@ -265,13 +266,23 @@ def run_cv_cell(cell, output_file_name = "chronovoltometry",  values = [[0, 2, -
             pstat_list.append(device_name)
         else:
             print(f"!!!!! Found a non IMX or IFC type device. It is called: {device_name}")
-
-
     mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+    imx_list.sort()
+    pstat_list.sort()
+    #del pstat_list[0]
+    print(pstat_list)
+    print(mux_pstat_index)
     pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])#change 1 back to mux_pstat_index #TODO
 
     mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
     mux.open()
+
+    for i in range(7):
+        mux.set_off_mode(i,tkp.MUX_CELL_LOCAL)
+
+    for pair in potentials_to_hold:
+        #mux.set_off_mode(pair[0]-mux_pstat_index*8,tkp.MUX_CELL_LOCAL)
+        mux.set_dac(pair[0]-mux_pstat_index*8, pair[1])
 
     mux.set_cell(cell-mux_pstat_index*8)
 

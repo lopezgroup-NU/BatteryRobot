@@ -264,7 +264,7 @@ class BatteryRobot(NorthC9):
         t8.set_temp(1, 10)
         print("Done running!")
 
-    def run_test(self, run_file, standard = None):
+    def run_test(self, run_file, standard = None, g_mode = True):
         '''
         Runs the testing files
         If standard is provided, will run experiment before and after test file is done
@@ -382,7 +382,8 @@ class BatteryRobot(NorthC9):
                                         0.1], 
                                 electrode_used = electrode_used,
                                 save_to_db_folder = save_to_db,
-                                standard=row_is_standard)
+                                standard=row_is_standard, 
+                                guilherme_mode = g_mode)
                         granular_log_file.write(f"\n * ran cv test" + f" *** {get_time_stamp()}")
                         # cv_files.append(cv_file)
                         self.set_output(6, False)
@@ -494,20 +495,20 @@ class BatteryRobot(NorthC9):
         self.remove_pipette()
         self.cap_and_return_vial_to_rack(original_position)
 
-    def run_cell_tests(self, cell_triplets, source, mL_to_dispense, cp_amps):
+    def run_cell_tests(self, cell_triplet_seeds, source, mL_to_dispense, cp_amps):
         """
         Docstring for run_cell_tests
         
         :param self: Description
-        :param cell_triplet_seeds: list of well indices; enter a list of triplets with the form [[0,8,16],[1,9,17],[2,10,18]]
+        :param cell_triplet_seeds: list of "seeds" from 0-7 which correspond to triplets with the form [[0,8,16],[1,9,17],[2,10,18], ...]
         :param source: reservoir index which can be drawn from
         :param mL_to_dispense: mL to dispense into each cell
         """
 
         cell_triplets = []
 
-        #for seed in cell_triplet_seeds:
-        #    cell_triplets.append([seed, seed+8, seed+16])
+        for seed in cell_triplet_seeds:
+            cell_triplets.append([seed, seed+8, seed+16])
 
         past_cell_triplets = []
         for triplet_index in range(source,len(cell_triplets)): #for each triplet
@@ -555,6 +556,8 @@ class BatteryRobot(NorthC9):
                 t3 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[2], cp_amps, 60))
                 t3.start()
 
+
+
                 t1.join()
                 t2.join()
                 t3.join()
@@ -563,8 +566,25 @@ class BatteryRobot(NorthC9):
                 
 
             past_cell_triplets.append(cell_triplets[triplet_index])
+        for past_cell_triplet in past_cell_triplets:
+            #run cp again on all 3 for 1 minute/60 seconds
+            t1 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[0], cp_amps, 60))
+            t1.start()
 
+            t2 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[1], cp_amps, 60))
+            t2.start()
 
+            t3 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[2], cp_amps, 60))
+            t3.start()
+
+            
+
+            t1.join()
+            t2.join()
+            t3.join()
+
+    def rungeis(self):
+        run_geis_cell(0)
 
     def pstat_mux_test(self):
 
@@ -582,9 +602,11 @@ class BatteryRobot(NorthC9):
                 pstat_iter = 0
             pstat_iter+=1
         print(pstat_list_names)
-"""
+        """
         imx_list = []
         pstat_list = []
+
+
         
 
         for device_name in pstat_list_names:
@@ -595,14 +617,50 @@ class BatteryRobot(NorthC9):
                 pstat_list.append(device_name)
             else:
                 print(f"!!!!! Found a non IMX or IFC type device. It is called: {device_name}")
-
+        
+        imx_list.sort()
+        pstat_list.sort()
+        del pstat_list[0]
 
         mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
-        #pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
         print(imx_list)
-        print(mux_pstat_index)
+        print(pstat_list)
+        #example_cp_test(8)
+        run_cp_cell(0)
+        #
+        #run_geis_cell(8)
+        #pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+        # mux = tkp.IMX("IMX", imx_list[0])
+        # mux.open()
+        # #mux.set_cell(0)
+        # mux.set_dac(0, 1.1)
+        # mux.set_off_mode(0,tkp.MUX_CELL_LOCAL)
+        # mux.set_off_mode(1,tkp.MUX_CELL_LOCAL)
+        # #mux.set_off_mode(2,tkp.MUX_CELL_LOCAL)
+        # mux.set_dac(0, 1.1)
+        # time.sleep(2)
+        # mux.close()
+        # time.sleep(1)
 
-        time.sleep(1)
+        #run_cv_cell(1, potentials_to_hold=[[0,1.38]])
+        
+        #mux.set_dac(1, 1.1)
+        #mux.set_dac(2, 1.1)
+        # print(mux.dac(0))
+        # time.sleep(1)
+        # print(mux.dac(0))
+        # time.sleep(1)
+        # print(mux.dac(0))
+        # time.sleep(1)
+        # print(mux.dac(3))
+        # time.sleep(1)
+        # print("done")
+
+        #print(imx_list)
+        print(mux_pstat_index)
+        #mux.close()
+
+        
         #mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
         #mux.open()
 
@@ -628,12 +686,14 @@ class BatteryRobot(NorthC9):
         t1.join()
         """
         
-        t0 = threading.Thread(target=run_cp_cell, args=(0, 1.5, 60))
-        t0.start()
-        t1 = threading.Thread(target=run_cp_cell, args=(8, 1.5, 60))
-        t1.start()
-        t0.join()
-        t1.join()
+        # t0 = threading.Thread(target=run_cp_cell, args=(0, 1.5, 60))
+        # t0.start()
+        # t1 = threading.Thread(target=run_cp_cell, args=(8, 1.5, 60))
+        # t1.start()
+        # t0.join()
+        # t1.join()
+
+
         #run_cv_cell(8, "simultest1",  [[0, 3, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1])
         
         #for i in range(0,3):

@@ -67,7 +67,8 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}, save_t
     pstat = tkp.Pstat("PSTAT")
     #Parameters
     #------------------------------------------------------------------
-    initial_freq = parameter_list.get("initial_freq", 100000)
+    initial_freq = parameter_list.get("initial_freq", 250000)
+    print(pstat.freq_limit_upper())
     final_freq = parameter_list.get("final_freq", 1)
     ac_current = parameter_list.get("ac_current", 0.00001) 
     dc_current = parameter_list.get("dc_current", 0.00)
@@ -221,7 +222,7 @@ def run_geis_cell(cell, output_file_name = "galvanostatic_eis",  parameter_list 
 
     mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
     pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
-
+    print(f"pstat upper frequency limit: {pstat.freq_limit_upper()}")
     mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
     mux.open()
 
