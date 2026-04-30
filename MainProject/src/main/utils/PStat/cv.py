@@ -9,8 +9,7 @@ from .experiment import Experiment
 from ..MathUtils import kinetic_fit
 from pathlib import Path
 
-#Statement of work
-#A modular rerunnable experiment according to given parameters. The resulting 
+#A modular rerunnable experiment according to given parameters. 
 class CV(Experiment): 
     def __init__(self, voltage_list : list, scanrates : list, holdtimes : list, maxcycles : int,sample_period : float, PSTATMODE : tkp.CTRLMODE, guilherme_mode = False, **kwargs):
         """This class creates a Cylic voltammatry experiment
@@ -135,6 +134,14 @@ class CV(Experiment):
         curve.set_stop_i_min(True, -1*i_limit)  #new
         curve.set_stop_i_max(True, i_limit)   #new
         
+        class OverVoltageError(Exception):
+            """Exception raised for specific application errors."""
+            print("--------------------------------------------------------")
+            for i in range(5):
+                print("---Excessive voltage detected! Stopping CV test---")
+            print("--------------------------------------------------------")   
+        pass
+
         tkp.log.info(f"Running CV experiment there will be ~{points} rows of data and the experiment will take {total_time} seconds")
         curve.run(True)
         while curve.running():
@@ -144,6 +151,9 @@ class CV(Experiment):
             voltage = data['vf']
             current = data['im']
             tkp.log.info(f'Point {point + 1} of {points}\nVoltage: {voltage:.4f} voltage\nCurrent: {current:.4f} Amps')
+
+            if abs(voltage) > 3:
+                raise OverVoltageError
         
         pstat.set_cell(False)
         data = curve.acq_data()
@@ -246,7 +256,7 @@ def run_cv_output(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.
         return db_path
 
 
-def run_cv_cell(cell, output_file_name = "chronovoltometry",  values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], electrode_used = "Pt", path_to_save_to = r"C:\AttomRobotFiles\Data\DB_Missaka\cv", save_to_db_folder = True, standard = False, potentials_to_hold = [[0,0]]):
+def run_cv_cell(cell, output_file_name = "chronovoltometry",  values = [[1, 1.650, 1.080, 1], [0.01, 0.01, 0.01], [0.05, 0.05, 0.05], 2, 0.1], electrode_used = "Pt", path_to_save_to = r"C:\AttomRobotFiles\Data\DB_Ciara\cv", save_to_db_folder = True, standard = False, potentials_to_hold = [[0,0]]):
                                                                     #  [[voltagelist],[  scanrates  ], [    holdtimes   ], maxcycles, sample_period]
     
     tkp.toolkitpy_init("open_circuit_voltage.py")
@@ -308,7 +318,7 @@ def run_cv_cell(cell, output_file_name = "chronovoltometry",  values = [[0, 2, -
         #C:\AttomRobotFiles\Data\DB_Missaka\eis
         db_path = Path(path_to_save_to) / f"{output_file_name}.csv"
         df.to_csv(db_path)   
-
+    mux.close()
     if standard:
         s_df_file = "res/standard/std_cv_test_summaries.csv"
     else:

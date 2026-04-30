@@ -1,3 +1,5 @@
+import random
+import string
 import time
 import heapq
 import yaml
@@ -91,7 +93,6 @@ class BatteryRobot(NorthC9):
         """
         Run a demo for the class which is visiting the lab on November 11th
         """
-
         print("Enter a '1' for each of the following if true, and a '0' if false")
 
         count_conditions_fulfilled = 0
@@ -463,6 +464,24 @@ class BatteryRobot(NorthC9):
         log_file.write("*" * 50 + "\n")
         log_file.close()
 
+    def translate_coords_to_index(self, coords):
+        """
+        takes in coords like "A2"
+        """
+
+        coords = coords.upper()
+        letter_index = 0
+        if coords[0] == 'A':
+            letter_index = 0
+        elif coords[0] == 'B':
+            letter_index = 1
+        elif coords[0] == 'C':
+            letter_index = 2
+        elif coords[0] == 'D':
+            letter_index = 3
+
+        index = 4*(coords[1]-1) + letter_index
+
     def dispense_into_well(self, reservoir_id, well, mL_to_fill):
         self.open_gripper()
         self.reset_pump()
@@ -477,17 +496,17 @@ class BatteryRobot(NorthC9):
         self.zero_scale()
 
         while mL_remaining > 0:
-        # draw from the vial in the carousel and dispense it at the microplate
+        # draw from the vial in the carousel and dispense it at the well plate
             self.goto_safe(carousel_aspirate)
             mL_to_dispense_this_cycle = min(1, mL_remaining)
             self.aspirate_ml(3, mL_to_dispense_this_cycle)
             mL_remaining -= mL_to_dispense_this_cycle
 
-            #TODO Enter code in here to go to the "well" position in ciara's microplate thing
+            #TODO Enter code in here to go to the "well" position in ciara's well plate thing
             
             self.dispense_ml(3, mL_to_dispense_this_cycle)
             
-            #TODO Enter code in here to leave the microplate. maybe a goto_safe(safe_zone)
+            #TODO Enter code in here to leave the well plate. maybe a goto_safe(safe_zone)
 
     def put_vial_back_from_carousel(self, original_position):
 
@@ -495,7 +514,7 @@ class BatteryRobot(NorthC9):
         self.remove_pipette()
         self.cap_and_return_vial_to_rack(original_position)
 
-    def run_cell_tests(self, cell_triplet_seeds, source, mL_to_dispense, cp_amps):
+    def run_cell_tests(self, cell_triplet_seeds, source, mL_to_dispense, cp_amps, test_run = True):
         """
         Docstring for run_cell_tests
         
@@ -505,6 +524,11 @@ class BatteryRobot(NorthC9):
         :param mL_to_dispense: mL to dispense into each cell
         """
 
+        plate_id = "PLATE" + ''.join(random.choices(string.hexdigits()[:16], k=16))
+
+        id_0 = ''.join(random.choices(string.hexdigits()[:16], k=8))
+        id_1 = ''.join(random.choices(string.hexdigits()[:16], k=8))
+        id_2 = ''.join(random.choices(string.hexdigits()[:16], k=8))
         cell_triplets = []
 
         for seed in cell_triplet_seeds:
@@ -512,33 +536,38 @@ class BatteryRobot(NorthC9):
 
         past_cell_triplets = []
         for triplet_index in range(source,len(cell_triplets)): #for each triplet
-            for subindex in [0,1,2]: # for the first (dispensing) action with the triplets, begin running test 1 (geis) immediately
-                self.dispense_into_well(source, cell_triplets[triplet_index][subindex], mL_to_dispense)
-                
-                eval(f"t{subindex} = threading.Thread(target={run_geis_cell}, args={(cell_triplets[triplet_index][subindex])})")
-                eval(f"t{subindex}.start()")
+             # for the first (dispensing) action with the triplets, begin running test 1 (geis) immediately
+            self.dispense_into_well(source, cell_triplets[triplet_index][0], mL_to_dispense)
+            t0 = threading.Thread(target=run_geis_cell, args=(cell_triplets[triplet_index][0], f"ID_{id_0}_EIS.csv"))
+            t0.start()
+            self.dispense_into_well(source, cell_triplets[triplet_index][1], mL_to_dispense)
+            t1 = threading.Thread(target=run_geis_cell, args=(cell_triplets[triplet_index][1], f"ID_{id_1}_EIS.csv"))
+            t1.start()
+            self.dispense_into_well(source, cell_triplets[triplet_index][2], mL_to_dispense)
+            t2 = threading.Thread(target=run_geis_cell, args=(cell_triplets[triplet_index][2], f"ID_{id_2}_EIS.csv"))
+            t2.start()
             #join the threads started in the eval statements above
             t0.join()
             t1.join()
             t2.join()
 
             #run cv
-            t0 = threading.Thread(target=run_cv_cell, args=(cell_triplets[triplet_index][0]))
+            t0 = threading.Thread(target=run_cv_cell, args=(cell_triplets[triplet_index][0], f"ID_{id_0}_CV.csv"))
             t0.start()
-            t1 = threading.Thread(target=run_cv_cell, args=(cell_triplets[triplet_index][1]))
+            t1 = threading.Thread(target=run_cv_cell, args=(cell_triplets[triplet_index][1], f"ID_{id_1}_CV.csv"))
             t1.start()
-            t2 = threading.Thread(target=run_cv_cell, args=(cell_triplets[triplet_index][2]))
+            t2 = threading.Thread(target=run_cv_cell, args=(cell_triplets[triplet_index][2], f"ID_{id_2}_CV.csv"))
             t2.start()
             t0.join()
             t1.join()
             t2.join()
             
             #run cp
-            t0 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][0], cp_amps, 600))
+            t0 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][0], cp_amps, 600, f"ID_{id_0}_CP.csv"))
             t0.start()
-            t1 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][1], cp_amps, 600))
+            t1 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][1], cp_amps, 600, f"ID_{id_1}_CP.csv"))
             t1.start()
-            t2 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][2], cp_amps, 600)) 
+            t2 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][2], cp_amps, 600, f"ID_{id_2}_CP.csv")) 
             t2.start()
             t0.join()
             t1.join()
@@ -549,42 +578,65 @@ class BatteryRobot(NorthC9):
                 #run cp again on all 3 for 1 minute/60 seconds
                 t1 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[0], cp_amps, 60))
                 t1.start()
-
                 t2 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[1], cp_amps, 60))
                 t2.start()
-
                 t3 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[2], cp_amps, 60))
                 t3.start()
-
-
 
                 t1.join()
                 t2.join()
                 t3.join()
-                 
-                pass
-                
+            
 
             past_cell_triplets.append(cell_triplets[triplet_index])
+
         for past_cell_triplet in past_cell_triplets:
             #run cp again on all 3 for 1 minute/60 seconds
             t1 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[0], cp_amps, 60))
             t1.start()
-
             t2 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[1], cp_amps, 60))
             t2.start()
-
             t3 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[2], cp_amps, 60))
             t3.start()
-
-            
 
             t1.join()
             t2.join()
             t3.join()
 
-    def rungeis(self):
-        run_geis_cell(0)
+        
+
+
+    def run_cell_tests_single(self, cell, source=0, mL_to_dispense=0, cp_amps=0):
+        """
+        Docstring for run_cell_tests
+        
+        :param self: Description
+        :param cell_triplet_seeds: list of "seeds" from 0-7 which correspond to triplets with the form [[0,8,16],[1,9,17],[2,10,18], ...]
+        :param source: reservoir index which can be drawn from
+        :param mL_to_dispense: mL to dispense into each cell
+        """
+
+        
+        #self.dispense_into_well(source, cell, mL_to_dispense)
+        run_geis_cell(cell)
+        
+           
+        #run cv
+        # t0 = threading.Thread(target=run_cv_cell, args=(cell))
+        # t0.start()
+        # t0.join()
+        
+        # #run cp
+        # t0 = threading.Thread(target=run_cp_cell, args=(cell, cp_amps, 600))
+        # t0.start()
+        # t0.join()
+        
+        
+    def runGeisCell(self, cell):
+        run_geis_cell(cell, output_file_name=f"cell_{cell}_eis")
+
+    def runCVCell(self, cell):
+        run_cv_cell(cell, output_file_name=f"cell_{cell}_cv")
 
     def pstat_mux_test(self):
 
@@ -606,9 +658,6 @@ class BatteryRobot(NorthC9):
         imx_list = []
         pstat_list = []
 
-
-        
-
         for device_name in pstat_list_names:
             tag = device_name[0:3]
             if tag == 'IMX':
@@ -620,13 +669,13 @@ class BatteryRobot(NorthC9):
         
         imx_list.sort()
         pstat_list.sort()
-        del pstat_list[0]
 
         mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
         print(imx_list)
         print(pstat_list)
+
         #example_cp_test(8)
-        run_cp_cell(0)
+        #run_cp_cell(0)
         #
         #run_geis_cell(8)
         #pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
@@ -802,13 +851,6 @@ class BatteryRobot(NorthC9):
             cells_tested.append(index)
             for c in range(0,len(cells_tested)):
                 pass
-
-
-            
-            
-
-
-            
 
         pass
 

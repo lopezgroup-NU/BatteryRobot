@@ -69,7 +69,7 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}, save_t
     #------------------------------------------------------------------
     initial_freq = parameter_list.get("initial_freq", 250000)
     print(pstat.freq_limit_upper())
-    final_freq = parameter_list.get("final_freq", 1)
+    final_freq = parameter_list.get("final_freq", 10)
     ac_current = parameter_list.get("ac_current", 0.00001) 
     dc_current = parameter_list.get("dc_current", 0.00)
     estimated_z = parameter_list.get("estimated_z", 1000)
@@ -199,7 +199,7 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}, save_t
     return zcurve
 
 
-def run_geis_cell(cell, output_file_name = "galvanostatic_eis",  parameter_list = {}, path_to_save_to = r"C:\AttomRobotFiles\Data\DB_Missaka\eis", save_to_db_folder = True, standard = False):
+def run_geis_cell(cell, output_file_name = "galvanostatic_eis",  parameter_list = {}, path_to_save_to = r"C:\AttomRobotFiles\Data\DB_Ciara\eis", save_to_db_folder = True, standard = False):
     tkp.toolkitpy_init("galvanostatic_eis.py")
 
 
@@ -221,6 +221,9 @@ def run_geis_cell(cell, output_file_name = "galvanostatic_eis",  parameter_list 
             print(f"!!!!! Found a non-IMX or IFC type device. It is called: {device_name}")
 
     mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+
+    print(pstat_list)
+    print(mux_pstat_index)
     pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
     print(f"pstat upper frequency limit: {pstat.freq_limit_upper()}")
     mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
@@ -230,8 +233,8 @@ def run_geis_cell(cell, output_file_name = "galvanostatic_eis",  parameter_list 
     #Parameters
     #------------------------------------------------------------------
     initial_freq = parameter_list.get("initial_freq", 100000)#TODO changed from 250000 to 100000, the manual says 1MHz max and 2MHz if external sine wave gen is used. Unsure of how G made it go to 2.5MHz ever
-    final_freq = parameter_list.get("final_freq", 1)
-    ac_current = parameter_list.get("ac_current", 0.00001) 
+    final_freq = parameter_list.get("final_freq", 100) #changed from 10
+    ac_current = parameter_list.get("ac_current", 0.02) #changed from 0.00001
     dc_current = parameter_list.get("dc_current", 0.00)
     estimated_z = parameter_list.get("estimated_z", 1000)
     points_per_decade = parameter_list.get("points_per_decade", 10)
@@ -328,6 +331,7 @@ def run_geis_cell(cell, output_file_name = "galvanostatic_eis",  parameter_list 
     temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
     temperature = temper.get_temperature()[1]
     
+    mux.close()
 
     df = pd.read_csv(out_path, index_col='# point')
     reflected_zimag = [-val for val in df['zimag']]

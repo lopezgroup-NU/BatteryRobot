@@ -224,7 +224,7 @@ class MongoQuery:
     Current collections - data (contains both eis and cv data)
     """
 
-    def __init__(self, uri="mongodb://localhost:27017/", db_name="test_db_zee_mk0"):
+    def __init__(self, uri="mongodb://localhost:27017/", db_name="electrocatalysis_DB"):
         self.conn = MongoConn(uri=uri, db_name=db_name)
 
     def listify(self, a, order = 1):
@@ -246,7 +246,24 @@ class MongoQuery:
         else:
             return a
         
+    def save_sample_log(self, plate_id, id_list, notes):
+        
+        time_stamp = time.ctime()
 
+        collection = self.conn.get_collection("sample_log")
+
+        collection.update_one(
+                {"plate_id": plate_id},
+                
+                {"$set": {"date": time_stamp,
+                        "id_list": id_list,
+                        "notes": notes
+                        }}, 
+                upsert=True
+            )
+    ####################################################################################################################
+    ######################################### STUFF FOR G BELOW THIS LINE ##############################################
+    ####################################################################################################################
     def default_option(self, doc, value, defaultVal = "N/A"):
             try:
                 return doc[value]
@@ -317,8 +334,6 @@ class MongoQuery:
                 print("threw key error")
                 pass
     
-    
-
     def convert_datapoints_to_trackable_format(self):
         collection = self.conn.get_collection("data")
         docs = list(collection.find({}))
@@ -372,8 +387,6 @@ class MongoQuery:
                 upsert=True
             )
             print("successfully changed format")
-            
-
 
     def add_same_cv_data_once(self, cv_file_list, ignore_first=True, components = {"AC":0, "FSI": 0, "ClO4": 0, "SO4": 0, "NO3": 0, "TFSI": 0}):
         
@@ -660,8 +673,7 @@ class MongoQuery:
                 upsert=True
 
                 )
-
-    
+ 
     def add_formulation(self, components = {"AC":0, "FSI": 0, "ClO4": 0, "SO4": 0, "NO3": 0, "TFSI": 0}):
         
         """
@@ -885,8 +897,6 @@ class MongoQuery:
                 upsert=True
 
                 )
-
-
 
     def add_cv_data_one(self, cv_file_list, ignore_first=True):
         all_cv_diff = []
@@ -1398,7 +1408,6 @@ class MongoQuery:
             except:
                 continue
 
-    
     def set_saturated_out(self, file):
         """
         Takes in file of salts where saturated out = true
@@ -1457,8 +1466,6 @@ class MongoQuery:
             with open(f"{collection_name}_zeeIsTestingThis.json", "w", encoding="utf-8") as file:
                 json.dump(docs, file, default=str, indent=4)
 
-        
-    
     def drop_data(self, collection_name):
         """
         Drop all data from a certain collection (i.e. table)

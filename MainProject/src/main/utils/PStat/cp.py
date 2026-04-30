@@ -358,7 +358,7 @@ def example_cp_test(cell):
 
 
 
-def run_cp_output(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], electrode_used = "Pt", save_to_db_folder = True, standard = False):
+def run_cp_output(output_file_name,values = [[0.002, 0.002 ,0.002, 0.002], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1], electrode_used = "Pt", save_to_db_folder = True, standard = False):
     
     tkp.toolkitpy_init("open_circuit_voltage.py")
     pstat = tkp.Pstat("PSTAT")
@@ -405,7 +405,7 @@ def run_cp_output(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.
         return db_path
 
 
-def run_cp_cell(cell, current=0, time_run=10, output_file_name = "chronopotentiometry", electrode_used = "Pt", path_to_save_to = r"C:\AttomRobotFiles\Data\DB_Missaka\cp", save_to_db_folder = True, standard = False):
+def run_cp_cell(cell, current, time_run, output_file_name = "chronopotentiometry", electrode_used = "Pt", path_to_save_to = r"C:\AttomRobotFiles\Data\DB_Ciara\cp", save_to_db_folder = True, standard = False):
     values = [[0, current, current, 0], [0.1, 0.1, 0.1], [time_run/2, time_run/2, 0.05], 1, 0.1]
     """
     #Vinit, Tinit, Vstep1, Tstep1, Vstep2, Tstep2, SamplePeriod,     CtrlMode
@@ -479,6 +479,7 @@ def run_cp_cell(cell, current=0, time_run=10, output_file_name = "chronopotentio
 
     s = time.localtime(time.time())
     curr_time = time.strftime("%Y-%m-%d %H:%M:%S", s)
+    mux.close()
 
     vf_diff,vf_max,vf_min  = cp_interpret(out_path)
     # overP, i0, alpha_c = kinetic_fit(out_path)
