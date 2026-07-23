@@ -15,6 +15,8 @@ from pathlib import Path
 from matplotlib import pyplot as plt          #Used to plot data
 import os
 
+LIVE_HOOK = None
+
 matplotlib.use('TkAgg')
 
 def check_eis_points(initial_freq, final_freq, points_per_decade):
@@ -398,6 +400,12 @@ def run_peis_cell(cell, output_file_name = "potentiostatic_eis", parameter_list 
                 time.sleep(0.01)
             if ok:
                 zcurve.add_point(readz)          # readz only has data on success
+                if LIVE_HOOK:
+                    try:
+                        _d = zcurve.acq_data()
+                        LIVE_HOOK("PEIS", _d['zreal'][zcurve.point - 1], -_d['zimag'][zcurve.point - 1])
+                    except Exception:
+                        pass
             steps.append((freq, ok))
             step += 1
             time.sleep(0.01)
@@ -794,5 +802,3 @@ def initialize_pstat(pstat):
     pstat.set_analog_out(0.0)
     pstat.set_pos_feed_enable(False)
     pstat.set_irupt_mode(tkp.IRUPTOFF)
-
-

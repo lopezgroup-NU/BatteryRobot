@@ -11,6 +11,8 @@ from pathlib import Path
 
 import logging
 
+LIVE_HOOK = None
+
 # FIX: single toolkitpy_init per process -- repeated inits cause Windows access violations
 _tkp_ready = False
 def _ensure_tkp(name="cv.py"):
@@ -160,6 +162,7 @@ class CV(Experiment):
                 point = data['point']
                 voltage = data['vf']
                 current = data['im']
+                if LIVE_HOOK: LIVE_HOOK("CV", voltage, current)
                 tkp.log.info(f'Point {point + 1} of {points}\nVoltage: {voltage:.4f} voltage\nCurrent: {current:.5f} Amps')
 
                 if abs(voltage) > 3:

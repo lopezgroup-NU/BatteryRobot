@@ -21,6 +21,7 @@ except ImportError:
             tkp.toolkitpy_init(tag)
             _TKP_READY[0] = True
 
+LIVE_HOOK = None
 
 #Statement of work
 #A modular rerunnable experiment according to given parameters. The resulting 
@@ -137,6 +138,7 @@ class CA(Experiment):
             while curve.running():
                 time.sleep(0.1)
                 data = curve.last_data_point()
+                if LIVE_HOOK: LIVE_HOOK("CA", time.time() - t0, data['im'])
                 if time.time() - last_print > 2:
                     print(f"point={data['point']:.3f}  vf={data['vf']:.3f}  im={data['im']:.3f}  t={time.time()-t0:.1f}")
                     last_print = time.time()

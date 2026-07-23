@@ -5,7 +5,7 @@ from config import powder_protocols, SourceRack, HeatRack
 from utils.PStat.geis import *
 from utils.PStat.cv import *
 from utils.PStat.ocv import *
-from utils.PStat.cp import *
+from utils.PStat.ca import *
 from temper_windows import TemperWindows
 import numpy as np
 import pandas as pd

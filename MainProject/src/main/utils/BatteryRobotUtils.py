@@ -15,7 +15,7 @@ from datetime import datetime as dt
 from utils.PStat.peis import *
 from utils.PStat.geis import *
 from utils.PStat.cv import *
-from utils.PStat.cp import *
+# from utils.PStat.cp import *
 from utils.PStat.ca import *
 from utils.PStat.triplet import *
 from utils.PStat.new_db import *
