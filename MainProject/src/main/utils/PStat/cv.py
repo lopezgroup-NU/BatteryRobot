@@ -9,8 +9,17 @@ from .experiment import Experiment
 from ..MathUtils import kinetic_fit
 from pathlib import Path
 
-#Statement of work
-#A modular rerunnable experiment according to given parameters. The resulting 
+import logging
+
+# FIX: single toolkitpy_init per process -- repeated inits cause Windows access violations
+_tkp_ready = False
+def _ensure_tkp(name="cv.py"):
+    global _tkp_ready
+    if not _tkp_ready:
+        tkp.toolkitpy_init(name)
+        _tkp_ready = True
+
+#A modular rerunnable experiment according to given parameters. 
 class CV(Experiment): 
     def __init__(self, voltage_list : list, scanrates : list, holdtimes : list, maxcycles : int,sample_period : float, PSTATMODE : tkp.CTRLMODE, **kwargs):
         """This class creates a Cylic voltammatry experiment
@@ -90,14 +99,15 @@ class CV(Experiment):
         return self.estimated_point_count() * self.sample_time        
 
     def estimated_point_count(self):
-        """This function returns the total number of data points for the CV"""
+        """Total number of data points for the CV (all cycles)."""
         SignalPoints0 = int(abs(self.voltage_list[1] - self.voltage_list[0])/(self.sample_time * self.scanrates[0]) + .5)
-        SignalPoints1 = int((self.holdtimes[0]/(self.sample_time) ) +0.5)
+        SignalPoints1 = int((self.holdtimes[0]/(self.sample_time)) + 0.5)
         SignalPoints2 = int(abs(self.voltage_list[2] - self.voltage_list[1])/(self.sample_time * self.scanrates[0]) + .5)
-        SignalPoints3 = int(abs(self.holdtimes[1] / self.sample_time) + 0.5)  # Hold 2
-        SignalPoints4 = int(abs((self.voltage_list[3] - self.voltage_list[2]) / (self.sample_time * self.scanrates[0])) + 0.5)  # V2 to Vfinal
-        SignalPoints5 = int((self.holdtimes[2] / self.sample_time) + 0.5)  # Hold 3 
-        return round(SignalPoints0 + SignalPoints1 + SignalPoints2 + SignalPoints3 + SignalPoints4 + SignalPoints5)
+        SignalPoints3 = int(abs(self.holdtimes[1] / self.sample_time) + 0.5)
+        SignalPoints4 = int(abs((self.voltage_list[3] - self.voltage_list[2]) / (self.sample_time * self.scanrates[0])) + 0.5)
+        SignalPoints5 = int((self.holdtimes[2] / self.sample_time) + 0.5)
+        per_cycle = SignalPoints0 + SignalPoints1 + SignalPoints2 + SignalPoints3 + SignalPoints4 + SignalPoints5
+        return round(per_cycle * self.maxcycles)
     
     def run_cv(self, pstat, max_size = 100000):
         """Runs the triangle wave experiment. A Cyclic voltammagram if in pstatmode, otherwise a galvanodynamic triangle wave
@@ -130,23 +140,38 @@ class CV(Experiment):
         pstat.set_cell(True)
         points = self.estimated_point_count()
         total_time = self.estimated_total_time()
-        curve.set_stop_i_min(True, -.000075)  #new
-        curve.set_stop_i_max(True, .000075)   #new
+        i_limit = 0.000075 if self.guilherme_mode else 0.001#0.005, 0.000075
+        # FIX: I-stops were truncating normal CVs mid-sweep ("only ran 1 voltage") and can never
+        # match Framework traces on conductive cells. Keep them only for guilherme_mode's
+        # deliberate 75 uA limit; normal runs rely on the |Vf| > 3 V guard below.
+        if self.guilherme_mode:
+            curve.set_stop_i_min(True, -1*i_limit)  #new
+            curve.set_stop_i_max(True, i_limit)   #new
         
+        class OverVoltageError(Exception):
+            pass
+
         tkp.log.info(f"Running CV experiment there will be ~{points} rows of data and the experiment will take {total_time} seconds")
         curve.run(True)
-        while curve.running():
-            Time.sleep(1)
-            data = curve.last_data_point()
-            point = data['point']
-            voltage = data['vf']
-            current = data['im']
-            tkp.log.info(f'Point {point + 1} of {points}\nVoltage: {voltage:.4f} voltage\nCurrent: {current:.4f} Amps')
-        
-        pstat.set_cell(False)
+        try:
+            while curve.running():
+                Time.sleep(1)
+                data = curve.last_data_point()
+                point = data['point']
+                voltage = data['vf']
+                current = data['im']
+                tkp.log.info(f'Point {point + 1} of {points}\nVoltage: {voltage:.4f} voltage\nCurrent: {current:.5f} Amps')
+
+                if abs(voltage) > 3:
+                    print("---Excessive voltage detected! Stopping CV test---")
+                    raise OverVoltageError("|Vf| > 3 V")
+        finally:
+            pstat.set_cell(False)   # cell goes off on every exit, including exceptions
+
         data = curve.acq_data()
         if data['stop_test'][-1] != 0:
-            tkp.log.info(f'Stop test occurred at point {data["point"]}')
+            print(f"*** CV stop-at tripped (i_limit {i_limit} A) -- sweep truncated")
+            tkp.log.info(f'Stop test occurred at point {data["point"][-1]}')  # FIX: last point, not the whole array
         print("Cyclic Voltammatry completed")
         self.is_run = True
         if self.PSTATMODE == tkp.PSTATMODE:
@@ -172,7 +197,12 @@ class CV(Experiment):
             pstat.set_vch_offset_enable(False)
             pstat.set_ach_range(3.0)
             pstat.set_ie_range_lower_limit(0) #For none
-            pstat.set_ie_range(8)
+            # pstat.set_ie_range(pstat.test_ie_range(0.01))   # sane starting range
+            pstat.set_ie_range(8 if self.guilherme_mode else 10)
+            pstat.set_ie_range_mode(True)
+            # FIX: set filters explicitly -- otherwise CV inherits PEIS's ~3 Hz filters
+            pstat.set_vch_filter(1.0/self.sample_time)
+            pstat.set_ich_filter(1.0/self.sample_time)
             pstat.set_pos_feed_enable(False)
             pstat.set_analog_out(0.0)
             pstat.set_voltage(0.0)
@@ -201,7 +231,7 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
     
     
     
-    tkp.toolkitpy_init("open_circuit_voltage.py")
+    _ensure_tkp("open_circuit_voltage.py")  # FIX: was tkp.toolkitpy_init on every call
     pstat = tkp.Pstat("PSTAT")
     cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
     data = cv.run_cv(pstat, max_size = 100000)
@@ -214,8 +244,12 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
         out_path = "res/cv/" + output_file_name + ".csv"
     np.savetxt(out_path, data, delimiter = ',', header = 'Point,time,Vf,Vu,Im,Ach,vsig,temp,Cycle,ie_range,overload,stop_test', fmt = '%s') 
     print("getting temp")
-    temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
-    temperature = temper.get_temperature()[1]
+    try:
+        temper = TemperWindows(vendor_id=0x3553, product_id=0xa001) # long press caps lock
+        temperature = temper.get_temperature()[1]
+    except Exception as e:
+        print("temp read failed: {}".format(e))
+        temperature = float("nan")
     
     df = pd.read_csv(out_path, index_col='# Point')
     df['temp(C)'] = temperature
@@ -223,6 +257,8 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
 
     if save_to_db_folder and not standard:
         #C:\AttomRobotFiles\Data\DB_Missaka\eis
+        #C:\AttomRobotFiles\Data\DB_Missaka\cv
+        
         db_path = Path(r"C:\AttomRobotFiles\Data\DB_Missaka\cv") / f"{output_file_name}.csv"
         df.to_csv(db_path)   
 
@@ -236,7 +272,13 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
     s = time.localtime(time.time())
     curr_time = time.strftime("%Y-%m-%d %H:%M:%S", s)
 
-    vf_diff,vf_max,vf_min  = cv_interpret(out_path)
+    # vf_diff,vf_max,vf_min  = cv_interpret(out_path)
+
+    try:
+        vf_diff, vf_max, vf_min = cv_interpret(out_path)
+    except Exception as e:
+        print("cv_interpret failed on {}: {}".format(output_file_name, e))
+        vf_diff = vf_max = vf_min = None
     # overP, i0, alpha_c = kinetic_fit(out_path)
     new_row = pd.DataFrame([[output_file_name, vf_max, vf_min, vf_diff, None, None, None, temperature, curr_time]], columns=['test name', 'vf_max', 'vf_min', 'vf_diff',  "overP", "i0", "alpha_c", 'temp', 'time'])
     s_df = pd.concat([s_df, new_row], ignore_index=True)
@@ -244,6 +286,154 @@ def run_cv2(output_file_name,values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.
 
     if save_to_db_folder and not standard:
         return db_path
+
+
+def run_cv_cell(cell, output_file_name = "chronovoltometry",  values = [[1, 1.8, 1.08, 1], [0.01, 0.01, 0.01], [0.05, 0.05, 0.05], 2, 0.1], electrode_used = "Pt", path_to_save_to = r"C:\AttomRobotFiles\Data\DB_Ciara\cv", save_to_db_folder = True, standard = False, potentials_to_hold = [[0,0]]):
+                                                                    #  [[voltagelist],[  scanrates  ], [    holdtimes   ], maxcycles, sample_period]
+    
+    _ensure_tkp("open_circuit_voltage.py")  # FIX: was tkp.toolkitpy_init on every call (24x per plate)
+    device_list = tkp.enum_sections()
+
+    #pstat_list_names = tkp.enum_sections()
+    #print(pstat_list_names)
+   
+    imx_list = []
+    pstat_list = []
+
+    for device_name in device_list:
+        tag = device_name[0:3]
+        if tag == 'IMX':
+            imx_list.append(device_name)
+        elif tag == 'IFC':
+            pstat_list.append(device_name)
+        else:
+            print(f"!!!!! Found a non IMX or IFC type device. It is called: {device_name}")
+    mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+    imx_list.sort()
+    pstat_list.sort()
+    #del pstat_list[0]
+    print(pstat_list)
+    print(mux_pstat_index)
+    # pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+
+    # mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
+    # mux.open()
+    # pstat.open()
+
+    # for i in range(8):
+    #     mux.set_off_mode(i,tkp.MUX_CELL_LOCAL)
+
+    # # for pair in potentials_to_hold:
+    # #     #mux.set_off_mode(pair[0]-mux_pstat_index*8,tkp.MUX_CELL_LOCAL)
+    # #     mux.set_dac(pair[0]-mux_pstat_index*8, pair[1])
+
+    # for pair in potentials_to_hold:
+    #     ch = pair[0] - mux_pstat_index*8
+    #     if 0 <= ch <= 7:
+    #         mux.set_dac(ch, pair[1])
+    #     # else: that cell isn't on this block's mux — skip it
+
+    # mux.set_cell(cell-mux_pstat_index*8)
+
+    # cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 0.01, guilherme_mode=False)
+    # # FIX: close mux/pstat on every exit -- an exception here used to leak GamryCom
+    # # leases (DEVICE_IN_USE on the next run)
+    # try:
+    #     data = cv.run_cv_test(pstat, max_size = 100000)
+    #     #TODO  
+    #     #add the new columns (electrode i think) to the actual CSV file
+    # finally:
+    #     mux.close()
+    #     pstat.close()
+
+
+
+    pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+    mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
+    try:
+        mux.open()
+        active_ch = cell - mux_pstat_index * 8
+        for ch in range(8):
+            if ch != active_ch:
+                mux.set_off_mode(ch, tkp.MUX_CELL_LOCAL)
+                mux.set_dac(ch, 0.0)
+        for pair in potentials_to_hold:
+            ch = pair[0] - mux_pstat_index * 8
+            if 0 <= ch <= 7 and ch != active_ch:
+                mux.set_dac(ch, pair[1])
+        mux.set_cell(active_ch)
+
+
+        cv = CV(values[0], values[1], values[2], values[3], values[4], tkp.PSTATMODE, imax=10, guilherme_mode=False)
+        data = cv.run_cv_test(pstat)
+    finally:
+        try:
+            pstat.set_cell(False)
+        except Exception:
+            pass
+        try:
+            mux.close()
+        except Exception:
+            pass
+        try:
+            pstat.close()
+        except Exception:
+            pass
+    # if standard:
+    #     out_path = "res/standard/cv/" + output_file_name+ ".csv"
+    # else:
+    #     out_path = "res/cv/" + output_file_name + ".csv"
+    # np.savetxt(out_path, data, delimiter = ',', header = 'Point,time,Vf,Vu,Im,Ach,vsig,temp,Cycle,ie_range,overload,stop_test', fmt = '%s')
+    # print("getting temp")
+    # temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
+    # temperature = temper.get_temperature()[1]
+    # today = datetime.datetime.now()
+    # formatted_date = today.strftime("%Y/%m/%d %H:%M:%S")  #Year/Month/Day Hour:Minute:Second
+
+    # df = pd.read_csv(out_path, index_col='# Point')
+    # df['temp(C)'] = temperature
+    # df['datetime'] = formatted_date
+    # df.to_csv(out_path)
+
+    # if save_to_db_folder and not standard:
+    #     #C:\AttomRobotFiles\Data\DB_Missaka\eis
+    #     db_path = Path(path_to_save_to) / f"{output_file_name}.csv"
+    #     df.to_csv(db_path)   
+    
+    # if standard:
+    #     s_df_file = "res/standard/std_cv_test_summaries.csv"
+    # else:
+    #     s_df_file = "res/cv_test_summaries.csv"
+
+    # s_df = pd.read_csv(s_df_file)
+
+    # s = time.localtime(time.time())
+    # curr_time = time.strftime("%Y-%m-%d %H:%M:%S", s)
+
+    # vf_diff,vf_max,vf_min  = cv_interpret(out_path)
+    # # overP, i0, alpha_c = kinetic_fit(out_path)
+    # new_row = pd.DataFrame([[output_file_name, vf_max, vf_min, vf_diff, None, None, None, temperature, curr_time]], columns=['test name', 'vf_max', 'vf_min', 'vf_diff',  "overP", "i0", "alpha_c", 'temp', 'time'])
+    # s_df = pd.concat([s_df, new_row], ignore_index=True)
+    # s_df.to_csv(s_df_file, index=False)
+
+    # if save_to_db_folder and not standard:
+    #     return db_path
+
+    df = pd.DataFrame(data)
+
+    # FIX: guard the dongle read -- an unguarded failure here threw away the whole run
+    try:
+        temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
+        df["temp(C)"] = temper.get_temperature()[1]
+    except Exception as e:
+        print("temp read failed: {}".format(e))
+        df["temp(C)"] = float("nan")
+    df["datetime"] = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+
+    return df
+
+
+
 
 def cv_interpret(filename):
     df_file = filename

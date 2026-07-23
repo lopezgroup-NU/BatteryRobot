@@ -2,7 +2,6 @@ from pyautogui import moveTo, dragTo, click
 from pywinauto import Application
 import subprocess
 import time
-from pywinauto import Application
 from pathlib import Path
 
 def is_app_running(app_name="LAND Battery Testing System - Monitor Software V7.4"):

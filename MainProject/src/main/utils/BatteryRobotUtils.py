@@ -4,18 +4,30 @@ import yaml
 import datetime
 import pandas as pd
 import tkinter as tk
+import threading
+import uuid
 from GUI import *
 from north import NorthC9
 from molmass import Formula
 from Locator import *
 from config import SourceRack, HeatRack, DispRack, PowderProtocol
+from datetime import datetime as dt
+from utils.PStat.peis import *
 from utils.PStat.geis import *
 from utils.PStat.cv import *
+from utils.PStat.cp import *
+from utils.PStat.ca import *
+from utils.PStat.triplet import *
+from utils.PStat.new_db import *
+
 from utils.PStat.ocv import *
-from .PowderShakerUtils import PowderShaker
-from .T8Utils import T8
-from .ExceptionUtils import *
-from .MathUtils import get_time_stamp
+from utils.mouseUtils import *
+from utils.PAGUtils import *
+from utils.PowderShakerUtils import PowderShaker
+from utils.T8Utils import T8
+from utils.ExceptionUtils import *
+from utils.MathUtils import get_time_stamp
+
 
 """
 Module for BatteryRobot operation
@@ -27,6 +39,13 @@ class BatteryRobot(NorthC9):
 
     child of NorthC9 - inherits North's methods plus methods defined in here
     """
+    Global_Plate = None
+    
+
+    # NOTE: PROPERTIES FOR PLATE_ID FILE SYSTEM. THESE ARE GLOBAL VARIABLES
+    Plate_Properties = {}
+
+    ACTIVE_TESTS = ["PEIS", "CV"]
 
     def __init__(self, address, network_serial, home=False, config_path = "config/config.yaml"):
         """
@@ -257,26 +276,733 @@ class BatteryRobot(NorthC9):
         t8.set_temp(1, 10)
         print("Done running!")
 
-    def run_test(self, run_file, standard = None):
+    def run_test(self, run_file, standard = None, g_mode = True): # NOTE: pumping is very slow; carousel rotates too much (overshoots) off center of bottle cap
         '''
         Runs the testing files
         If standard is provided, will run experiment before and after test file is done
         Standard should be a dict consisting of the standard's name (default to "standard") 
         and the position it is located. e.g.
-
+ 
         standard = {
             "name": "standard",
             "pos": "B5",
             "electrode_used": "Pt"
         }
-
+ 
         '''
-
-        today = datetime.datetime.now()
+        import uuid
+        import toolkitpy as tkp
+        if not getattr(tkp, "_init_done", False):
+            tkp.toolkitpy_init("run_test.py")
+            tkp._init_done = True
+            tkp.toolkitpy_init = lambda *a, **k: None
+ 
+        today = dt.now()
         formatted_date = today.strftime("%Y%m%d_%H%M%S")  # YearMonthDay_HourMinuteSecond
         
-        granular_log_file = open(f"C:/AttomRobotFiles/Software/BatteryRobot/MainProject/src/main/granular_logs/test_{formatted_date}.txt", "a")        
+        granular_log_file = open(f"C:/AttomRobotFiles/Software/BatteryRobot/MainProject/src/main/granular_logs/test_{formatted_date}.txt", "a", buffering=1)
+        # granular_log_file = open(f"C:/AttomRobotFiles/Software/BatteryRobot/MainProject/src/main/granular_logs/test_{formatted_date}.txt", "a")        
+ 
+        summary_path = r"C:\AttomRobotFiles\Software\BatteryRobot\MainProject\src\main\res\data_summary.csv"
 
+        # 
+
+
+        # def record_run(test_id, run_id, run_type: str, order):
+        #     import os
+        #     new_row = pd.DataFrame([{
+        #         "id": test_id,
+        #         "run_id": run_id,
+        #         "order": order,
+        #         "electrode": electrode_used,
+        #         "formulation": getattr(test, "Experiment", ""),
+        #         "run_type": run_type,
+        #     }])
+        #     write_header = not os.path.exists(summary_path)
+        #     new_row.to_csv(summary_path, mode="a", header=write_header, index=False)
+ 
+        # def record_run(test_id, run_id, run_type: str, order):
+        #     import os
+        #     sub = ("res/standard/" if row_is_standard else "res/") + \
+        #           ("geis/" if run_type == "GEIS" else "cv/")
+        #     new_row = pd.DataFrame([{
+        #         "id": test_id, "run_id": run_id, "order": order,
+        #         "electrode": electrode_used,
+        #         "formulation": getattr(test, "Experiment", ""),
+        #         "run_type": run_type,
+        #         "standard": row_is_standard,
+        #         "path": os.path.abspath(sub + test_id + ".csv"),
+        #         "time": get_time_stamp(),
+        #     }])
+        #     write_header = not os.path.exists(summary_path)
+        #     new_row.to_csv(summary_path, mode="a", header=write_header, index=False)
+
+        summary = SummaryCSV(DATA_SUMMARY)
+
+        def record_run(test_id, run_id, run_type: str, order):
+            import os
+            exp = str(getattr(test, "Experiment", ""))
+            comps = parse_formulation(exp)
+            sub = "res/" + ("geis/" if run_type == "GEIS" else "cv/")
+            fpath = os.path.abspath(sub + test_id + ".csv")
+            summary.append(TestRecord(
+                id=test_id, run_id=run_id,
+                formulation=canonical_formulation(comps) or exp,  # LiTFSI_1p50m -> LiTFSI_1p5m; plain names pass through
+                run_type=run_type, order=order,
+                electrode=str(electrode_used),
+                date=get_time_stamp(),
+                temp=read_temp(fpath),
+                notes=str(getattr(test, "Notes", "")),
+                path=fpath,
+                components=comps,
+            ))
+
+
+        df = pd.read_csv(run_file)
+        self.disp_rack.get_sol_vols()
+        missing = [p for p in df["Target_vial"] if p not in self.disp_rack.sol_vols]
+        if missing:
+            raise Exception("Target vials missing from disp_rack.csv (name/volume): {}".format(missing))
+        run_standard = standard is not None
+        if run_standard:
+            # perform checks on disp rack and ensure vial has been added. 
+            name = standard.get("name", "standard")
+            try:
+                pos = standard.get("pos")
+            except:
+                raise Exception("Need to provide a pos for standard!")
+            
+            tup = self.disp_rack.get_vial_by_pos(pos)
+            if tup is None:
+                raise Exception("Add standard vial to disp_rack.csv first!")
+ 
+            if tup[0] != name:
+                raise Exception(f"Make sure vial name at {pos} on disp_rack.csv is the same \
+                                as what you provide to run_test()")
+            
+            
+            name = name + "_" + formatted_date
+            std = {"Experiment": name, "Target_vial": pos,
+                   "electrode_used": standard.get("electrode_used"),
+                   "GEIS": True, "GEIS_Conditions": "250000 1 0.00001",
+                   "CV": True, "CV_Conditions": "2 -2 0.020",
+                   "CE": False, "SaveDB": False}
+            missing = set(df.columns) - set(std)
+            if missing:
+                raise Exception(f"Standard row missing columns: {missing}")
+            new_row = pd.DataFrame([std])[df.columns]
+            df = pd.concat([new_row, df, new_row], ignore_index=True)
+            # row = [name, pos, standard.get("electrode_used"),True, "250000 1 0.00001", True, "2 -2 0.020", False, False]
+            # new_row = pd.DataFrame([row], columns=df.columns)
+            # df = pd.concat([new_row, df, new_row], ignore_index=True)
+ 
+        log_file = open("experiments/experiments.log", "a")
+        log_file.write("*" * 50 + "\n")
+        log_file.write(f"Running tests: {get_time_stamp()} \n")
+ 
+        for i, test in enumerate(df.itertuples()):
+            try:
+                print(test)
+                target_pos = test.Target_vial
+                electrode_used=test.electrode_used
+                log_file.write(f"   Beginning tests for position {target_pos} at: \
+                               {get_time_stamp()} \n")
+ 
+                target_idx = self.disp_rack.pos_to_index(target_pos)
+                GEIS = True if test.GEIS else False
+                CV = True if test.CV else False
+                CE = True if test.CE else False
+                run_id = uuid.uuid4().hex 
+
+                save_to_db = test.SaveDB
+                row_is_standard = run_standard and (i == 0 or i==len(df) - 1)
+                if GEIS and CV:
+                    if len(test.GEIS_Conditions.split()) != 3:
+                        raise ContinuableRuntimeError("GEIS_CONDITIONS must have 3 parameters!")
+                    if len(test.CV_Conditions.split()) != 3:
+                        raise ContinuableRuntimeError("CV_CONDITIONS must have 3 parameters!")
+ 
+                    init_freq, final_freq, amp = [float(i) for i in test.GEIS_Conditions.split()]
+                    point1, point2, rate = [float(i) for i in test.CV_Conditions.split()]
+ 
+                    geis_parameter_list = {
+                        "initial_freq": init_freq,
+                        "final_freq": final_freq,
+                        "ac_current": amp           #AC current amplitude
+                    }
+ 
+                    # this test is a standard test if we determine we're running a standard
+                    # and this is the first or last row of the run
+                    geis_files = []
+                    cv_files = []
+                    # run test three times
+                    for j in range(3):
+                        test_id_geis = uuid.uuid4().hex
+ 
+                        self.move_vial(rack_disp_official[target_idx], vial_carousel)
+                        granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {get_time_stamp()}")
+                        self.goto_safe(safe_zone)
+                        granular_log_file.write(f"\n * moved arm to safe zone" + f" *** {get_time_stamp()}")
+                        self.draw_to_sensor(target_idx, viscous=True, special=True)
+                        granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {get_time_stamp()}")
+                        self.set_output(6, False)
+                        self.set_output(7, False)
+                        self.set_output(8, False)
+                        
+                        run_geis(output_file_name=test_id_geis,
+                                parameter_list=geis_parameter_list, 
+                                save_to_db_folder = save_to_db,
+                                standard=row_is_standard)
+                        granular_log_file.write(f"\n * ran geis test" + f" *** {get_time_stamp()}")
+                        # geis_files.append(geis_file)
+                        record_run(test_id_geis, run_id, "GEIS", j)
+                        self.draw_sensor1to2(viscous=True)
+
+                        # self.draw_sensor1to2(target_idx, viscous=True)
+                        granular_log_file.write(f"\n * drew from carousel vial to sensor 2 (from sensor 1)" + f" *** {get_time_stamp()}")
+                        self.set_output(6, True)
+                        self.set_output(7, True)
+                        self.set_output(8, True)
+                        ocv = RunOCV_lastV()
+                        print("running cv test")
+                        test_id_cv = uuid.uuid4().hex
+                        run_cv_output(output_file_name=test_id_cv,
+                                values=[[ocv, point1, point2, 0],
+                                        [rate, rate, rate],
+                                        [0.05, 0.05, 0.05],
+                                        1,
+                                        0.1], 
+                                electrode_used = electrode_used,
+                                save_to_db_folder = save_to_db,
+                                standard=row_is_standard)
+                        granular_log_file.write(f"\n * ran cv test" + f" *** {get_time_stamp()}")
+                        # cv_files.append(cv_file)
+                        self.set_output(6, False)
+                        self.set_output(7, False)
+                        self.set_output(8, False)
+ 
+                        record_run(test_id_cv, run_id, "CV", j)
+ 
+                    if save_to_db:
+                        pass
+ 
+                elif GEIS:
+                    if len(test.GEIS_Conditions.split()) != 3:
+                        raise ContinuableRuntimeError("GEIS_CONDITIONS must have 3 parameters!")
+                    init_freq, final_freq, amp = [float(i) for i in test.GEIS_Conditions.split()]
+ 
+                    geis_parameter_list = {
+                        "initial_freq": init_freq,
+                        "final_freq": final_freq,
+                        "ac_current": amp
+                    }
+                    self.set_output(6, False)
+                    self.set_output(7, False)
+                    self.set_output(8, False)
+                    for j in range(3):
+                        test_id = uuid.uuid4().hex
+                        self.move_vial(rack_disp_official[target_idx], vial_carousel)
+                        granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {get_time_stamp()}")
+                        self.goto_safe(safe_zone)
+                        granular_log_file.write(f"\n * moved arm to safe zone" + f" *** {get_time_stamp()}")
+                        self.draw_to_sensor(target_idx, viscous=True, special=True)
+                        granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {get_time_stamp()}")
+                        run_geis(output_file_name=f"{test_id}",
+                                 parameter_list=geis_parameter_list,
+                                save_to_db_folder = save_to_db,
+                                standard=row_is_standard)
+                        granular_log_file.write(f"\n * ran geis test" + f" *** {get_time_stamp()}")
+                        record_run(test_id, run_id, "GEIS", j)
+                elif CV:
+                    if len(test.CV_CONDITIONS.split()) != 3:
+                        raise ContinuableRuntimeError("CV_CONDITIONS must have 3 parameters!")
+                    # pass point1, pooint2, rate to run_cv2 
+                    point1, point2, rate = [float(i) for i in test.CV_Conditions.split()]
+ 
+                    self.set_output(6, True)
+                    self.set_output(7, True)
+                    self.set_output(8, True)
+                    for j in range(3):
+                        test_id = uuid.uuid4().hex
+                        self.move_vial(rack_disp_official[target_idx], vial_carousel)
+                        granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {get_time_stamp()}")
+                        self.draw_to_sensor(target_idx, second_sensor=True)
+                        granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {get_time_stamp()}")
+                        ocv = RunOCV_lastV()
+                        run_cv_output(output_file_name=test_id,
+                                values=[[ocv, point1, point2, 0],
+                                        [rate, rate, rate],
+                                        [0.05, 0.05, 0.05],
+                                        1,
+                                        0.1],
+                                electrode_used = electrode_used,
+                                save_to_db_folder = save_to_db,
+                                standard=row_is_standard)
+                        granular_log_file.write(f"\n * ran cv test" + f" *** {get_time_stamp()}")
+                        record_run(test_id, run_id, "CV", j)
+                    self.set_output(6, False)
+                    self.set_output(7, False)
+                    self.set_output(8, False)
+ 
+                log_file.write(f"   Finished tests for position {target_pos} at: \
+                               {get_time_stamp()} \n")
+ 
+                self.purge()
+ 
+            except ContinuableRuntimeError as e:
+                response = input(f"{e}. Unable to run current test. Continue with others? Yes/No")
+                if response.upper() == "YES":
+                    pass
+                elif response.upper() == "NO":
+                    break
+ 
+        log_file.write(f"Finished all formulations: {get_time_stamp()} \n")
+        log_file.write("*" * 50 + "\n")
+        log_file.close()
+        granular_log_file.close()
+
+    def runs_to_official(self, 
+                   staging_dir = Path(r"C:\AttomRobotFiles\Software\BatteryRobot\MainProject\src\main\res\DB_upsert_G"), 
+                   data_summary = Path(r"C:\AttomRobotFiles\Software\BatteryRobot\MainProject\src\main\res\data_summary.csv"), 
+                   db_root = Path(r"C:\AttomRobotFiles\Data\DB_Missaka"),
+                   official = Path(r"C:\AttomRobotFiles\Data\DB_Missaka\official_summary.csv"), 
+                   move = False):
+        promote_folder(staging_dir, data_summary, db_root, official, move)
+
+
+    def runs_to_DB(self,
+                   official = Path(r"C:\AttomRobotFiles\Data\DB_Missaka\official_summary.csv"), 
+                   uri = "mongodb://localhost:27017/",
+                   db_name = "G_updated",
+                   coll_name = "formulations"):
+        upload_official_to_mongo(official, uri, db_name, coll_name)
+
+    def translate_coords_to_index(self, coords):
+        """
+        takes in coords like "A2"
+        """
+
+        coords = coords.upper()
+        letter_index = 0
+        if coords[0] == 'A':
+            letter_index = 0
+        elif coords[0] == 'B':
+            letter_index = 1
+        elif coords[0] == 'C':
+            letter_index = 2
+        elif coords[0] == 'D':
+            letter_index = 3
+
+        index = 4*(coords[1]-1) + letter_index
+
+    def dispense_into_well(self, reservoir_id, well, mL_to_fill):
+        self.open_gripper()
+        self.reset_pump()
+
+
+        #source = disp_rack_id
+        #wells_to_fill = well
+        mL_remaining = mL_to_fill
+
+        #move vial to the carousel, uncap it, and get pipette
+        self.get_pipette()
+        self.zero_scale()
+
+        while mL_remaining > 0:
+        # draw from the vial in the carousel and dispense it at the well plate
+            self.goto_safe(carousel_aspirate)
+            mL_to_dispense_this_cycle = min(1, mL_remaining)
+            self.aspirate_ml(3, mL_to_dispense_this_cycle)
+            mL_remaining -= mL_to_dispense_this_cycle
+
+            #TODO Enter code in here to go to the "well" position in ciara's well plate thing
+            
+            self.dispense_ml(3, mL_to_dispense_this_cycle)
+            
+            #TODO Enter code in here to leave the well plate. maybe a goto_safe(safe_zone)
+
+    def get_xyz_position(self):
+        pos_cts = self.get_robot_positions()
+        pos_xyz = list(self.n9_fk(pos_cts[0], pos_cts[1], pos_cts[2]))
+        pos_xyz.pop()
+        z = self.counts_to_mm(3, pos_cts[3])
+        pos_xyz.append(z)
+        print(pos_xyz)
+        return pos_xyz
+    
+    def set_pos_manual(self):
+        self.home_robot()
+        self.robot_servo(False)
+
+        input("Position Arm. Enter to set desired position")
+
+        captured_position = self.get_robot_positions()
+
+        input("Press Enter to test saved position")
+        self.home_robot()
+        self.goto_safe(captured_position)
+        print(captured_position)
+
+    def star_dropcast(self, position, volume = 0.5, pump_id = 3):
+        self.goto_safe(position)
+
+        pos_cts = self.get_robot_positions()
+        pos_xyz = list(self.n9_fk(pos_cts[0], pos_cts[1], pos_cts[2]))
+        pos_xyz.pop()
+        z = self.counts_to_mm(3, pos_cts[3])
+        pos_xyz.append(z)
+        print(pos_xyz)
+        #pos_xyz = [66,70,285]
+        squish_factor = 0.6
+        r = 4
+        circle_points = []
+        num_steps = 12
+        for index in range(0,num_steps//2):
+            theta = ((index/(num_steps//2)) * 2*math.pi) + math.pi/2
+            circle_points.append([r*math.cos(theta), r*math.sin(theta)*squish_factor])
+        
+            theta = ((index/(num_steps//2)) * 2*math.pi) + math.pi/2
+            circle_points.append([-1*r*math.cos(theta), r*math.sin(theta)*squish_factor])
+        #circle_points.append([-1*r, 0])
+        #circle_points.append([r, 0])
+        # if len(circle_points) % 4 != 0:
+        #     for i in range(len(circle_points) % 4):
+        #         circle_points.pop()
+        dispense_steps = num_steps + 1
+        print(circle_points)
+        print(len(circle_points))
+        for i in range(0, num_steps//2):
+            circle_points[i][1] += r*squish_factor
+            circle_points[i+int((len(circle_points)/2))][1] -= r*squish_factor
+        already_dispensed_coords = []
+
+        for coord in circle_points:
+            if [round(coord[0],1), round(coord[1],1)] not in already_dispensed_coords:
+                print(f"{ coord[0]}\t{coord[1]}")
+                self.move_xy(pos_xyz[0] + coord[0], pos_xyz[1] + coord[1])
+                self.delay(0.1)
+                self.dispense_ml(pump_id, volume/(dispense_steps))
+                already_dispensed_coords.append([round(coord[0],1), round(coord[1],1)])
+        self.move_xy(pos_xyz[0] + (r*2), pos_xyz[1])
+        self.delay(0.1)
+        self.dispense_ml(pump_id, volume/(dispense_steps))
+
+        self.move_xy(pos_xyz[0] - (r*1.8), pos_xyz[1])
+        self.delay(0.1)
+        self.dispense_ml(pump_id, volume/(dispense_steps))
+        self.delay(1)
+        self.goto_safe(dropcast_aspirate)
+        self.home_pump(pump_id)
+            #self.pump_helper(length=1250/num_steps, draw=True, pump_address=3,suppress=True) 
+
+    def star_dropcast_prep(self, pump_id = 3, empty_pipette = False):
+        self.home_pump(pump_id)
+        self.goto_safe(dropcast_aspirate)
+        self.set_pump_valve(pump_id, self.PUMP_VALVE_LEFT)
+        if empty_pipette:
+            self.aspirate_ml(pump_id, 0.5)
+            self.dispense_ml(pump_id, 0.5)
+
+    def star_dropcast_cleanup(self, pump_id = 3):
+        self.home_pump(pump_id)
+
+    def put_vial_back_from_carousel(self, original_position):
+
+        # remove pipette and cap and return vial
+        self.remove_pipette()
+        self.cap_and_return_vial_to_rack(original_position)
+
+    def run_cell_tests(self, cell_triplet_seeds, source, mL_to_dispense, cp_amps, test_run = True):
+        """
+        Docstring for run_cell_tests
+        
+        :param self: Description
+        :param cell_triplet_seeds: list of "seeds" from 0-7 which correspond to triplets with the form [[0,8,16],[1,9,17],[2,10,18], ...]
+        :param source: reservoir index which can be drawn from
+        :param mL_to_dispense: mL to dispense into each cell
+        """
+
+        plate_id = "PLATE" + ''.join(random.choices(string.hexdigits()[:16], k=16))
+
+        id_0 = ''.join(random.choices(string.hexdigits()[:16], k=8))
+        id_1 = ''.join(random.choices(string.hexdigits()[:16], k=8))
+        id_2 = ''.join(random.choices(string.hexdigits()[:16], k=8))
+        cell_triplets = []
+
+        for seed in cell_triplet_seeds:
+            cell_triplets.append([seed, seed+8, seed+16])
+
+        past_cell_triplets = []
+        for triplet_index in range(source,len(cell_triplets)): #for each triplet
+             # for the first (dispensing) action with the triplets, begin running test 1 (geis) immediately
+            self.dispense_into_well(source, cell_triplets[triplet_index][0], mL_to_dispense)
+            t0 = threading.Thread(target=run_geis_cell, args=(cell_triplets[triplet_index][0], f"ID_{id_0}_EIS.csv")) #saves data; eval statements
+            t0.start()
+            self.dispense_into_well(source, cell_triplets[triplet_index][1], mL_to_dispense)
+            t1 = threading.Thread(target=run_geis_cell, args=(cell_triplets[triplet_index][1], f"ID_{id_1}_EIS.csv"))
+            t1.start()
+            self.dispense_into_well(source, cell_triplets[triplet_index][2], mL_to_dispense)
+            t2 = threading.Thread(target=run_geis_cell, args=(cell_triplets[triplet_index][2], f"ID_{id_2}_EIS.csv"))
+            t2.start()
+            #join the threads started in the eval statements above
+            t0.join()
+            t1.join()
+            t2.join()
+
+            #run cv
+            t0 = threading.Thread(target=run_cv_cell, args=(cell_triplets[triplet_index][0], f"ID_{id_0}_CV.csv"))
+            t0.start()
+            t1 = threading.Thread(target=run_cv_cell, args=(cell_triplets[triplet_index][1], f"ID_{id_1}_CV.csv"))
+            t1.start()
+            t2 = threading.Thread(target=run_cv_cell, args=(cell_triplets[triplet_index][2], f"ID_{id_2}_CV.csv"))
+            t2.start()
+            t0.join()
+            t1.join()
+            t2.join()
+            
+            #run cp
+            t0 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][0], cp_amps, 600, f"ID_{id_0}_CP.csv"))
+            t0.start()
+            t1 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][1], cp_amps, 600, f"ID_{id_1}_CP.csv"))
+            t1.start()
+            t2 = threading.Thread(target=run_cp_cell, args=(cell_triplets[triplet_index][2], cp_amps, 600, f"ID_{id_2}_CP.csv")) 
+            t2.start()
+            t0.join()
+            t1.join()
+            t2.join()
+            
+            
+            for past_cell_triplet in past_cell_triplets:
+                #run cp again on all 3 for 1 minute/60 seconds
+                t1 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[0], cp_amps, 60))
+                t1.start()
+                t2 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[1], cp_amps, 60))
+                t2.start()
+                t3 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[2], cp_amps, 60))
+                t3.start()
+
+                t1.join()
+                t2.join()
+                t3.join()
+            
+
+            past_cell_triplets.append(cell_triplets[triplet_index])
+
+        for past_cell_triplet in past_cell_triplets:
+            #run cp again on all 3 for 1 minute/60 seconds
+            t1 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[0], cp_amps, 60))
+            t1.start()
+            t2 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[1], cp_amps, 60))
+            t2.start()
+            t3 = threading.Thread(target=run_cp_cell, args=(past_cell_triplet[2], cp_amps, 60))
+            t3.start()
+
+            t1.join()
+            t2.join()
+            t3.join()
+
+    def run_cell_tests_single(self, cell, source=0, mL_to_dispense=0, cp_amps=0):
+        """
+        Docstring for run_cell_tests
+        
+        :param self: Description
+        :param cell_triplet_seeds: list of "seeds" from 0-7 which correspond to triplets with the form [[0,8,16],[1,9,17],[2,10,18], ...]
+        :param source: reservoir index which can be drawn from
+        :param mL_to_dispense: mL to dispense into each cell
+        """
+
+        
+        #self.dispense_into_well(source, cell, mL_to_dispense)
+        run_geis_cell(cell)
+        
+           
+        #run cv
+        # t0 = threading.Thread(target=run_cv_cell, args=(cell))
+        # t0.start()
+        # t0.join()
+        
+        # #run cp
+        # t0 = threading.Thread(target=run_cp_cell, args=(cell, cp_amps, 600))
+        # t0.start()
+        # t0.join()
+
+    def run_triple_cell(self):
+        # triplet_test();  
+        pass
+        
+    def runGeisCell(self, cell):
+        run_geis_cell(cell, output_file_name=f"cell_{cell}_eis")
+
+    def runPeisCell(self, cell):
+        run_peis_cell(cell, output_file_name=f"cell_{cell + 1000}_peis")
+
+
+    def runCVCell(self, cell):
+        # now = datetime.now()
+        run_cv_cell(cell, output_file_name=f"cell_{cell+100}_cv")
+
+    def runCACell(self, cell):
+        # now = datetime.now()
+        run_ca_cell(cell, voltage = 1, time_run = 30, output_file_name=f"cell_{cell+100}_ca")
+
+    def set_tests_list(self, *names):
+        set_tests(*names)
+
+    def create_new_plate(self):
+        self.Plate_Properties = plate_inputs()
+        print("The following inputs are for the SAMPLE LOG file (added to the sample_log.csv)")
+        operator = input("Operator: ")
+        hypothesis = input("Hypothesis: ")
+        notes = input("Notes: ")
+        self.Global_Plate = createPlate(config_notes = {"operator" : operator, "hypothesis" : hypothesis, "notes" : notes})
+
+    def new_plate(self):
+        from GUI.triplet_gui import new_plate
+        self.plate = new_plate()
+        return self.plate
+
+
+    def run_tests_new(self, row, column):
+        run_test_cell(self.Global_Plate, row, column, self.Plate_Properties)
+
+    def pstat_mux_test(self):
+
+        cell = 23
+
+        tkp.toolkitpy_init('chrono.py')
+        pstat_list_names = tkp.enum_sections()
+        print(pstat_list_names)
+        """
+        pstat_iter = 0
+        while pstat_iter < len(pstat_list_names):
+            print(pstat_list_names[pstat_iter][0:3])
+            if pstat_list_names[pstat_iter][0:3] == 'IFC':
+                pstat_list_names.pop(pstat_iter)
+                pstat_iter = 0
+            pstat_iter+=1
+        print(pstat_list_names)
+        """
+        imx_list = []
+        pstat_list = []
+
+        for device_name in pstat_list_names:
+            tag = device_name[0:3]
+            if tag == 'IMX':
+                imx_list.append(device_name)
+            elif tag == 'IFC':
+                pstat_list.append(device_name)
+            else:
+                print(f"!!!!! Found a non IMX or IFC type device. It is called: {device_name}")
+        
+        imx_list.sort()
+        pstat_list.sort()
+
+        mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+        print(imx_list)
+        print(pstat_list)
+
+        #example_cp_test(8)
+        #run_cp_cell(0)
+        #
+        #run_geis_cell(8)
+        #pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+        # mux = tkp.IMX("IMX", imx_list[0])
+        # mux.open()
+        # #mux.set_cell(0)
+        # mux.set_dac(0, 1.1)
+        # mux.set_off_mode(0,tkp.MUX_CELL_LOCAL)
+        # mux.set_off_mode(1,tkp.MUX_CELL_LOCAL)
+        # #mux.set_off_mode(2,tkp.MUX_CELL_LOCAL)
+        # mux.set_dac(0, 1.1)
+        # time.sleep(2)
+        # mux.close()
+        # time.sleep(1)
+
+        #run_cv_cell(1, potentials_to_hold=[[0,1.38]])
+        
+        #mux.set_dac(1, 1.1)
+        #mux.set_dac(2, 1.1)
+        # print(mux.dac(0))
+        # time.sleep(1)
+        # print(mux.dac(0))
+        # time.sleep(1)
+        # print(mux.dac(0))
+        # time.sleep(1)
+        # print(mux.dac(3))
+        # time.sleep(1)
+        # print("done")
+
+        #print(imx_list)
+        print(mux_pstat_index)
+        #mux.close()
+
+        
+        #mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
+        #mux.open()
+
+        #mux.set_cell(0)
+        #run_cv_cell(0, "simultest0",  [[0, 3, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1])
+        """ THIS WORKS
+        t0 = threading.Thread(target=run_cv_cell, args=(0, f"simul_chronovoltometrycycledummy0",  [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1]))
+        t0.start()
+        t1 = threading.Thread(target=run_cv_cell, args=(8, f"simul_chronovoltometrycycledummy1",  [[0, -2, 2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1]))
+        t1.start()
+        t0.join()
+        t1.join()
+        """
+
+        #run_geis_cell(8, "dummygeistest1")
+        """ WORKS
+        t0 = threading.Thread(target=run_geis_cell, args=(0, "dummy_geis_0"))
+        t0.start()
+        t1 = threading.Thread(target=run_geis_cell, args=(8, "dummy_geis_1"))
+        t1.start()
+        #join the threads started in the eval statements above
+        t0.join()
+        t1.join()
+        """
+        
+        # t0 = threading.Thread(target=run_cp_cell, args=(0, 1.5, 60))
+        # t0.start()
+        # t1 = threading.Thread(target=run_cp_cell, args=(8, 1.5, 60))
+        # t1.start()
+        # t0.join()
+        # t1.join()
+
+
+        #run_cv_cell(8, "simultest1",  [[0, 3, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1])
+        
+        #for i in range(0,3):
+
+            #data0 = run_cv_cell(0, mux, f"dummycelltest0c{i}",  [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1])
+            
+
+            #mux.set_dac(0, 0.5)
+            #data1 = run_cv_cell(1, mux, f"dummycelltest1c{i}",  [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1])
+            # t1 = threading.Thread(target=run_cv_cell, args=(1, f"chronovoltometrycycledummy1c{i}",  [[0, 2, -2, 0], [0.1, 0.1, 0.1], [1, 1, 1], 1, 0.1]))
+            # t1.start()
+            # t1.join()
+            #mux.set_dac(1, 0.5)
+        
+
+        """
+        pstat_list = []
+        ps1 = tkp.Pstat("PSTAT")
+        ps1.set_ctrl_mode(tkp.PSTATMODE)#for some reason unable to connect to pstats?
+        print(ps1.label())
+        for i in range(0,len(pstat_list_names)):
+            pstat_list[i] = tkp.Pstat(pstat_list_names[i])
+            print(pstat_list_names[i])
+        """
+        #values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1]
+        #cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
+        #data = run_cv_cell("dummycelltest1", 0)
+        #data2 = run_geis_cell("dummygeistest1", pstat_index=1)
+        #print(data)
+        #print(data)
+
+
+        """
         df = pd.read_csv(run_file)
         run_standard = standard is not None
         if run_standard:
@@ -302,158 +1028,58 @@ class BatteryRobot(NorthC9):
             new_row = pd.DataFrame([row], columns=df.columns)
             df = pd.concat([new_row, df, new_row], ignore_index=True)
 
-        log_file = open("experiments/experiments.log", "a")
-        log_file.write("*" * 50 + "\n")
-        log_file.write(f"Running tests: {get_time_stamp()} \n")
 
-        for i, test in enumerate(df.itertuples()):
-            try:
-                print(test)
-                target_pos = test.Target_vial
-                electrode_used=test.electrode_used
-                log_file.write(f"   Beginning tests for position {target_pos} at: \
-                               {get_time_stamp()} \n")
 
-                target_idx = self.disp_rack.pos_to_index(target_pos)
-                GEIS = True if test.GEIS else False
-                CV = True if test.CV else False
-                CE = True if test.CE else False
-                output_file_name = f"{test.Experiment}_{electrode_used}_{formatted_date}"
-                save_to_db = test.SaveDB
-                row_is_standard = run_standard and (i == 0 or i==len(df) - 1)
-                if GEIS and CV:
-                    if len(test.GEIS_Conditions.split()) != 3:
-                        raise ContinuableRuntimeError("GEIS_CONDITIONS must have 3 parameters!")
-                    if len(test.CV_Conditions.split()) != 3:
-                        raise ContinuableRuntimeError("CV_CONDITIONS must have 3 parameters!")
+        # pass point1, pooint2, rate to run_cv_output 
+        point1, point2, rate = [float(i) for i in test.CV_Conditions.split()]
 
-                    init_freq, final_freq, amp = [float(i) for i in test.GEIS_Conditions.split()]
-                    point1, point2, rate = [float(i) for i in test.CV_Conditions.split()]
+        self.set_output(6, True)
+        self.set_output(7, True)
+        self.set_output(8, True)
+        for j in range(3):
+            self.move_vial(rack_disp_official[target_idx], vial_carousel)
+            self.draw_to_sensor(target_idx, second_sensor=True)
+            ocv = RunOCV_lastV()
+            run_cv_output(output_file_name=output_file_name + f"_cv{i}",
+                    values=[[ocv, point1, point2, 0],
+                            [rate, rate, rate],
+                            [0.05, 0.05, 0.05],
+                            1,
+                            0.1],
+                    electrode_used = electrode_used,
+                    save_to_db_folder = save_to_db,
+                    standard=row_is_standard)
+        self.set_output(6, False)
+        self.set_output(7, False)
+        self.set_output(8, False)
+        """
 
-                    geis_parameter_list = {
-                        "initial_freq": init_freq,
-                        "final_freq": final_freq,
-                        "ac_current": amp           #AC current amplitude
-                    }
+    def cell_test_cp(self, cells, channels, set_voltages):
+        """
+        Docstring for cell_test_24
+        
+        :param self: Description
+        :param cells: takes in a list with the indices of cells to run tests on
+        """
+        channel = channels[0]
+        volts = set_voltages[0]
+        tkp.toolkitpy_init("open_circuit_voltage.py")
+        
+        mux = tkp.IMX("mux1")
+        mux.open()
+        mux.set_off_mode(channel, volts)
+        #mux.close()
+        mux.setDAC(channel, 1)
+        run_cv_cell("test_cv", 0, channel)
+        run_geis_cell("test_geis", 0, channel)
+        cells_tested = []
+        for cell in range(1,len(cells)):
+            index = cells[cell]
+            cells_tested.append(index)
+            for c in range(0,len(cells_tested)):
+                pass
 
-                    # this test is a standard test if we determine we're running a standard
-                    # and this is the first or last row of the run
-                    geis_files = []
-                    cv_files = []
-                    # run test three times
-                    for j in range(3): #TODO MAKE range(3) AGAIN ONCE DONE TESTING
-                        
-                        self.move_vial(rack_disp_official[target_idx], vial_carousel)
-                        granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {get_time_stamp()}")
-                        self.goto_safe(safe_zone)
-                        granular_log_file.write(f"\n * moved arm to safe zone" + f" *** {get_time_stamp()}")
-                        self.draw_to_sensor(target_idx, viscous=True, special=True)
-                        granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {get_time_stamp()}")
-                        self.set_output(6, False)
-                        self.set_output(7, False)
-                        self.set_output(8, False)
-                        
-                        run_geis(output_file_name=output_file_name + f"_geis{j}", 
-                                parameter_list=geis_parameter_list, 
-                                save_to_db_folder = save_to_db,
-                                standard=row_is_standard)
-                        granular_log_file.write(f"\n * ran geis test" + f" *** {get_time_stamp()}")
-                        # geis_files.append(geis_file)
-
-                        self.draw_sensor1to2(target_idx, viscous=True)
-                        granular_log_file.write(f"\n * drew from carousel vial to sensor 2 (from sensor 1)" + f" *** {get_time_stamp()}")
-                        self.set_output(6, True)
-                        self.set_output(7, True)
-                        self.set_output(8, True)
-                        ocv = RunOCV_lastV()
-                        print("running cv test")
-                        run_cv2(output_file_name=output_file_name + f"_cv{j}",
-                                values=[[ocv, point1, point2, 0],
-                                        [rate, rate, rate],
-                                        [0.05, 0.05, 0.05],
-                                        1,
-                                        0.1], 
-                                electrode_used = electrode_used,
-                                save_to_db_folder = save_to_db,
-                                standard=row_is_standard)
-                        granular_log_file.write(f"\n * ran cv test" + f" *** {get_time_stamp()}")
-                        # cv_files.append(cv_file)
-                        self.set_output(6, False)
-                        self.set_output(7, False)
-                        self.set_output(8, False)
-
-                    if save_to_db:
-                        pass
-
-                elif GEIS:
-                    if len(test.GEIS_Conditions.split()) != 3:
-                        raise ContinuableRuntimeError("GEIS_CONDITIONS must have 3 parameters!")
-                    init_freq, final_freq, amp = [float(i) for i in test.GEIS_Conditions.split()]
-
-                    geis_parameter_list = {
-                        "initial_freq": init_freq,
-                        "final_freq": final_freq,
-                        "ac_current": amp
-                    }
-                    self.set_output(6, False)
-                    self.set_output(7, False)
-                    self.set_output(8, False)
-                    for j in range(3):
-                        self.move_vial(rack_disp_official[target_idx], vial_carousel)
-                        granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {get_time_stamp()}")
-                        self.goto_safe(safe_zone)
-                        granular_log_file.write(f"\n * moved arm to safe zone" + f" *** {get_time_stamp()}")
-                        self.draw_to_sensor(target_idx, viscous=True, special=True)
-                        granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {get_time_stamp()}")
-                        run_geis(output_file_name=output_file_name + f"_geis{j}", 
-                                 parameter_list=geis_parameter_list,
-                                save_to_db_folder = save_to_db,
-                                standard=row_is_standard)
-                        granular_log_file.write(f"\n * ran geis test" + f" *** {get_time_stamp()}")
-                elif CV:
-                    if len(test.CV_CONDITIONS.split()) != 3:
-                        raise ContinuableRuntimeError("CV_CONDITIONS must have 3 parameters!")
-                    # pass point1, pooint2, rate to run_cv2 
-                    point1, point2, rate = [float(i) for i in test.CV_Conditions.split()]
-
-                    self.set_output(6, True)
-                    self.set_output(7, True)
-                    self.set_output(8, True)
-                    for j in range(3):
-                        self.move_vial(rack_disp_official[target_idx], vial_carousel)
-                        granular_log_file.write(f"\n * moved vial from index {target_idx} to carousel" + f" *** {get_time_stamp()}")
-                        self.draw_to_sensor(target_idx, second_sensor=True)
-                        granular_log_file.write(f"\n * drew from carousel vial to sensor 1" + f" *** {get_time_stamp()}")
-                        ocv = RunOCV_lastV()
-                        run_cv2(output_file_name=output_file_name + f"_cv{i}",
-                                values=[[ocv, point1, point2, 0],
-                                        [rate, rate, rate],
-                                        [0.05, 0.05, 0.05],
-                                        1,
-                                        0.1],
-                                electrode_used = electrode_used,
-                                save_to_db_folder = save_to_db,
-                                standard=row_is_standard)
-                        granular_log_file.write(f"\n * ran cv test" + f" *** {get_time_stamp()}")
-                    self.set_output(6, False)
-                    self.set_output(7, False)
-                    self.set_output(8, False)
-
-                log_file.write(f"   Finished tests for position {target_pos} at: \
-                               {get_time_stamp()} \n")
-
-                self.purge()
-
-            except ContinuableRuntimeError as e:
-                response = input(f"{e}. Unable to run current test. Continue with others? Yes/No")
-                if response.upper() == "YES":
-                    pass
-                elif response.upper() == "NO":
-                    break
-
-        log_file.write(f"Finished all formulations: {get_time_stamp()} \n")
-        log_file.write("*" * 50 + "\n")
-        log_file.close()
+        pass
 
     def dispense_powder_and_scale(self, protocol, dest_id, mass, container_index=0, collect=False, ret=True):
         """
@@ -515,7 +1141,7 @@ class BatteryRobot(NorthC9):
             
 
 
-            demo_velocity = 20
+            demo_velocity = 23
             #make sure that sourcerack(9) is full of water
             #make sure that disp_rack(0) is an empty vial
             #Print out any pre-reqs for running the program at the beginning, i.e. "Make sure that there are empty vials in positions 1, 2, and 3"        
@@ -543,7 +1169,7 @@ class BatteryRobot(NorthC9):
             self.close_gripper()
             self.delay(1)
             self.goto_safe(safe_zone, vel=demo_velocity)
-            self.spin_axis(0, 5000)
+            # self.spin_axis(0, 5000)
             self.goto_safe(heatplate_official2[0], vel=demo_velocity)
             self.open_gripper()
             self.spin_axis(6, 7000)
@@ -1114,6 +1740,22 @@ class BatteryRobot(NorthC9):
         self.goto_safe(safe_zone)
         self.move_carousel(0, 0)
 
+    def add_date_times_to_files(self):
+        folder = Path("C:/AttomRobotFiles/Software/BatteryRobot/MainProject/src/main/res/cv")
+        for file in folder.iterdir():
+            if file.is_file():
+                #print(file.name) # or file.absolute()
+                s = file.stat().st_ctime
+                readable_time = dt.fromtimestamp(s)
+                r = random.randrange(0,100)
+                if r == 0:
+                    print(f"{r}, {file.name} created on {readable_time}")
+                #creation_time = os.path.getctime(path)
+                # Convert to readable datetime object
+                #dt_object = datetime.datetime.fromtimestamp(creation_time)
+                #print("File created on:", dt_object)
+
+
     def get_pip_height(self, vial):
         """
         Return appropriate pipette height given target solution to draw from.
@@ -1155,14 +1797,25 @@ class BatteryRobot(NorthC9):
 
         return mols
 
-    def move_cap_to_holder(self):
+    def goto_notsosafe(self, position, vel=10):
+        """
+        Goto position without any safety checks. Use with caution.
+        """
+        current = self.get_robot_positions()
+        self.move_z(current[3] + 100, vel=vel)
+        self.goto([position[0], position[1], position[2], position[3] + 100], vel=vel)
+        new = self.get_robot_positions()
+        self.move_z(new[3] - 100, vel=vel)
+
+    def move_cap_to_holder_rack_src(self, source_id, rack=rack_source_official):
         """
         Helper function to move cap to a free cap holder.
         Assumes gripper is at target vial's cap's location
         """
+        self.goto_safe(rack[source_id])
         self.close_gripper()
         self.delay(.5)
-        self.uncap(revs=6)
+        self.uncap(pitch = 1.35, revs=7)
 
         if self.cap_holder_1_free:
             self.goto_safe(cap_holder_1_approach)
@@ -1177,7 +1830,34 @@ class BatteryRobot(NorthC9):
         else:
             raise Exception("Cap holders are taken!")
 
-        self.cap(revs=3, torque_thresh=400)
+        self.cap(revs=4, torque_thresh=400)
+        self.open_gripper()
+        self.delay(.5)
+        return cap_holder_id
+
+    def move_cap_to_holder(self):
+        """
+        Helper function to move cap to a free cap holder.
+        Assumes gripper is at target vial's cap's location
+        """
+        self.close_gripper()
+        self.delay(.5)
+        self.uncap(pitch = 1.35, revs=7)
+
+        if self.cap_holder_1_free:
+            self.goto_safe(cap_holder_1_approach)
+            self.cap_holder_1_free = False
+            cap_holder_id = 1
+
+        elif self.cap_holder_2_free:
+            self.goto_safe(cap_holder_2_approach)
+            self.cap_holder_2_free = False
+            cap_holder_id = 2
+
+        else:
+            raise Exception("Cap holders are taken!")
+
+        self.cap(revs=4, torque_thresh=400)
         self.open_gripper()
         self.delay(.5)
         return cap_holder_id
@@ -1195,11 +1875,18 @@ class BatteryRobot(NorthC9):
 
         self.close_gripper()
         self.delay(.5)
-        self.uncap(revs=5)
+        self.uncap(pitch = 1.35, revs=7)
         self.goto_safe(rack_source_official_approach[source_id])
-        self.cap(revs=3, torque_thresh=400)
+        self.cap(revs=4, torque_thresh=400)
         self.open_gripper()
-        self.goto_safe(safe_zone)
+        # self.goto_safe(safe_zone)
+
+    def rack_source_official_test(self, source_id = [0, 1, 2, 3, 4]):
+        for i in source_id:
+            self.move_cap_to_holder_rack_src(i)
+            self.move_cap_from_holder(i, 1)
+            self.delay(0.5)
+
 
     def uncap_vial_in_carousel(self):
         """

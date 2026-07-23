@@ -1,0 +1,55 @@
+
+ * moved vial from index 0 to carousel *** 2026-04-28 13:40:54
+ * moved arm to safe zone *** 2026-04-28 13:41:00
+ * drew from carousel vial to sensor 1 *** 2026-04-28 13:48:36
+ * ran geis test *** 2026-04-28 13:49:38
+ * drew from carousel vial to sensor 2 (from sensor 1) *** 2026-04-28 13:51:25
+ * ran cv test *** 2026-04-28 13:55:46
+ * moved vial from index 0 to carousel *** 2026-04-28 13:56:03
+ * moved arm to safe zone *** 2026-04-28 13:56:09
+ * drew from carousel vial to sensor 1 *** 2026-04-28 14:03:46
+ * ran geis test *** 2026-04-28 14:04:39
+ * drew from carousel vial to sensor 2 (from sensor 1) *** 2026-04-28 14:06:26
+ * ran cv test *** 2026-04-28 14:10:46
+ * moved vial from index 0 to carousel *** 2026-04-28 14:11:03
+ * moved arm to safe zone *** 2026-04-28 14:11:09
+ * drew from carousel vial to sensor 1 *** 2026-04-28 14:18:46
+ * ran geis test *** 2026-04-28 14:19:40
+ * drew from carousel vial to sensor 2 (from sensor 1) *** 2026-04-28 14:21:27
+ * ran cv test *** 2026-04-28 14:25:50
+ * moved vial from index 1 to carousel *** 2026-04-28 14:54:29
+ * moved arm to safe zone *** 2026-04-28 14:54:35
+ * drew from carousel vial to sensor 1 *** 2026-04-28 15:02:21
+ * ran geis test *** 2026-04-28 15:03:16
+ * drew from carousel vial to sensor 2 (from sensor 1) *** 2026-04-28 15:05:03
+ * ran cv test *** 2026-04-28 15:09:39
+ * moved vial from index 1 to carousel *** 2026-04-28 15:09:56
+ * moved arm to safe zone *** 2026-04-28 15:10:02
+ * drew from carousel vial to sensor 1 *** 2026-04-28 15:17:38
+ * ran geis test *** 2026-04-28 15:18:32
+ * drew from carousel vial to sensor 2 (from sensor 1) *** 2026-04-28 15:20:19
+ * ran cv test *** 2026-04-28 15:25:03
+ * moved vial from index 1 to carousel *** 2026-04-28 15:25:20
+ * moved arm to safe zone *** 2026-04-28 15:25:26
+ * drew from carousel vial to sensor 1 *** 2026-04-28 15:33:02
+ * ran geis test *** 2026-04-28 15:33:56
+ * drew from carousel vial to sensor 2 (from sensor 1) *** 2026-04-28 15:35:43
+ * ran cv test *** 2026-04-28 15:40:26
+ * moved vial from index 2 to carousel *** 2026-04-28 16:09:05
+ * moved arm to safe zone *** 2026-04-28 16:09:11
+ * drew from carousel vial to sensor 1 *** 2026-04-28 16:16:57
+ * ran geis test *** 2026-04-28 16:17:51
+ * drew from carousel vial to sensor 2 (from sensor 1) *** 2026-04-28 16:19:38
+ * ran cv test *** 2026-04-28 16:24:02
+ * moved vial from index 2 to carousel *** 2026-04-28 16:24:19
+ * moved arm to safe zone *** 2026-04-28 16:24:25
+ * drew from carousel vial to sensor 1 *** 2026-04-28 16:32:01
+ * ran geis test *** 2026-04-28 16:32:57
+ * drew from carousel vial to sensor 2 (from sensor 1) *** 2026-04-28 16:34:44
+ * ran cv test *** 2026-04-28 16:39:41
+ * moved vial from index 2 to carousel *** 2026-04-28 16:39:58
+ * moved arm to safe zone *** 2026-04-28 16:40:04
+ * drew from carousel vial to sensor 1 *** 2026-04-28 16:47:39
+ * ran geis test *** 2026-04-28 16:48:33
+ * drew from carousel vial to sensor 2 (from sensor 1) *** 2026-04-28 16:50:20
+ * ran cv test *** 2026-04-28 16:54:47

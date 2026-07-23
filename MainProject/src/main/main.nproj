@@ -789,6 +789,106 @@
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null
+    },
+    "test_arm": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        79,
+        389,
+        716,
+        683
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "rack_disp_official_test_high": {
+      "type": "Grid",
+      "tool": 1,
+      "counts": [
+        1651,
+        4627,
+        17067,
+        2800
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        8,
+        6,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "new_grid_item_copy": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        -763,
+        33575,
+        36538,
+        7450
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "new_grid_item_copy0": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        -763,
+        33575,
+        36538,
+        7450
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "dropcast_coords_eight": {
+      "type": "Grid",
+      "tool": 1,
+      "counts": [
+        -779,
+        33436,
+        35888,
+        9000
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        4,
+        2,
+        1
+      ],
+      "pitch": [
+        28,
+        27,
+        0.0
+      ]
+    },
+    "dropcast_aspirate": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        -686,
+        36281,
+        43866,
+        2800
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
     }
   },
   "sim_inputs": {

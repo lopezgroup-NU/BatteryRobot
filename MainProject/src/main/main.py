@@ -5,8 +5,11 @@ from config import powder_protocols, SourceRack, HeatRack
 from utils.PStat.geis import *
 from utils.PStat.cv import *
 from utils.PStat.ocv import *
+from utils.PStat.cp import *
 from temper_windows import TemperWindows
 import numpy as np
+import pandas as pd
+
 from GUI import setup_gui
 
 paths = ['C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages','C:\\Users\\llf1362\\AppData\\Roaming\\Python\\Python37\\site-packages','C:\\Users\\llf1362\\Documents\\NorthIDE\\lib','C:\\Users\\llf1362\\Documents\\NorthIDE\\python37.zip','C:\\Users\\llf1362\\Documents\\NorthIDE\\DLLs','C:\\Users\\llf1362\\Documents\\NorthIDE','C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\tkintertable-1.3.2-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\future-0.18.2-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\ftdi_serial-0.1.9-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\ftd2xx-1.1.2-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\pypiwin32-223-py3.7.egg','C:\\Users\\llf1362\\Desktop\\BatteryRobot\\MainProject\\src\\main\\utils\\PStat','C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\pywin32-227-py3.7-win32.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\pmw-2.0.1-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\pyopengl-3.1.5-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\pyopengl_accelerate-3.1.5-py3.7-win32.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\pyopengltk-0.0.3-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\pywavefront-1.3.2-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\numpy-1.18.4-py3.7-win32.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\pyglm-1.2.0-py3.7-win32.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\scikit_learn-0.23.1-py3.7-win32.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\threadpoolctl-2.1.0-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\scipy-1.5.0rc1-py3.7-win32.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\joblib-0.15.1-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\scikit_optimize-0.8.dev0-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\pyaml-20.4.0-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\pyyaml-5.3.1-py3.7-win32.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\matplotlib-3.2.1-py3.7-win32.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\python_dateutil-2.8.1-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\pyparsing-3.0.0a1-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\kiwisolver-1.2.0-py3.7-win32.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\cycler-0.10.0-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\inputs-0.5-py3.7.egg', 'C:\\Users\\llf1362\\Documents\\NorthIDE\\lib\\site-packages\\keyboard-0.13.5-py3.7.egg','C:\\Users\\llf1362\\Documents\\NorthIDE\\Lib\\site-packages']
@@ -16,18 +19,21 @@ for i in paths:
 # setup_gui()
 #create_plan("experiments/yest3.csv", "config/source_rack.csv")
 
+# INSTRUCTIONS FOR USE (CIARA'S NEW DATA):
+# 1. rob.create_new_plate()
+# 2. rob.set_tests_list("PEIS", "CV")
+# 3. rob.run_tests_new(4, "B")
 
-
-rob = BatteryRobot('A', network_serial='AU06EZ1P', home= False)
+rob = BatteryRobot('A', network_serial='AU06EZ1P', home= True)
 t8 = T8('B', network = rob.network)
 p2 = PowderShaker('C', network = rob.network)
 # waters = list(range(10,48))
-standard = {"name": "p5m_NO3",
-            "pos": "C6",
+standard = {"name": "p5m_LiNO3",
+            "pos": "A1",
             "electrode_used": "Pt"}
 
 #rob.purge()
 ####rob.run_formulation("C:/AttomRobotFiles/Software/BatteryRobot/MainProject/src/main/experiments/formulation.csv")
-####rob.run_test("C:/AttomRobotFiles/Software/BatteryRobot/MainProject/src/main/experiments/experiments.csv", standard = standard)
-#rob.run_test('C:/Users/llf1362/Desktop/BatteryRobot/MainProject/src/main/experiments/experiments.csv')
+# rob.run_test("C:/AttomRobotFiles/Software/BatteryRobot/MainProject/src/main/experiments/experiments.csv")
+#rob.run_test('C:\AttomRobotFiles\Software\BatteryRobot\MainProject\src\main\experiments\experiments.csv')
 

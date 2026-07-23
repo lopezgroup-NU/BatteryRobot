@@ -1,0 +1,4 @@
+
+ * moved vial from index 0 to carousel *** 2026-07-14 10:48:11
+ * moved arm to safe zone *** 2026-07-14 10:48:16
+ * drew from carousel vial to sensor 1 *** 2026-07-14 10:56:12

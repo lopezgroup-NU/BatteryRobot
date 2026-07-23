@@ -1,6 +1,10 @@
 #Galv EIS
 from temper_windows import TemperWindows
 import toolkitpy as tkp
+if not getattr(tkp, "_init_done", False):
+    tkp.toolkitpy_init("run_test.py")
+    tkp._init_done = True
+    tkp.toolkitpy_init = lambda *a, **k: None
 import numpy as np                       #Used to store and manipulate raw data output
 import time                              #Used for script time delay
 import math
@@ -67,8 +71,9 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}, save_t
     pstat = tkp.Pstat("PSTAT")
     #Parameters
     #------------------------------------------------------------------
-    initial_freq = parameter_list.get("initial_freq", 250000)
-    final_freq = parameter_list.get("final_freq", 1)
+    initial_freq = parameter_list.get("initial_freq", 100000) #250000
+    print(pstat.freq_limit_upper())
+    final_freq = parameter_list.get("final_freq", 10)
     ac_current = parameter_list.get("ac_current", 0.00001) 
     dc_current = parameter_list.get("dc_current", 0.00)
     estimated_z = parameter_list.get("estimated_z", 1000)
@@ -129,28 +134,48 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}, save_t
     max_points = check_eis_points(initial_freq, final_freq, points_per_decade)
     zcurve = tkp.ZCurve(int(max_points)) #convert max_points to int to prevent error
 
+
     current_points = 0
+    bad_reads = 0
     while current_points < max_points:
         freq = math.pow(10.0, math.log10(initial_freq) + current_points * log_increment)
-        status = readz.Measure(freq, ac_current,dc_current)
-        if status == False:
-            print('Bad Value')
-            if status == 0:
-                print('empty')
-                continue
-            elif status == 1:
-                continue
-            else:
+        status = readz.Measure(freq, ac_current, dc_current)
+        if not status:
+            bad_reads += 1
+            if bad_reads >= 30:
+                print(f"skipping {freq:.3g} Hz after 30 failed reads")
                 current_points += 1
-                continue
-        else:
-            zcurve.add_point(readz)
-            data = zcurve.acq_data()
-            nextpoint = zcurve.point
-            lastpoint = nextpoint-1
-        current_points +=1
-
+                bad_reads = 0
+            continue
+        bad_reads = 0
+        zcurve.add_point(readz)
+        current_points += 1
         time.sleep(.010)
+    # current_points = 0
+    # while current_points < max_points:
+    #     print(current_points)
+    #     print(max_points)
+    #     freq = math.pow(10.0, math.log10(initial_freq) + current_points * log_increment)
+    #     status = readz.Measure(freq, ac_current,dc_current)
+    #     if status == False:
+    #         print('Bad Value')
+            
+    #         if status == 0:
+    #             print('empty')
+    #             continue
+    #         elif status == 1:
+    #             continue
+    #         else:
+    #             current_points += 1
+    #             continue
+    #     else:
+    #         zcurve.add_point(readz)
+    #         data = zcurve.acq_data()
+    #         nextpoint = zcurve.point
+    #         lastpoint = nextpoint-1
+    #     current_points +=1
+
+    #     time.sleep(.010)
 
     pstat.set_cell(False)
 
@@ -163,7 +188,190 @@ def run_geis(output_file_name = "galvanostatic_eis", parameter_list = {}, save_t
     
     temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
     temperature = temper.get_temperature()[1]
+    today = datetime.datetime.now()
+    formatted_date = today.strftime("%Y/%m/%d %H:%M:%S")  #Year/Month/Day Hour:Minute:Second
+
+    df = pd.read_csv(out_path, index_col='# point')
+    reflected_zimag = [-val for val in df['zimag']]
+    df.insert(2, 'reflected_zimag', reflected_zimag)
+    df['temp(C)'] = temperature
+    df['datetime'] = formatted_date
     
+    df.to_csv(out_path)
+    #"C:\AttomRobotFiles\Data\DB_Missaka\eis"
+    if save_to_db_folder and not standard:
+        db_path = Path(r"C:\AttomRobotFiles\Data\DB_Missaka\eis") / f"{output_file_name}.csv"
+        df.to_csv(db_path) 
+
+    # extract minima
+    if standard:
+        s_df_file = "res/standard/std_geis_test_summaries.csv"
+    else:
+        s_df_file = "res/geis_test_summaries.csv"
+    s_df = pd.read_csv(s_df_file)
+    df_no_negatives = df[df.reflected_zimag >=0]
+    min_index = df_no_negatives['reflected_zimag'].idxmin()  # Get the index of the minimum value
+    R1_nofit = df_no_negatives['zreal'].loc[min_index]  # Use .loc to get the value at that index
+    R1 = 10
+    s = time.localtime(time.time())
+    curr_time = time.strftime("%Y-%m-%d %H:%M:%S", s)
+    new_row = pd.DataFrame([[output_file_name, R1, R1_nofit, temperature, curr_time]], columns=['test name', 'zreal', 'minima', 'temp', 'time'])
+
+    s_df = pd.concat([s_df, new_row], ignore_index=True)
+    s_df.to_csv(s_df_file, index=False)  
+
+    if save_to_db_folder and not standard:
+        return db_path, zcurve
+
+    return zcurve
+
+
+def run_geis_cell(cell, output_file_name = "galvanostatic_eis",  parameter_list = {}, path_to_save_to = r"C:\AttomRobotFiles\Data\DB_Ciara\eis", save_to_db_folder = True, standard = False):
+    tkp.toolkitpy_init("galvanostatic_eis.py")
+
+
+    device_list = tkp.enum_sections()
+
+    #pstat_list_names = tkp.enum_sections()
+    #print(pstat_list_names)
+   
+    imx_list = []
+    pstat_list = []
+
+    for device_name in device_list:
+        tag = device_name[0:3]
+        if tag == 'IMX':
+            imx_list.append(device_name)
+        elif tag == 'IFC':
+            pstat_list.append(device_name)
+        else:
+            print(f"!!!!! Found a non-IMX or IFC type device. It is called: {device_name}")
+
+    mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+
+    print(pstat_list)
+    print(mux_pstat_index)
+    pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+    print(f"pstat upper frequency limit: {pstat.freq_limit_upper()}")
+    mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
+    try:
+        pstat.open() # THIS command was never used before; I am not sure if this is something we should be using but it has to be opened in order to run pstat.close()
+        mux.open()
+
+        mux.set_cell(cell-mux_pstat_index*8)
+        #Parameters
+        #------------------------------------------------------------------
+        initial_freq = parameter_list.get("initial_freq", 100000)#TODO changed from 250000 to 100000, the manual says 1MHz max and 2MHz if external sine wave gen is used. Unsure of how G made it go to 2.5MHz ever
+        final_freq = parameter_list.get("final_freq", 100) #changed from 10
+        ac_current = parameter_list.get("ac_current", 0.02) #changed from 0.00001
+        dc_current = parameter_list.get("dc_current", 0.00)
+        estimated_z = parameter_list.get("estimated_z", 1000)
+        points_per_decade = parameter_list.get("points_per_decade", 10)
+
+        # internal state - pre 1st measurement
+        gain = 1.0
+        inoise = 0.0
+        vnoise = 0.0
+        ienoise = 0.0
+
+        #-----------------------------------------------------------
+        final_freq = abs(final_freq)
+        initial_freq = abs(initial_freq)
+
+        freq_lim_lower = pstat.freq_limit_lower()
+        freq_lim_upper = pstat.freq_limit_upper()
+        print(freq_lim_upper)
+        print(initial_freq)
+        if(initial_freq > freq_lim_upper):
+            print("Initial frequency exceeds upper frequency limit")
+            initial_freq = freq_lim_upper
+        if(final_freq > freq_lim_upper):
+            final_freq = freq_lim_upper
+            print("Final frequency exceeds upper frequency limit")
+        if(initial_freq < freq_lim_lower):
+            initial_freq = freq_lim_lower
+            print("Initial frequency exceeds lower frequency limit")
+        if(final_freq < freq_lim_lower):
+            final_freq = freq_lim_lower
+            print("Final frequency exceeds lower frequency limit")
+        
+        #==========================================
+        initialize_pstat1(pstat)
+        pstat.set_ctrl_mode(tkp.GSTATMODE)
+        pstat.set_i_convention(tkp.ICONVENTION.ANODIC)
+        ie_range = pstat.test_ie_range(abs(dc_current) + 1.414*abs(ac_current))
+        pstat.set_ie_range(ie_range)
+        r_measure = pstat.ie_resistor(ie_range)
+        Sdc = r_measure * dc_current
+        Sac = r_measure * ac_current
+        pstat.set_voltage(Sdc)
+        pstat.set_cell(tkp.CELL_ON)
+        dc_voltage = pstat.measure_v()
+
+        readz = tkp.ReadZ(pstat)
+        readz.set_gain(gain)
+        readz.set_inoise(inoise)
+        readz.set_vnoise(vnoise)
+        readz.set_ienoise(ienoise)
+        readz.set_zmod(estimated_z)
+        readz.set_idc(dc_current)
+        readz.set_speed(1) #Normal
+        readz.set_drift_cor(False)
+        
+        #==========================================
+        log_increment = 1.0/points_per_decade
+        if initial_freq > final_freq:
+            log_increment = -log_increment
+        max_points = check_eis_points(initial_freq, final_freq, points_per_decade)
+        zcurve = tkp.ZCurve(int(max_points)) #convert max_points to int to prevent error
+
+        current_points = 0
+        while current_points < max_points:
+            freq = math.pow(10.0, math.log10(initial_freq) + current_points * log_increment)
+            status = readz.Measure(freq, ac_current,dc_current)
+            if status == False:
+                print('Bad Value')
+                if status == 0:
+                    print('empty')
+                    continue
+                elif status == 1:
+                    continue
+                else:
+                    current_points += 1
+                    continue
+            else:
+                zcurve.add_point(readz)
+                data = zcurve.acq_data()
+                nextpoint = zcurve.point
+                lastpoint = nextpoint-1
+            current_points +=1
+
+            time.sleep(.010)
+    finally:
+        # pstat.set_cell(False)
+        # pstat.close()
+        # mux.close()
+        # ADDED to release the pstat so we can run another test without it returning a task error
+        # logic is that since the mux closes but not the pstat, the pstat is floating with the previous test case and won't accept another run
+        try: pstat.set_cell(False)
+        except Exception: pass
+        try: mux.close()
+        except Exception: pass
+        try: pstat.close()
+        except Exception: pass
+
+
+    if standard:
+        out_path = "res/standard/geis/" + output_file_name+ ".csv"
+    else:
+        out_path = "res/geis/" + output_file_name+ ".csv"
+    np.savetxt(out_path, zcurve.acq_data(),delimiter = ',', 
+               header = 'point,freq,zreal,zimag,zmod,zphz,zsig,Idc,Vdc,ie_range,gain,vmod,vphz,vsig,vthd,imod,iphz,isig,ithd,zreal_drift,zimag_drift,zmod_drift,zphz_drift')
+    
+    temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
+    temperature = temper.get_temperature()[1]
+    
+    # mux.close()
 
     df = pd.read_csv(out_path, index_col='# point')
     reflected_zimag = [-val for val in df['zimag']]
@@ -201,7 +409,7 @@ if __name__ == "__main__":
     parameter_list = {}
     parameter_list['initial_freq']= 250000
     parameter_list['final_freq'] = 1.0    
-    zcurve = run_geis(parameter_list)
+    zcurve = run_geis(parameter_list = parameter_list)
     
     
 

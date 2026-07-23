@@ -1,7 +1,7 @@
 ,0,1,2,3,4
-0,e,e,H2O_4 8 5,LiClO4_2 8 5,e
-1,e,e,H2O_5 8 5,e,e
-2,e,e,LiOAc_1 8.00 5,e,e
-3,e,e,LiClO4_1 8.00 5,e,x
+0,LiTFSI_1 10 0.5,e,H2O_1 10 0.5,LiClO4_1 10 0.5,e
+1,Li2SO4_1 10 0.5,e,H2O_2 10 0.5,e,e
+2,e,e,LiOAc_1 10 0.5,e,e
+3,e,H2O_3 10 0.5,LiClO4_1 10 0.5,H20_6 0.0 0,x
 4,e,e,e,x,x
 5,e,x,x,x,x
