@@ -19,6 +19,7 @@ from utils.PStat.cv import *
 from utils.PStat.ca import *
 from utils.PStat.triplet import *
 from utils.PStat.new_db import *
+from utils.PStat.triplet_analysis import analyze_folder
 
 from utils.PStat.ocv import *
 from utils.mouseUtils import *
@@ -864,6 +865,10 @@ class BatteryRobot(NorthC9):
 
     def run_tests_new(self, row, column):
         run_test_cell(self.Global_Plate, row, column, self.Plate_Properties)
+
+    def folder_analysis(self, data_root):
+        analyze_folder(data_root)
+
 
     def pstat_mux_test(self):
 

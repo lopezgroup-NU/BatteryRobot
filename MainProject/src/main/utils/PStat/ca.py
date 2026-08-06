@@ -93,7 +93,8 @@ class CA(Experiment):
             pstat.set_voltage(0.0)
             pstat.set_pos_feed_resistance(0.0)
 
-            
+    
+
     def estimated_point_count(self):
         return int(self.holdtime / self.sample_time + 0.5)      
 
@@ -111,8 +112,7 @@ class CA(Experiment):
         Returns
         -------
         NumPy ND array
-            Returns an ND array with the data of the experiment
-        """
+            Returns some ND array with experiment data        """
 
         pstat.set_ctrl_mode(tkp.PSTATMODE) # potentiostatic mode (holding constant voltage)
 
@@ -690,6 +690,461 @@ def cp_interpret(filename):
     vf_diff = vf_max-vf_min
 
     return(vf_diff,vf_max,vf_min )
+
+
+import threading
+ 
+# fall back only if the live file doesn't already define these
+try:
+    LIVE_HOOK
+except NameError:
+    LIVE_HOOK = None
+ 
+try:
+    _ensure_tkp
+except NameError:
+    def _ensure_tkp():
+        ensure_toolkit_init("ca.py")
+ 
+CA_CYCLE_SETTLE_S = 0.01  # pause after a mux channel switch before energizing
+
+ 
+ 
+def _plate_devices():
+    """Sorted IMX / IFC section lists (sorted so mux i <-> pstat i stays stable)."""
+    devices = tkp.enum_sections()
+    imx_list = sorted(d for d in devices if d[:3] == "IMX")
+    pstat_list = sorted(d for d in devices if d[:3] == "IFC")
+    return imx_list, pstat_list
+
+# # ====== Cycling CA v3: single curve per mux + COM diet ======
+# # REPLACES ca_cycle_mux() and _ca_cycle_frames() in utils/PStat/ca.py.
+# # Both defs at MODULE LEVEL (def at column 0).
+# # v2 -> v3: no COM calls in the switch path except the switch itself
+# # (harvests run every harvest_s off the critical path, switch anchors are
+# # wall->hardware-time bounds recalibrated at each harvest, live hook is
+# # throttled), plus loud detection if the acquisition dies early.
+
+# CA_CYCLE_BLANK_S = 0.005    # discard window after each switch, hardware time
+# CA_CYCLE_SWITCH_MARGIN_S = 0.020   # covers COM jitter in the wall->hw calibration
+
+
+# def ca_cycle_mux(mux_idx, channels, voltage, overall_time, interval,
+#                  sample_period=0.1, idle_mode="local", stop_event=None,
+#                  checkpoint_s=600.0, checkpoint_cb=None, max_size=None,
+#                  blank_s=CA_CYCLE_BLANK_S, harvest_s=5.0, live_hz=1.0,
+#                  hot_switch=False):
+#     """Round-robin CA on ONE mux with a single continuous acquisition.
+
+#     One constant-V signal runs for the whole time; a channel switch is only
+#     cell-off -> mux.set_cell -> cell-on (3 COM calls; 1 with hot_switch=True,
+#     which leaves the pstat driving through the handoff -- only sane with
+#     idle_mode='local' so both cells sit at `voltage` on the DAC).
+
+#     Data is pulled with acq_data every `harvest_s` seconds, not at every
+#     switch, and chopped afterwards using per-switch markers. Markers are
+#     wall-clock stamps mapped onto the pstat's time base via an offset that is
+#     re-measured at every harvest, biased so the marker can only ever be LATE:
+#     kept data for each dwell starts within [blank_s, blank_s + sample_period
+#     (+ a few ms of COM jitter)] after the relay -- for a ~10 ms settle, run
+#     sample_period <= 0.01.
+
+#     Returns {channel: DataFrame(Point, time, t_hold, Vf, Im, Cycle)}.
+#     Prints switch-timing stats; prints a loud warning and ends the run if the
+#     acquisition stops early (e.g. a firmware signal/point limit).
+#     """
+#     channels = [int(c) for c in channels]
+#     if not channels:
+#         raise ValueError("ca_cycle_mux: no channels given")
+#     for c in channels:
+#         if not 0 <= c <= 7:
+#             raise ValueError(f"ca_cycle_mux: channel {c} out of range 0-7")
+#     if interval < 2 * sample_period:
+#         raise ValueError("ca_cycle_mux: interval must be >= 2 * sample_period")
+#     if interval <= blank_s + sample_period + 0.02:
+#         raise ValueError("ca_cycle_mux: interval too short for the blank window")
+#     if stop_event is None:
+#         stop_event = threading.Event()
+#     if max_size is None:
+#         max_size = int(float(overall_time) / float(sample_period)) + 4096
+
+#     _ensure_tkp()
+#     imx_list, pstat_list = _plate_devices()
+#     if mux_idx >= len(imx_list) or mux_idx >= len(pstat_list):
+#         raise RuntimeError(
+#             f"ca_cycle_mux: mux {mux_idx} not available "
+#             f"(found {len(imx_list)} IMX, {len(pstat_list)} IFC)")
+
+#     pstat = tkp.Pstat("Pstat", pstat_list[mux_idx])
+#     mux = tkp.IMX("IMX", imx_list[mux_idx])
+#     mux.open()
+#     pstat.open()
+
+#     ca = CA(voltage, [0.1, 0.1, 0.1], interval, 1, sample_period, tkp.PSTATMODE, imax=50)
+
+#     buffers = {c: {"time": [], "t_hold": [], "vf": [], "im": [], "cycle": []}
+#                for c in channels}
+#     hold_acc = {c: 0.0 for c in channels}
+#     # per-dwell windows in hw time: keep points in [starts[k], ends[k])
+#     # starts[k] = upper bound of switch end + blank; ends[k] = lower bound of
+#     # the next cell-off (inf for the dwell in progress)
+#     dw_start = [blank_s]
+#     dw_end = [float("inf")]
+#     dw_ch = [channels[0]]
+#     dw_cy = [0]
+#     dwell_first = {}   # dwell idx -> (first kept hw t, hold base at that t)
+#     state = {"last_hw_t": -1.0, "synth_n": 0, "base": 0.0, "died": False}
+#     switch_ms = []
+#     pad = max(5.0, 2.0 * float(interval))
+#     head_pad = sample_period + CA_CYCLE_SWITCH_MARGIN_S + blank_s
+
+#     def _harvest(curve, wall_now):
+#         d = curve.acq_data()
+#         im = np.asarray(d['im'], dtype=float)
+#         vf = np.asarray(d['vf'], dtype=float)
+#         try:
+#             tt = np.asarray(d['time'], dtype=float)
+#         except Exception:
+#             tt = (state["synth_n"] + np.arange(len(im))) * sample_period
+#         state["synth_n"] += len(im)
+#         new = tt > state["last_hw_t"] + 1e-9   # cumulative- and drained-safe
+#         tt, vf, im = tt[new], vf[new], im[new]
+#         if not len(tt):
+#             return
+#         state["last_hw_t"] = float(tt[-1])
+#         # recalibrate wall->hw offset with a wall stamp taken AFTER acq_data
+#         # returned, so hw_est(w) = (w - t_run0) - base is always <= true hw(w)
+#         state["base"] = (time.time() - t_run0) - state["last_hw_t"]
+
+#         st = np.asarray(dw_start, dtype=float)
+#         en = np.asarray(dw_end, dtype=float)
+#         idx = np.searchsorted(st, tt, side="right") - 1
+#         keep = (idx >= 0) & (tt < en[np.clip(idx, 0, len(en) - 1)])
+#         tt, vf, im, idx = tt[keep], vf[keep], im[keep], idx[keep]
+#         for k in np.unique(idx):
+#             m = idx == k
+#             ts, vs, cs = tt[m], vf[m], im[m]
+#             ch, cy = dw_ch[k], dw_cy[k]
+#             if k not in dwell_first:
+#                 dwell_first[k] = (float(ts[0]), hold_acc[ch])
+#             first_t, hbase = dwell_first[k]
+#             b = buffers[ch]
+#             b["time"].extend(ts.tolist())
+#             b["t_hold"].extend((hbase + (ts - first_t)).tolist())
+#             b["vf"].extend(vs.tolist())
+#             b["im"].extend(cs.tolist())
+#             b["cycle"].extend([cy] * len(ts))
+#             hold_acc[ch] = hbase + float(ts[-1] - first_t) + sample_period
+
+#     curve = None
+#     signal = None
+#     aborted = False
+#     cur_cycle = 0
+#     try:
+#         pstat.set_ctrl_mode(tkp.PSTATMODE)
+#         ca.initialize_pstat(pstat)
+#         for c in range(8):
+#             if c in channels and idle_mode == "local":
+#                 mux.set_off_mode(c, tkp.MUX_CELL_LOCAL)
+#                 mux.set_dac(c, voltage)
+#             else:
+#                 mux.set_off_mode(c, tkp.MUX_CELL_OPEN)
+
+#         signal = pstat.signal_const_new(voltage, float(overall_time) + pad,
+#                                         sample_period, tkp.PSTATMODE)
+#         pstat.set_signal_const(signal)
+#         pstat.init_signal()
+#         curve = tkp.ChronoACurve(pstat, max_size)
+#         mux.set_cell(channels[0])
+#         pstat.set_cell(True)
+#         t_run0 = time.time()          # wall stamp BEFORE run: hw 0 is at/after this
+#         curve.run(True)
+#         t0_wall = time.time()
+#         try:   # seed the wall->hw offset (one COM call, start of run only)
+#             state["base"] = (time.time() - t_run0) - float(curve.last_data_point()['time'])
+#         except Exception:
+#             state["base"] = time.time() - t_run0
+
+#         cur_idx = 0
+#         slot = 1
+#         last_ckpt = t0_wall
+#         last_harvest = t0_wall
+#         last_live = 0.0
+
+#         while True:
+#             slot_end = t0_wall + slot * float(interval)
+#             while True:
+#                 now = time.time()
+#                 if now >= slot_end:
+#                     break
+#                 if stop_event.is_set():
+#                     aborted = True
+#                     break
+#                 time.sleep(min(0.05, max(slot_end - now, 0.001)))
+#                 now = time.time()
+#                 if LIVE_HOOK and live_hz > 0 and now - last_live >= 1.0 / live_hz:
+#                     last_live = now
+#                     try:
+#                         ld = curve.last_data_point()
+#                         LIVE_HOOK("CA", float(ld['time']), float(ld['im']))
+#                     except Exception:
+#                         pass
+#                 if now - last_harvest >= harvest_s:
+#                     last_harvest = now
+#                     _harvest(curve, now)
+#                     try:
+#                         alive = curve.running()
+#                     except Exception:
+#                         alive = True
+#                     if not alive and (now - t0_wall) < float(overall_time) - 1.0:
+#                         state["died"] = True
+#                         print(f"*** CA cycle mux{mux_idx}: ACQUISITION ENDED EARLY at "
+#                               f"hw t~{state['last_hw_t']:.1f}s of {overall_time}s "
+#                               f"(signal/point limit?) -- stopping and keeping data")
+#                         break
+#                     if checkpoint_cb and now - last_ckpt >= checkpoint_s:
+#                         try:
+#                             checkpoint_cb(_ca_cycle_frames(buffers))
+#                         except Exception:
+#                             import traceback
+#                             traceback.print_exc()
+#                         last_ckpt = now
+
+#             if aborted or state["died"] or (time.time() - t0_wall) >= float(overall_time):
+#                 break
+
+#             # ---- the switch: 3 COM calls (1 if hot) ----
+#             nxt = (cur_idx + 1) % len(channels)
+#             sw0 = time.time()
+#             if hot_switch:
+#                 mux.set_cell(channels[nxt])
+#             else:
+#                 pstat.set_cell(False)
+#                 mux.set_cell(channels[nxt])
+#                 pstat.set_cell(True)
+#             sw1 = time.time()
+#             switch_ms.append((sw1 - sw0) * 1000.0)
+#             # hw_est() is a calibrated LOWER bound of true hw time, so:
+#             # old dwell ends at hw_est(sw0); new dwell starts at
+#             # hw_est(sw1) + sample_period + margin (an upper bound) + blank
+#             dw_end[-1] = (sw0 - t_run0) - state["base"]
+#             dw_start.append((sw1 - t_run0) - state["base"] + head_pad)
+#             dw_end.append(float("inf"))
+#             if nxt == 0:
+#                 cur_cycle += 1
+#             dw_ch.append(channels[nxt])
+#             dw_cy.append(cur_cycle)
+#             cur_idx = nxt
+#             slot += 1
+
+#         _harvest(curve, time.time())   # final pull
+
+#         try:
+#             pstat.set_cell(False)
+#         except Exception:
+#             pass
+#         stopper = getattr(curve, "stop", None)
+#         if callable(stopper):
+#             try:
+#                 stopper()
+#             except Exception:
+#                 pass
+#             t_limit = time.time() + 3.0
+#         else:
+#             t_limit = time.time() + (3.0 if (aborted or state["died"]) else pad + 5.0)
+#         try:
+#             while curve.running() and time.time() < t_limit:
+#                 time.sleep(0.2)
+#         except Exception:
+#             pass
+#     finally:
+#         for _f in (lambda: pstat.set_cell(False),
+#                    lambda: mux.set_cell(False),
+#                    lambda: mux.close(),
+#                    lambda: pstat.close()):
+#             try:
+#                 _f()
+#             except Exception:
+#                 pass
+
+#     if switch_ms:
+#         s = sorted(switch_ms)
+#         print("*** CA cycle mux{}: {} cycles, {} switches | switch ms "
+#               "mean {:.0f} / p95 {:.0f} / max {:.0f} | head discard <= {:.0f} ms{}".format(
+#                   mux_idx, cur_cycle, len(switch_ms),
+#                   sum(s) / len(s), s[int(0.95 * (len(s) - 1))], s[-1],
+#                   head_pad * 1000.0,
+#                   " | DIED EARLY" if state["died"] else ""))
+#     return _ca_cycle_frames(buffers)
+
+
+# def _ca_cycle_frames(buffers):
+#     out = {}
+#     for ch, b in buffers.items():
+#         n = len(b["time"])
+#         out[ch] = pd.DataFrame({"Point": np.arange(n),
+#                                 "time": b["time"],
+#                                 "t_hold": b["t_hold"],
+#                                 "Vf": b["vf"],
+#                                 "Im": b["im"],
+#                                 "Cycle": b["cycle"]})
+#     return out
+
+def _ca_cycle_frames(buffers):
+    out = {}
+    for ch, b in buffers.items():
+        n = len(b["time"])
+        out[ch] = pd.DataFrame({"Point": np.arange(n),
+                                "time": b["time"],
+                                "Vf": b["vf"],
+                                "Im": b["im"],
+                                "Cycle": b["cycle"]})
+    return out
+     
+def ca_cycle_mux(mux_idx, channels, voltage, overall_time, interval,
+                 sample_period=0.1, idle_mode="local", stop_event=None,
+                 checkpoint_s=600.0, checkpoint_cb=None, max_size=100000,
+                 settle_skip_s=0.00):
+    """
+    idle_mode: "local" -> selected channels are parked on the mux DAC at
+               `voltage` between dwells (stay biased); "open" -> disconnected.
+               Unselected channels on this mux are always OPEN.
+    checkpoint_cb: optional callable({channel: DataFrame}) invoked every
+               `checkpoint_s` seconds with the partial data so far.
+ 
+    Returns {channel: DataFrame(Point, time, Vf, Im, Cycle)} where `time` is
+    seconds since the run started (global clock, so the gaps while other
+    channels were active are visible in the data).
+    """
+    channels = [int(c) for c in channels]
+    if not channels:
+        raise ValueError("ca_cycle_mux: no channels given")
+    for c in channels:
+        if not 0 <= c <= 7:
+            raise ValueError(f"ca_cycle_mux: channel {c} out of range 0-7")
+    if interval < 2 * sample_period:
+        raise ValueError("ca_cycle_mux: interval must be >= 2 * sample_period")
+    if interval <= settle_skip_s + 2 * sample_period:
+        raise ValueError("ca_cycle_mux: interval too short for settle_skip_s")
+    if stop_event is None:
+        stop_event = threading.Event()
+ 
+    _ensure_tkp()
+    imx_list, pstat_list = _plate_devices()
+    if mux_idx >= len(imx_list) or mux_idx >= len(pstat_list):
+        raise RuntimeError(
+            f"ca_cycle_mux: mux {mux_idx} not available "
+            f"(found {len(imx_list)} IMX, {len(pstat_list)} IFC)")
+ 
+    pstat = tkp.Pstat("Pstat", pstat_list[mux_idx])
+    mux = tkp.IMX("IMX", imx_list[mux_idx])
+    mux.open()
+    pstat.open()
+
+    # time.sleep(0.04)
+    ca = CA(voltage, [0.1, 0.1, 0.1], interval, 1, sample_period, tkp.PSTATMODE, imax=50)
+    buffers = {c: {"time": [], "vf": [], "im": [], "cycle": []} for c in channels}
+    t0 = time.time()
+    deadline = t0 + float(overall_time)
+    last_ckpt = t0
+    cycle = 0
+ 
+    try:
+        pstat.set_ctrl_mode(tkp.PSTATMODE)
+        ca.initialize_pstat(pstat)
+ 
+        for c in range(8):
+            if c in channels and idle_mode == "local":
+                mux.set_off_mode(c, tkp.MUX_CELL_LOCAL)
+                mux.set_dac(c, voltage)
+            else:
+                mux.set_off_mode(c, tkp.MUX_CELL_OPEN)
+ 
+        while not stop_event.is_set() and time.time() < deadline:
+            progressed = False
+            for ch in channels:
+                now = time.time()
+                if stop_event.is_set() or now >= deadline:
+                    break
+                dwell = min(float(interval), deadline - now)
+                if dwell < settle_skip_s + max(2.0 * sample_period, 0.05):
+                    break
+ 
+                mux.set_cell(ch)
+                time.sleep(CA_CYCLE_SETTLE_S)
+ 
+                signal = pstat.signal_const_new(voltage, dwell, sample_period, tkp.PSTATMODE)
+                pstat.set_signal_const(signal)
+                pstat.init_signal()
+                time.sleep(0.01)
+                curve = tkp.ChronoACurve(pstat, max_size)
+                dwell_wall0 = time.time()
+                aborted_at = None
+                pstat.set_cell(True)
+                try:
+                    curve.run(True)
+                    while curve.running():
+                        if stop_event.is_set():
+                            aborted_at = time.time()
+                            break
+                        time.sleep(min(0.1, sample_period))
+                        try:
+                            if LIVE_HOOK and time.time() - dwell_wall0 >= settle_skip_s:
+                                d = curve.last_data_point()
+                                LIVE_HOOK("CA", time.time() - t0, d['im'])
+                        except Exception:
+                            pass
+                finally:
+                    pstat.set_cell(False)
+ 
+                d = curve.acq_data()
+                im = np.asarray(d['im'], dtype=float)
+                vf = np.asarray(d['vf'], dtype=float)
+                try:
+                    tt = np.asarray(d['time'], dtype=float)
+                except Exception:
+                    tt = np.arange(len(im)) * sample_period
+                if aborted_at is not None:   # drop any cell-off tail points
+                    keep = tt <= (aborted_at - dwell_wall0) + sample_period
+                    tt, vf, im = tt[keep], vf[keep], im[keep]
+                keep = tt >= settle_skip_s   # drop the switch/energize transient
+                tt, vf, im = tt[keep], vf[keep], im[keep]
+ 
+                b = buffers[ch]
+                b["time"].extend(((dwell_wall0 - t0) + tt).tolist())
+                b["vf"].extend(vf.tolist())
+                b["im"].extend(im.tolist())
+                b["cycle"].extend([cycle] * len(tt))
+                del signal
+                del curve
+                progressed = True
+ 
+            if not progressed:
+                break
+            cycle += 1
+ 
+            if checkpoint_cb and time.time() - last_ckpt >= checkpoint_s:
+                try:
+                    checkpoint_cb(_ca_cycle_frames(buffers))
+                except Exception:
+                    import traceback
+                    traceback.print_exc()
+                last_ckpt = time.time()
+    finally:
+        for _f in (lambda: pstat.set_cell(False),
+                   lambda: mux.set_cell(False),
+                   lambda: mux.close(),
+                   lambda: pstat.close()):
+            try:
+                _f()
+            except Exception:
+                pass
+ 
+    print(f"*** CA cycle mux{mux_idx} done: {cycle} full cycles over "
+          f"{time.time() - t0:.0f}s on channels {channels}")
+    return _ca_cycle_frames(buffers)
+ 
+
 
 '''
 if __name__ == "__main__":

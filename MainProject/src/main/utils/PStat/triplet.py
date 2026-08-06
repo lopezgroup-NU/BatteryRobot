@@ -16,6 +16,11 @@ from utils.PStat.peis import *
 from utils.PStat.cv import *
 from utils.PStat.ca import *
 from GUI.triplet_gui import *
+from utils.PStat.triplet_analysis import *
+try:
+    from utils.PStat.default_analysis import compute_default_analysis, analysis_subdoc
+except ImportError:
+    from default_analysis import compute_default_analysis, analysis_subdoc
 
 import csv
 import pandas as pd
@@ -61,6 +66,8 @@ DATA_DIRECTORY = "C:\\AttomRobotFiles\\Software\\BatteryRobot\\MainProject\\src\
 SAMPLE_LOG_DIRECTORY = "C:\\AttomRobotFiles\\Software\\BatteryRobot\\MainProject\\src\\main\\res\\ciara_new_data\\sample\\sample_log.csv"
 PLATE_LOG_DIRECTORY = "C:\\AttomRobotFiles\\Software\\BatteryRobot\\MainProject\\src\\main\\res\\ciara_new_data\\plate\\plate_log.csv"
 
+AUTO_ANALYZE = True  # regenerate plots after every test (triplet_analysis.analyze_cell_folder)
+
 # Headers for log files
 SAMPLE_LOG_COLS = ["plateID", "Date", "Operator", "Hypothesis", "Notes"]
 PLATE_LOG_COLS = ["PlateID", "Cell Position", "Material Name", "Catalyst Loading",
@@ -105,6 +112,11 @@ def write_measurement(measurement, plate_id: str, root: str | Path = ".") -> tup
         ("n_points", 0 if measurement.data is None else len(measurement.data)),  # data points collected
     ]
     rows += [(k, measurement.params[k]) for k in sorted(measurement.params)]
+    try:
+        rows += list(compute_default_analysis(
+            measurement.electrochemical_test, measurement.data, measurement.params).items())
+    except Exception as e:
+        rows += [("analysis_error", repr(e))]
     with open(meta_path, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["field", "value"])
@@ -114,6 +126,16 @@ def write_measurement(measurement, plate_id: str, root: str | Path = ".") -> tup
                     measurement.electrochemical_test, measurement.params,
                     measurement.start_time, data_path, data_df=measurement.data)
 
+    # ---- auto-analysis: regenerate this cell's plots after every test ----
+    if AUTO_ANALYZE:
+            try:
+                try:
+                    from utils.PStat.triplet_analysis import analyze_cell_folder
+                except ImportError:
+                    from triplet_analysis import analyze_cell_folder
+                analyze_cell_folder(cell_dir)
+            except Exception as e:
+                print(f"[analysis] plot generation failed for {cell_dir}: {e}")
     return data_path, meta_path
 
 # ts deprecated
@@ -240,8 +262,109 @@ PARAM_DEFAULTS = {
         "maxcycle":      2,
         "sample_period": 0.1,
     },
-    "CA": {"voltage": 1.0, "time_run": 30, "sample_period": 0.1},
+    "CA": {"voltage": 1.8, "time_run": 120, "sample_period": 0.1},
 }
+
+import os
+import threading
+import traceback
+ 
+PARAM_DEFAULTS["CA_CYCLE"] = {
+    "voltage": 1.8, 
+    "overall_time": 7200.0,  # total seconds for the whole run
+    "interval": 0.1,        # seconds spent on each cell before switching
+    "sample_period": 0.0001,    # s between points
+    "idle_mode": "local",    # "local": mux DAC holds selected cells at `voltage; "open": disconnected
+    "checkpoint_s": 600.0,   # partial-CSV flush in case of failures; probably update to shorter intervals
+}
+ 
+ 
+def _ca_cycle_csv_path(plate_id, cell_id, root="."):
+    cell_dir = Path(root) / DATA_DIRECTORY / _stem(plate_id, cell_id)
+    cell_dir.mkdir(parents=True, exist_ok=True)
+    return cell_dir / _data_filename(plate_id, cell_id, "CA_CYCLE")
+ 
+ 
+def _atomic_csv(df, path):
+    tmp = Path(str(path) + ".tmp")
+    df.to_csv(tmp, index=False)
+    os.replace(tmp, path)
+ 
+ 
+def run_ca_cycle_mux(plate, mux_idx, hw_cells, params=None, root=".", stop_event=None):
+    """One mux's share of a cycling-CA run: drives ca_cycle_mux() and records
+    one CA_CYCLE Measurement per cell through the normal pipeline. Call from
+    one thread per mux (the GUI does this), or use run_ca_cycle_plate()."""
+    resolved = _resolve_params(plate, "CA_CYCLE", params)
+    hw_cells = sorted({int(c) for c in hw_cells})
+    for c in hw_cells:
+        if c // 8 != mux_idx:
+            raise ValueError(f"cell {c} is not on mux {mux_idx}")
+    ch_to_hw = {c % 8: c for c in hw_cells}
+ 
+    def _cell_id(hw):
+        return f"{hw // 4 + 1}{'ABCD'[hw % 4]}"
+ 
+    def _checkpoint(partial):   # {channel: df} -> partial CSVs at the final paths
+        for ch, df in partial.items():
+            _atomic_csv(df, _ca_cycle_csv_path(plate.plate_id, _cell_id(ch_to_hw[ch]), root))
+ 
+    start = dt.now()
+    dfs = ca_cycle_mux(mux_idx=mux_idx,
+                       channels=sorted(ch_to_hw),
+                       voltage=float(resolved["voltage"]),
+                       overall_time=float(resolved["overall_time"]),
+                       interval=float(resolved["interval"]),
+                       sample_period=float(resolved["sample_period"]),
+                       idle_mode=str(resolved.get("idle_mode", "local")).lower(),
+                       stop_event=stop_event,
+                       checkpoint_s=float(resolved.get("checkpoint_s", 600.0)),
+                       checkpoint_cb=_checkpoint)
+    finish = dt.now()
+ 
+    out = []
+    for ch, df in dfs.items():
+        hw = ch_to_hw[ch]
+        m = Measurement(row=hw // 4 + 1, column="ABCD"[hw % 4],
+                        electrochemical_test="CA_CYCLE",
+                        start_time=start, finish_time=finish,
+                        params={**resolved, "hw_cell": hw, "mux": mux_idx,
+                                "cells_in_run": hw_cells},
+                        data=df)
+        plate.measurements.append(m)
+        write_measurement(m, plate.plate_id, root)
+        out.append(m)
+    return out
+ 
+ 
+def run_ca_cycle_plate(plate, hw_cells, params=None, root=".", stop_event=None):
+    """Cycling CA over any subset of the 24 cells: groups by mux, runs all
+    muxes concurrently (one thread each), blocks until every mux finishes."""
+    by_mux = {}
+    for c in sorted({int(c) for c in hw_cells}):
+        by_mux.setdefault(c // 8, []).append(c)
+ 
+    results, errors, threads = [], [], []
+ 
+    def work(mi, cs):
+        try:
+            results.extend(run_ca_cycle_mux(plate, mi, cs, params, root, stop_event))
+        except Exception as e:
+            errors.append((mi, e))
+            traceback.print_exc()
+ 
+    for mi, cs in sorted(by_mux.items()):
+        t = threading.Thread(target=work, args=(mi, cs), daemon=True,
+                             name=f"ca_cycle_mux{mi}")
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join()
+ 
+    if errors:
+        raise RuntimeError("CA cycle failed on mux(es): "
+                           + ", ".join(f"{mi}: {e!r}" for mi, e in errors))
+    return results
 
 # ---- Utils ---- #
 
@@ -480,6 +603,7 @@ def measurement_doc(m: Measurement, plate_id: str, data_path=None, meta_path=Non
         "finish_time": m.finish_time.isoformat() if m.finish_time else "",
         "n_points": 0 if m.data is None else len(m.data),
         "params": _mongo_safe(m.params),
+        "analysis": analysis_subdoc(m.electrochemical_test, m.data, m.params) if m.data is not None else None,
         "data_path": str(data_path) if data_path else None,  # None = aborted/empty run
         "meta_path": str(meta_path) if meta_path else None,
     }
@@ -683,8 +807,8 @@ def upload_cell_run(plate_id, cell_id, cell_num, test, params, time_ran, data_pa
     run_doc = {
         "params": _mongo_safe(params),
         "time_ran": _fmt_time(time_ran),
-        "x_intercept": x_intercept(data_df) if data_df is not None else None,
         "path": str(data_path) if data_path else None,
+        "analysis": analysis_subdoc(test, data_df, params) if data_df is not None else None,
     }
     try:
         coll.update_one({"_id": "{}_{}".format(plate_id, cell_id)}, {"$set": {
