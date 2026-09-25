@@ -22,6 +22,10 @@ for i in paths:
 # rob.folder_analysis(r"[file name]")
 
 rob = BatteryRobot('A', network_serial='AU06EZ1P', home= True)
+rob.robot_servo(True)
+rob.open_gripper()
+rob.open_clamp()
+#rob.home_robot()
 t8 = T8('B', network = rob.network)
 p2 = PowderShaker('C', network = rob.network)
 # waters = list(range(10,48))
