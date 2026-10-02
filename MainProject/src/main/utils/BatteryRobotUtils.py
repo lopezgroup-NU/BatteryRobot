@@ -862,6 +862,10 @@ class BatteryRobot(NorthC9):
         self.plate = new_plate()
         return self.plate
 
+    def new_formulation(self):
+            from GUI.formulate_app import setup_gui
+            self.plate = setup_gui()
+            return self.plate
 
     def run_tests_new(self, row, column):
         run_test_cell(self.Global_Plate, row, column, self.Plate_Properties)
@@ -1301,6 +1305,8 @@ class BatteryRobot(NorthC9):
 
 
 
+    
+
     def dispense_vol(self, dest_id, source_id, target_vol, collect=False, ret=True, speed = 8):
         """
         Dispense {target_vol} ml from vial with id {source_id} into vial with id {dest_id}
@@ -1369,6 +1375,125 @@ class BatteryRobot(NorthC9):
         data["Intended(ml)"] = target_vol
         data["Real(ml)"] = dispensed
         return data
+
+    
+    def ciara_dispense_mass(self, mg_target, density=0.001, tolerance=1, zero_scale=True):
+        print("note that this function uses the density of water in mg/mL (0.001). Set density=x for whatever fluid you are using")
+        """
+        Dispenses liquid into the vial being held in the carousel clamp by mass
+        Args:
+            mg_target (float): Target mass to dispense in mg
+            first_dispense (float): The volume to be dispensed in the first iteration, in mL
+            tolerance (float): Tolerance
+            density (float): Density of the liquid being dispensed
+            zero_scale (bool): Whether to zero the scale before starting
+        """
+        self.goto_safe(carousel_dispense)
+        mg_togo = mg_target
+        
+        #intialize
+
+        prev_mass = 0
+        delta_mass = 0
+        
+        if zero_scale:
+            self.zero_scale()
+            self.delay(0.5)
+        tare = self.read_steady_scale() * 1000
+
+        
+
+        
+        mg_togo = mg_target
+        #density = 0.001#min_dispense_volume / meas_mass #density here is not real density, but accounts for any amount that the robot is "off" in dispensing volume and such
+        #print(meas_mass)
+        #print(density)
+        self.goto(carousel_aspirate)
+        count = 0
+        vol_to_go = mg_togo*density
+        self.dispense_ml(3, vol_to_go)
+        self.goto(carousel_dispense)
+        self.delay(0.5)
+        self.read_steady_scale()  # dummy read to wait for steady
+        self.delay(0.5)  # delay after steady to allow for more settling time
+        meas_mass = self.read_steady_scale() * 1000 - tare
+
+        mg_togo = mg_target - meas_mass
+        count=0
+        while mg_togo > tolerance and count < 5:
+            count+=1
+            vol_to_go = mg_togo*density
+            self.goto(carousel_aspirate)
+            self.dispense_ml(3, vol_to_go)
+            self.goto(carousel_dispense)
+            meas_mass = self.read_steady_scale() * 1000 - tare
+            mg_togo = mg_target - meas_mass
+
+
+        meas_mass = self.read_steady_scale() * 1000 - tare
+        """while mg_togo > tolerance:  #TODO should have a max count condition? other timeout?
+            count += 1                
+            vol_to_go = 0.9*mg_togo*density
+
+            self.dispense_ml(3, vol_to_go)
+            
+            self.delay(0.5)
+            self.read_steady_scale()  # dummy read to wait for steady
+            self.delay(0.5)  # delay after steady to allow for more settling time
+            meas_mass = self.read_steady_scale() * 1000 - tare
+            
+            mg_togo = mg_target - meas_mass
+            delta_mass = meas_mass - prev_mass
+            prev_mass = meas_mass
+
+            if delta_mass < 10:
+                #if delta is this low, nothing was dispensed, so it is likely that we ran out of fluid. we'll break the loop under this condition
+                break
+            #if delta_mass <= 0:
+            #    shake_t = max_new_t
+            #else:
+            #    shake_t *= (iter_target/delta_mass)
+            #shake_t = min(max_new_t, shake_t)  # no larger than max growth allows
+            #shake_t = max(ps.min_shake_t, shake_t)  # no shorter than min time
+            #shake_t = min(ps.max_shake_t, shake_t)  # no longer than max time
+            
+            print(f'Iteration {count}:')
+            print(f'\tJust dispensed:  {delta_mass:.1f} mg')
+            print(f'\tRemaining:       {mg_togo:.1f} mg')
+            #print(f'\tNext target:     {iter_target:.1f} mg')
+            #print(f'\tNext time:       {int(shake_t)} ms')
+            print('')
+        #self.set_opening(100)
+        #self.set_opening(0)
+
+        if mg_togo < tolerance and mg_togo > 15:
+            self.dispense_ml(3, 0.035)"""
+        
+        print(f'Result:')
+        #print(f'\tLast iter:  {delta_mass:.1f} mg')
+        print(f'\tDispensed: {meas_mass:.1f} mg')
+        #print(f'\tRemaining: {mg_togo:.1f} mg')
+        #print(f'\tTime:      {int(perf_counter()-start_t)} s')
+        print('')
+
+        return meas_mass
+
+    def mass_accuracy_test(self, mg_target):
+        self.delay(1)
+        self.goto_safe(safe_zone)
+        self.delay(3)
+        self.move_pump(3, 0)
+        self.delay(0.5)
+        self.move_pump(3, 3000)
+        self.close_clamp()
+        self.delay(0.5)
+        self.open_clamp()
+        self.delay(0.5)
+        self.goto_safe(carousel_aspirate)
+        self.delay(0.5)
+        self.ciara_dispense_mass_new(mg_target)
+        self.delay(0.5)
+        self.goto_safe(safe_zone)
 
     def dispense_mass(self, dest_id, source, target_mass,
                              density, collect=False, ret=True):
@@ -1441,6 +1566,9 @@ class BatteryRobot(NorthC9):
         self.set_pump_speed(0, 15)
         self.set_pump_valve(0, 0)
         self.move_pump(0, 0)
+
+    def empty_pipette(self):
+        self.move_pump(3, 0)
 
     def pump_helper(self, length=1300, v_in=13, v_out=0, draw=True):
         """
@@ -2000,3 +2128,404 @@ class BatteryRobot(NorthC9):
         except InitializationError as e:
             print(e)
             print("Fix the rack csvs and try again.")
+
+        # ------------------------------------------------------------------
+    # Teach-point capture -> Locator.py lines
+    # ------------------------------------------------------------------
+    @staticmethod
+    def format_locator(name, points):
+        """
+        Locator.py-style line from [gripper, shoulder, elbow, z] count lists.
+        1 point  -> 'name = [g, s, e, z]'
+        n points -> 'name = [[g, s, e, z], [g, s, e, z], ]'   (same trailing ', ]' north.exe writes)
+        """
+        fmt = lambda p: "[" + ", ".join(str(int(c)) for c in p) + "]"
+        if len(points) == 1:
+            return f"{name} = {fmt(points[0])}"
+        return f"{name} = [" + ", ".join(fmt(p) for p in points) + ", ]"
+
+    def capture_positions(self, name="new_pos", home=True, approach_offset=None,
+                          out_file="experiments/captured_positions.py"):
+        """
+        Servos off -> move arm by hand -> Enter captures get_robot_positions().
+        Prompt:  Enter = capture   u = undo last   p = peek (print, no capture)   q / Ctrl+C = done
+        Prints a paste-ready Locator.py line, appends it to out_file, returns the point list.
+        approach_offset: optional [dg, ds, de, dz] counts -> also emits '<name>_approach'
+                         (e.g. [0, 0, 0, -1225] like microplate_*_approach).
+        Use q to finish, not Thonny Stop - Stop kills the backend with servos released.
+        """
+        if home:
+            self.home_robot()
+        self.robot_servo(False)
+        pts = []
+        try:
+            while True:
+                cmd = input(f"[{len(pts)} captured] Enter=capture  u=undo  p=peek  q=done > ").strip().lower()
+                if cmd == "q":
+                    break
+                if cmd == "u":
+                    print("  removed", pts.pop() if pts else "nothing")
+                    continue
+                if cmd == "p":
+                    print("  ", [int(c) for c in self.get_robot_positions()])
+                    continue
+                pts.append([int(c) for c in self.get_robot_positions()])
+                print(f"  {len(pts)}: {pts[-1]}")
+        except KeyboardInterrupt:
+            print("\n  interrupted - keeping captures")
+        finally:
+            self.robot_servo(True)   # re-engage; arm holds where you left it
+
+        if not pts:
+            print("nothing captured")
+            return pts
+
+        lines = [self.format_locator(name, pts)]
+        if approach_offset is not None:
+            appr = [[c + d for c, d in zip(p, approach_offset)] for p in pts]
+            lines.append(self.format_locator(name + "_approach", appr))
+        out = "\n".join(lines)
+        print("\n# ---- paste into Locator.py ----\n" + out + "\n# -------------------------------")
+        if out_file:
+            try:
+                with open(out_file, "a") as f:
+                    f.write(f"# {get_time_stamp()}\n{out}\n")
+            except OSError as e:
+                print(f"(not written to {out_file}: {e})")
+        return pts
+
+    def replay_positions(self, points, home=True, vel=10):
+        """
+        Verify captures: home, then goto_safe each point (Enter between), end at safe_zone.
+        Accepts one point or a list of points.
+        """
+        if points and not isinstance(points[0], (list, tuple)):
+            points = [points]
+        if home:
+            self.home_robot()
+        for i, p in enumerate(points):
+            input(f"Enter -> goto_safe {i}: {p} ")
+            self.goto_safe(p, vel=vel)
+        self.goto_safe(safe_zone, vel=vel)
+
+    def plate_grid(self, cell0, cell_right, cell_down, right_steps=1, down_steps=1,
+                   rows=6, cols=4, check=None):
+        """Plate rig cell locations from three taught ones. Nothing moves.
+ 
+        cell0       taught location of 1A (cell 0): [gripper, elbow, shoulder, z]
+        cell_right  taught location in row 1, right_steps columns over (1B: 1, 1D: 3)
+        cell_down   taught location in column A, down_steps rows down (2A: 1, 6A: 5)
+        check       optional (cell_index, taught_location), e.g. (23, loc_6D): prints how
+                    far the computed point lands from one you taught
+ 
+        Far-apart references are more accurate: rob.plate_grid(a1, d1, a6, 3, 5) beats
+        rob.plate_grid(a1, b1, a2). The grid is laid out in x/y mm (n9_fk, as in
+        get_xyz_position) and turned back into joint counts by solving n9_fk from the
+        neighbouring cell, so every cell keeps the taught arm configuration; z and the
+        gripper are spread linearly in counts. Returns rows*cols locations, index =
+        hardware cell (1A=0, 1B=1 ... 6D=23), and prints them ready to paste into
+        plate_locations.CELL_LOCATIONS."""
+        import math
+ 
+        def xy(g, e, s):
+            p = self.n9_fk(g, e, s)
+            return float(p[0]), float(p[1])
+ 
+        def solve(x_t, y_t, g, e, s):
+            # elbow/shoulder counts that put the tool at (x_t, y_t) mm: Newton on n9_fk
+            h = 5.0                                    # counts, finite-difference step
+            for _ in range(50):
+                x, y = xy(g, e, s)
+                ex, ey = x_t - x, y_t - y
+                if ex * ex + ey * ey < 1e-4:           # within 0.01 mm
+                    return e, s
+                xe, ye = xy(g, e + h, s)
+                xs, ys = xy(g, e, s + h)
+                a, b, c, d = (xe - x) / h, (xs - x) / h, (ye - y) / h, (ys - y) / h
+                det = a * d - b * c
+                if abs(det) < 1e-12:
+                    raise ValueError("arm stretched straight near ({:.1f}, {:.1f}) mm".format(x_t, y_t))
+                e += (d * ex - b * ey) / det
+                s += (a * ey - c * ex) / det
+            raise ValueError("could not solve the arm pose for ({:.1f}, {:.1f}) mm".format(x_t, y_t))
+ 
+        p0, pr, pd = xy(*cell0[:3]), xy(*cell_right[:3]), xy(*cell_down[:3])
+        col = ((pr[0] - p0[0]) / right_steps, (pr[1] - p0[1]) / right_steps)   # one column step, mm
+        row = ((pd[0] - p0[0]) / down_steps, (pd[1] - p0[1]) / down_steps)     # one row step, mm
+        pc, prw = math.hypot(*col), math.hypot(*row)
+        cos_a = (col[0] * row[0] + col[1] * row[1]) / (pc * prw)
+        print("column pitch {:.2f} mm, row pitch {:.2f} mm, {:.1f} deg between them (90 = square)".format(
+            pc, prw, math.degrees(math.acos(max(-1.0, min(1.0, cos_a))))))
+ 
+        grid, solved = [], {}
+        for r in range(rows):
+            for c in range(cols):
+                g = cell0[0] + c * (cell_right[0] - cell0[0]) / right_steps \
+                    + r * (cell_down[0] - cell0[0]) / down_steps
+                z = cell0[3] + c * (cell_right[3] - cell0[3]) / right_steps \
+                    + r * (cell_down[3] - cell0[3]) / down_steps
+                e, s = solved.get((r, c - 1)) or solved.get((r - 1, c)) or (cell0[1], cell0[2])
+                e, s = solve(p0[0] + c * col[0] + r * row[0], p0[1] + c * col[1] + r * row[1],
+                             g, float(e), float(s))
+                solved[(r, c)] = (e, s)
+                grid.append([int(round(g)), int(round(e)), int(round(s)), int(round(z))])
+ 
+        if check is not None:
+            k, loc = check
+            gx, gy = xy(*grid[k][:3])
+            tx, ty = xy(*loc[:3])
+            print("check cell {}: computed point is {:.2f} mm from the taught one, z off by {:+d} counts".format(
+                k, math.hypot(gx - tx, gy - ty), grid[k][3] - int(loc[3])))
+        print("CELL_LOCATIONS = [")
+        for k, loc in enumerate(grid):
+            print("    {},  # {}{}  {}".format(loc, k // cols + 1, chr(65 + k % cols), k))
+        print("]")
+        return grid
+
+    def aug_27_demo(self):
+        dispense_zone = [[-151, 4015, 7358, 6953], [29, 5459, 10412, 6410], [23, 3990, 9682, 7216], [24, 5315, 11901, 6079] ]
+        dispense_zone_approach = [[-151, 4015, 7358, 682], [29, 5459, 10412, 682], [23, 3990, 9682, 682], [24, 5315, 11901, 682]]
+        draw_zone = [80, 401, 1347, 1982]
+        for i in range(4):
+            self.goto_safe(draw_zone)
+            self.aspirate_ml(3, 1)
+            for j in range(10):
+                self.goto_safe(dispense_zone[i], vel = 10)
+                self.dispense_ml(3, 0.1)
+                self.goto_safe(dispense_zone_approach[i], vel = 10)
+                self.delay(1)
+
+        self.goto_safe(draw_zone)
+
+
+
+
+
+
+        # ------------------------------------------------------------------
+    # Teach-point capture -> Locator.py lines
+    # ------------------------------------------------------------------
+    @staticmethod
+    def format_locator(name, points):
+        """
+        Locator.py-style line from [gripper, shoulder, elbow, z] count lists.
+        1 point  -> 'name = [g, s, e, z]'
+        n points -> 'name = [[g, s, e, z], [g, s, e, z], ]'   (same trailing ', ]' north.exe writes)
+        """
+        fmt = lambda p: "[" + ", ".join(str(int(c)) for c in p) + "]"
+        if len(points) == 1:
+            return f"{name} = {fmt(points[0])}"
+        return f"{name} = [" + ", ".join(fmt(p) for p in points) + ", ]"
+
+    def capture_positions(self, name="new_pos", home=True, approach_offset=None,
+                          out_file="experiments/captured_positions.py"):
+        """
+        Servos off -> move arm by hand -> Enter captures get_robot_positions().
+        Prompt:  Enter = capture   u = undo last   p = peek (print, no capture)   q / Ctrl+C = done
+        Prints a paste-ready Locator.py line, appends it to out_file, returns the point list.
+        approach_offset: optional [dg, ds, de, dz] counts -> also emits '<name>_approach'
+                         (e.g. [0, 0, 0, -1225] like microplate_*_approach).
+        Use q to finish,
+        """
+        if home:
+            self.home_robot()
+        self.robot_servo(False)
+        pts = []
+        try:
+            while True:
+                cmd = input(f"[{len(pts)} captured] Enter=capture  u=undo  p=peek  q=done > ").strip().lower()
+                if cmd == "q":
+                    break
+                if cmd == "u":
+                    print("  removed", pts.pop() if pts else "nothing")
+                    continue
+                if cmd == "p":
+                    print("  ", [int(c) for c in self.get_robot_positions()])
+                    continue
+                pts.append([int(c) for c in self.get_robot_positions()])
+                print(f"  {len(pts)}: {pts[-1]}")
+        except KeyboardInterrupt:
+            print("\n  interrupted - keeping captures")
+        finally:
+            self.robot_servo(True)   # re-engage; arm holds where you left it
+
+        if not pts:
+            print("nothing captured")
+            return pts
+
+        lines = [self.format_locator(name, pts)]
+        if approach_offset is not None:
+            appr = [[c + d for c, d in zip(p, approach_offset)] for p in pts]
+            lines.append(self.format_locator(name + "_approach", appr))
+        out = "\n".join(lines)
+        print("\n# ---- paste into Locator.py ----\n" + out + "\n# -------------------------------")
+        if out_file:
+            try:
+                with open(out_file, "a") as f:
+                    f.write(f"# {get_time_stamp()}\n{out}\n")
+            except OSError as e:
+                print(f"(not written to {out_file}: {e})")
+        return pts
+
+    def replay_positions(self, points, home=True, vel=10):
+        """
+        Verify captures: home, then goto_safe each point (Enter between), end at safe_zone.
+        Accepts one point or a list of points.
+        """
+        if points and not isinstance(points[0], (list, tuple)):
+            points = [points]
+        if home:
+            self.home_robot()
+        for i, p in enumerate(points):
+            input(f"Enter -> goto_safe {i}: {p} ")
+            self.goto_safe(p, vel=vel)
+        self.goto_safe(safe_zone, vel=vel)
+
+    def aug_27_demo(self):
+        dispense_zone = [[-151, 4015, 7358, 6953], [29, 5459, 10412, 6410], [23, 3990, 9682, 7216], [24, 5315, 11901, 6079] ]
+        dispense_zone_approach = [[-151, 4015, 7358, 3400], [29, 5459, 10412, 3400], [23, 3990, 9682, 3400], [24, 5315, 11901, 3400]]
+        draw_zone = [80, 401, 1347, 1982]
+        for i in range(4): # if not changed, range(insert number of points)
+            self.goto_safe(draw_zone)
+            self.aspirate_ml(3, 1) # (pump_id, mL)
+            for j in range(10): # number of times it dispenses into same vial
+                self.goto_safe(dispense_zone[i], vel = 3)
+                self.dispense_ml(3, 0.1) # (pump_id, mL)
+                self.goto_safe(dispense_zone_approach[i], vel = 3)
+                self.delay(60) # delay (in seconds)
+
+    @staticmethod
+    def transfer(src, dst, ml, pump=3, max_ml=1.0, fresh_pipette=True):
+        """genesis.transfer -- hand-build one pipette routine when the table isn't enough."""
+        from utils.PStat.Genesis.genesis import transfer
+        return transfer(src, dst, ml, pump, max_ml, fresh_pipette)
+
+    def run_timed_routines(self, plans, points_file="experiments/captured_positions.py",
+                           routines=None, pipette="fresh", anchor="finish", vel=10, home=False, end_at_safe=True,
+                           operator_id="", db=None, wait=False,
+                           log_file="experiments/formulation.log"):
+        """
+        Timed additions where every step replays a captured routine. Points come
+        from a capture_positions() file (Locator.py syntax); scheduling is
+        genesis.TimedFormulation (one arm, earliest-due vial goes next).
+
+            plans        the additions table: csv text (triple-quoted string), a csv path,
+                         a DataFrame, [header, row, ...], or a list of genesis.VialPlan.
+                         One row per step -- see genesis.plans_from_table:
+                             Vial, Source, From,      To,        mL,  Wait_min, Repeat
+                             v1,   A,      A_src,     v1_disp,   1.0, 0            # draw + dispense
+                             v1,   B,      B_src,     v1_disp,   0.5, 5
+                             v2,   A,      draw_zone, ,          1.0, 0            # draw only
+                             v2,   A,      ,          disp_zone, 0.1, 1,       10  # dispense 0.1 mL x10, 1/min
+            points_file  parsed by genesis.load_points -> {name: [[g, s, e, z], ...]};
+                         capture_positions() appends, and the last capture of a name wins
+            routines     optional {name: sequence} for anything the table can't say; a
+                         table row with a Routine cell uses one of these (or a plain point
+                         array) instead of From/To/mL. Lookup order: routines, keywords,
+                         points file. Sequence items:
+                             "name"              goto_safe each point of that array (or a nested routine)
+                             "swap_pipette"      drop the tip if holding one, take a fresh one *
+                             "drop_pipette"      drop the tip if holding one (no-op otherwise) *
+                             "safe"              goto_safe(safe_zone)
+                             [g, s, e, z]        goto_safe that one point
+                             ("method", *args)   self.method(*args), e.g. ("aspirate_ml", 3, 1.0), ("delay", 1)
+                             callable            fn(self)
+                             [item, item, ...]   nested sequence
+            pipette      one switch for the two * keywords above:
+                           "fresh"  they work as written -> transfer() gives every addition a new tip
+                           "once"   take one tip before the schedule (unless already holding one),
+                                    keep it for every step, drop it when the schedule ends normally;
+                                    the keywords become no-ops
+                           "off"    never touch the tip; the keywords become no-ops
+                         Explicit ("get_pipette",) / ("remove_pipette",) tuples always run regardless.
+            anchor       "finish": Wait_min counts from when the vial's previous step finished
+                         "start":  from when it started -> a repeated dispense keeps a true period
+            end_at_safe  goto_safe(safe_zone) after each step so the next vial starts from a known
+                         spot; False leaves the arm where the step ended (one vial, tip loaded)
+            returns the running TimedFormulation: .print_status(), .stop(), .join(), .db
+
+        A loaded tip (draw-only row) stays on the arm until its dispenses are done,
+        so don't schedule another vial's draw or transfer inside that window.
+        """
+        from utils.PStat.Genesis.genesis import (TimedFormulation, VialPlan, load_points,   # same rule as utils.PStat.triplet
+                                         plans_from_csv, plans_from_table)
+
+        pts = load_points(points_file)
+        routines = dict(routines or {})
+        if pipette == "fresh":                                # add a line here to add a keyword
+            keywords = {"swap_pipette": [("check_remove_pipette",), ("get_pipette",)],
+                        "drop_pipette": [("check_remove_pipette",)]}
+        elif pipette in ("once", "off"):
+            keywords = {"swap_pipette": [], "drop_pipette": []}      # no-ops
+        else:
+            raise ValueError(f"pipette must be 'fresh', 'once' or 'off', got {pipette!r}")
+        if isinstance(plans, str) or hasattr(plans, "__fspath__"):
+            plans = plans_from_csv(plans)                     # csv text or file path
+        elif not all(isinstance(p, VialPlan) for p in plans):
+            plans = plans_from_table(plans)                   # DataFrame, list of dicts, [header, row, ...]
+        plans = list(plans)
+
+        def is_point(x):
+            return (isinstance(x, (list, tuple)) and len(x) == 4
+                    and all(isinstance(c, (int, float)) for c in x))
+
+        def resolve(item, depth=0):
+            """Flatten one routine into [("goto", pt) | ("call", name, args) | ("fn", f)]."""
+            if depth > 10:
+                raise ValueError(f"routine nesting too deep at {item!r}")
+            if is_point(item):
+                return [("goto", [int(c) for c in item])]
+            if isinstance(item, str):
+                if item in routines:
+                    return resolve(routines[item], depth + 1)
+                if item in keywords:
+                    return resolve(keywords[item], depth + 1)
+                if item == "safe":
+                    return [("goto", safe_zone)]
+                if item in pts:
+                    return [("goto", p) for p in pts[item]]
+                raise KeyError(f"{item!r} is not in routines, keywords or {points_file}")
+            if isinstance(item, tuple):
+                if not (item and isinstance(item[0], str) and callable(getattr(self, item[0], None))):
+                    raise ValueError(f"bad call {item!r}; want ('method', *args)")
+                return [("call", item[0], tuple(item[1:]))]
+            if callable(item):
+                return [("fn", item)]
+            if isinstance(item, list):
+                ops = []
+                for sub in item:
+                    ops.extend(resolve(sub, depth + 1))
+                return ops
+            raise ValueError(f"can't interpret routine item {item!r}")
+
+        for p in plans:                                       # fail before anything moves
+            for a in p.additions:
+                resolve(a.routine)
+
+        def execute(vial, add):
+            ops = resolve(add.routine)
+            for op in ops:
+                if op[0] == "goto":
+                    self.goto_safe(op[1], vel=vel)
+                elif op[0] == "call":
+                    getattr(self, op[1])(*op[2])
+                else:
+                    op[1](self)
+            if end_at_safe:
+                self.goto_safe(safe_zone, vel=vel)
+            return {"routine": add.name, "ops": len(ops)}
+
+        def finish(tf):                                       # worker thread, after the last step
+            if pipette == "once" and not any(tl.status == "failed" for tl in tf.timelines.values()):
+                self.check_remove_pipette()               # a failed run leaves the arm as it is
+
+        if home:
+            self.home_robot()
+        if pipette == "once" and not self.holding_pipette:
+            self.get_pipette()
+        tf = TimedFormulation(execute, plans, db=db, operator_id=operator_id, log_path=log_file,
+                              on_finish=finish, anchor=anchor)
+        tf.start()
+        if wait:
+            tf.join()
+        return tf
