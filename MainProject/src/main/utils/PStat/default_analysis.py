@@ -1,3 +1,22 @@
+"""Analyze electrochemical tests and save their results.
+
+Function overview:
+    compute_default_analysis: Choose an analyzer and format metrics and errors.
+    analyze_peis: Estimate the Nyquist intercept and high-frequency resistance.
+    peis_r_xintercept / peis_rs_positive_slope: Return those estimates in ohms.
+    analyze_cv: Find onset, oxidation peaks, peak current, and threshold width.
+    analyze_cp: Measure voltage drift, current change, failure time, and extrema.
+    analyze_ca: Measure current drift, change, failure time, and extrema,
+        accounting for cycles when detecting failure.
+    analysis_subdoc: Select metrics and format them for Mongo.
+    upsert_meta: Update metadata CSV fields using an atomic file replacement.
+    analyze_into_meta: Compute metrics and save them to a run's metadata CSV.
+    backfill: Refresh metadata for supported runs in a folder and its subfolders.
+
+Private helpers read and clean data, smooth signals, fit slopes, find crossings
+and extrema, format values, identify test types, and load stored parameters.
+"""
+
 from __future__ import annotations
 
 import csv
@@ -16,22 +35,17 @@ ANALYSIS_VERSION = "1"
 _trapz = getattr(np, "trapezoid", None) or getattr(np, "trapz")
 
 # ---- tunables -------------------------------------------------------------
-CV_J_THRESHOLD_MA_CM2 = 10.0       # width metric threshold, mA/cm^2
-CV_ONSET_WIN          = 10         # onset: points per sliding window (params["cv_onset_win"] overrides)
-CV_ONSET_SLOPE_K      = 5.0        # onset: slope must exceed foot median + K*MAD (params["cv_onset_slope_k"])
-CP_FAILURE_I_A        = 0.01e-3    # |Im| below this counts as failure (0.01 mA)
-CP_EDGE_N             = 5          # "first/last x datapoints" for start/end values (params["cp_edge_n"] overrides)
-EXTREMA_PROM_FRAC     = 0.02       # local-extrema prominence, fraction of signal range
-EXTREMA_MAX_KEPT      = 50         # cap on reported local extrema per signal
+CV_J_THRESHOLD_MA_CM2 = 10.0       # current-density threshold for CV width (mA/cm^2)
+CV_ONSET_WIN          = 10         # window size; override with params["cv_onset_win"]
+CV_ONSET_SLOPE_K      = 5.0        # noise multiplier; override with params["cv_onset_slope_k"]
+CP_FAILURE_I_A        = 0.01e-3    # failure threshold for |Im| (0.01 mA)
+CP_EDGE_N             = 5          # endpoint sample count; override with params["cp_edge_n"]
+EXTREMA_PROM_FRAC     = 0.02       # peak prominence as a fraction of signal range
+EXTREMA_MAX_KEPT      = 50         # maximum peaks or troughs per signal
 
-# Prefer the existing implementation from triplet_analysis when present.
-# NOTE: dataanalysis.py is deliberately NOT imported here. It executes
-# `import matplotlib.pyplot` at import time (Tk-root hazard in GUI worker
-# threads) and pulls BUMPS + the `impedance` package, which don't belong in
-# the per-test write path. Its minR is a DREAM-fit seed, not a reported
-# metric; the light PEIS estimators live here canonically. If dataanalysis
-# ever needs them, it should import peis_r_xintercept / peis_rs_positive_slope
-# FROM this module -- never the other way around.
+# Reuse triplet_analysis when available. Keep dataanalysis imports out of
+# the per-test write path to avoid GUI and fitting dependencies.
+# Other modules can import the shared PEIS estimators from here.
 try:
     from utils.PStat.triplet_analysis import estimate_rs_from_positive_slope as _rs_ext
 except ImportError:
@@ -44,7 +58,7 @@ except ImportError:
 # ---- small helpers --------------------------------------------------------
 
 def _col(df, *names):
-    """Case-insensitive column fetch ('# Point' == 'point'). Returns float ndarray."""
+    """Return a numeric column, ignoring case and a leading # in its name."""
     lut = {}
     for c in df.columns:
         lut[str(c).lower().strip().lstrip("#").strip()] = c
@@ -86,12 +100,14 @@ def _fmt(v):
 # ---- PEIS -----------------------------------------------------------------
 
 def _r_xintercept(zr, zi):
-    """Nyquist x-intercept. Arrays ordered high -> low freq; zi is raw Zimag.
-    Returns (R_ohm, method)."""
+    """Return (resistance in ohms, method) for the Nyquist x-intercept.
+
+    Use raw Zimag and arrays ordered from high to low frequency.
+    """
     s = np.sign(zi)
     cross = np.where(s[:-1] * s[1:] < 0)[0]
     if len(cross):
-        k = int(cross[0])  # highest-frequency crossing = ohmic intercept
+        k = int(cross[0])  # Use the highest-frequency crossing.
         x0, x1, y0, y1 = zr[k], zr[k + 1], zi[k], zi[k + 1]
         return float(x0 + (0.0 - y0) * (x1 - x0) / (y1 - y0)), "interp"
     k = int(np.nanargmin(np.abs(zi)))
@@ -99,15 +115,17 @@ def _r_xintercept(zr, zi):
 
 
 def _rs_positive_slope_local(zr, zi):
-    """Fit the high-frequency ascending branch of (-Zim) vs Zreal; x-intercept = Rs.
-    Arrays ordered high -> low freq."""
+    """Estimate Rs from the rising -Zimag branch.
+
+    Arrays must run from high to low frequency.
+    """
     y = -np.asarray(zi, dtype=float)
     x = np.asarray(zr, dtype=float)
     n = len(y)
     if n < 3:
         raise ValueError("too few points")
     k = 1
-    while k < n and y[k] >= y[k - 1]:  # walk down-freq while -Zim still rising
+    while k < n and y[k] >= y[k - 1]:  # Follow the rising branch.
         k += 1
     k = min(max(k, 3), max(3, n // 2))
     m, b = np.polyfit(x[:k], y[:k], 1)
@@ -117,7 +135,7 @@ def _rs_positive_slope_local(zr, zi):
 
 
 def _peis_arrays(df):
-    """(freq, zreal, zimag) as finite float arrays ordered high -> low freq."""
+    """Return finite (frequency, Zreal, Zimag) arrays, highest frequency first."""
     freq = _col(df, "freq", "zfreq", "frequency")
     zr = _col(df, "zreal", "z_real", "zre")
     try:
@@ -130,20 +148,18 @@ def _peis_arrays(df):
 
 
 def peis_r_xintercept(df):
-    """Nyquist x-intercept resistance (ohm). Canonical implementation --
-    import from here (vial or plate side) instead of re-implementing."""
+    """Return the Nyquist x-intercept resistance in ohms."""
     _, zr, zi = _peis_arrays(df)
     return _r_xintercept(zr, zi)[0]
 
 
 def peis_rs_positive_slope(df):
-    """Rs from the high-frequency positive-slope branch (ohm). Defers to
-    triplet_analysis.estimate_rs_from_positive_slope when importable."""
+    """Estimate Rs in ohms, using triplet_analysis when available."""
     if _rs_ext is not None:
         try:
             return float(_rs_ext(df))
         except Exception:
-            pass  # signature/impl mismatch -> local fallback
+            pass  # Use the local estimate if this fails.
     _, zr, zi = _peis_arrays(df)
     return _rs_positive_slope_local(zr, zi)
 
@@ -163,7 +179,7 @@ def analyze_peis(df, params, errs):
 # ---- CV -------------------------------------------------------------------
 
 def _pick_cycle(cyc):
-    """Return mask + label for the 2nd distinct Cycle value (works for 0- or 1-indexed)."""
+    """Select the second cycle label, the only label, or all data if none exist."""
     vals = np.unique(cyc[np.isfinite(cyc)])
     if len(vals) >= 2:
         c = vals[1]
@@ -182,7 +198,7 @@ def _strict_increasing(v, i):
 
 
 def _window_slopes(vv, ii, w):
-    """Least-squares slope of every length-w sliding window (vectorized)."""
+    """Fit a slope for each sliding window of w points."""
     cx = np.cumsum(np.insert(vv, 0, 0.0))
     cy = np.cumsum(np.insert(ii, 0, 0.0))
     cxx = np.cumsum(np.insert(vv * vv, 0, 0.0))
@@ -197,12 +213,11 @@ def _window_slopes(vv, ii, w):
 
 
 def _onset(v2, i2, fwd, win=CV_ONSET_WIN, k=CV_ONSET_SLOPE_K):
-    """Onset on the anodic branch. Primary: slide a `win`-point window along the branch,
-    LS-fit the slope in each; "significant" = slope above (median + k*MAD) of the window
-    slopes in the baseline foot (lowest 30% of V range), floored at 5% of the slope
-    dynamic range; two consecutive windows must pass. Onset = V of the FIRST point of
-    the first passing window. Fallbacks: tangent-intersection, then 5%-of-max threshold.
-    Returns (V_onset, method)."""
+    """Return (onset voltage, method) for the anodic branch.
+
+    Look for two rising-slope windows above the baseline threshold.
+    Falls back to a tangent fit, then a 5% current-rise threshold.
+    """
     vv, ii_raw = _strict_increasing(v2[fwd], i2[fwd])
     if len(vv) < max(10, 2 * win):
         raise ValueError("anodic branch too short")
@@ -214,7 +229,7 @@ def _onset(v2, i2, fwd, win=CV_ONSET_WIN, k=CV_ONSET_SLOPE_K):
         m_b = float(np.median(ref))
         mad = float(np.median(np.abs(ref - m_b))) * 1.4826
         rng_sl = float(np.nanmax(sl)) - m_b
-        thr = m_b + max(k * mad, 0.05 * rng_sl)  # noise-scaled, floored for noiseless data
+        thr = m_b + max(k * mad, 0.05 * rng_sl)  # Keep a threshold even without noise.
         ok = np.isfinite(sl) & (sl > 0) & (sl >= thr)
         hit = np.where(ok[:-1] & ok[1:])[0]
         if len(hit):
@@ -241,7 +256,7 @@ def _onset(v2, i2, fwd, win=CV_ONSET_WIN, k=CV_ONSET_SLOPE_K):
 
 
 def _ox_peaks(v2, i2, fwd):
-    """Local maxima of I on the anodic branch. JSON-able list of {"V","I"}."""
+    """Return anodic current peaks as a list of {"V", "I"} dictionaries."""
     vv, ii = _strict_increasing(v2[fwd], i2[fwd])
     n = len(ii)
     if n < 7:
@@ -249,7 +264,7 @@ def _ox_peaks(v2, i2, fwd):
     iis = _smooth(ii, max(3, n // 100))
     rng = float(np.max(iis) - np.min(iis))
     resid_mad = 1.4826 * float(np.median(np.abs(ii - iis)))
-    if rng <= 0 or rng <= 6.0 * resid_mad:  # no structure above the noise floor
+    if rng <= 0 or rng <= 6.0 * resid_mad:  # Ignore signals dominated by noise.
         return []
     prom = EXTREMA_PROM_FRAC * rng
     w = max(3, n // 50)
@@ -258,7 +273,7 @@ def _ox_peaks(v2, i2, fwd):
     rmax = s.rolling(2 * w + 1, center=True, min_periods=1).max().to_numpy()
     lmin = s.rolling(wp + 1, min_periods=1).min().to_numpy()
     rmin = s[::-1].rolling(wp + 1, min_periods=1).min().to_numpy()[::-1]
-    # a real oxidative peak descends on both sides; a saturation plateau does not
+    # Require a drop on both sides to exclude saturation plateaus.
     cand = _collapse_runs(np.where((iis >= rmax - 1e-15) & (iis - lmin >= prom) & (iis - rmin >= prom))[0])
     cand = cand[(cand > 0) & (cand < n - 1)]
     kept = []
@@ -270,8 +285,10 @@ def _ox_peaks(v2, i2, fwd):
 
 
 def _cross_v(vb, ib, th, direction, pick="first"):
-    """V where I crosses `th` on a branch (arrays in scan order).
-    direction: 'up'|'down'; pick: 'first'|'last' matching crossing in scan order."""
+    """Find the voltage where current crosses "th" in scan order.
+
+    direction is "up" or "down"; pick selects the "first" or "last" crossing.
+    """
     d = np.asarray(ib, dtype=float) - th
     s = np.sign(d)
     hits = []
@@ -321,10 +338,9 @@ def analyze_cv(df, params, errs):
     onset = _try(errs, "onset", lambda: _onset(v2, i2, fwd, onset_win, onset_k), (float("nan"), ""))
     peaks = _try(errs, "ox_peaks", lambda: _ox_peaks(v2, i2, fwd), [])
     imax_k = int(np.nanargmax(i))
-    # crossings bounding the high-current region: last up-cross going in, first down-cross coming out
+    # Bound the high-current region: last upward crossing, first downward crossing.
     width = _try(errs, "capacitance_width", lambda: float(
-        _cross_v(v2[fwd], i2[fwd], i_th, "up", pick="last")
-        - _cross_v(v2[rev], i2[rev], i_th, "down", pick="first")))
+        _cross_v(v2[fwd], i2[fwd], i_th, "up", pick="last") - _cross_v(v2[rev], i2[rev], i_th, "down", pick="first")))
 
     return {
         "cv_cycle_used": cycle_used,
@@ -336,7 +352,7 @@ def analyze_cv(df, params, errs):
         "cv_n_ox_peaks": len(peaks),
         "cv_i_max_a": float(i[imax_k]),
         "cv_v_at_i_max_v": float(v[imax_k]),
-        "cv_capacitance_width_v": width,
+        "cv_width_v": width,
         "cv_capacitance_j_threshold_ma_cm2": CV_J_THRESHOLD_MA_CM2,
         "cv_area_cm2": area,
     }
@@ -345,7 +361,7 @@ def analyze_cv(df, params, errs):
 # ---- CP -------------------------------------------------------------------
 
 def _collapse_runs(idxs):
-    """Contiguous candidate-index runs (flat plateaus) -> single middle representative."""
+    """Keep the middle index of each consecutive group of candidates."""
     if not len(idxs):
         return np.asarray(idxs, dtype=int)
     out, start, prev = [], int(idxs[0]), int(idxs[0])
@@ -361,7 +377,7 @@ def _collapse_runs(idxs):
 
 
 def _local_extrema(y):
-    """Indices of local maxima/minima of y (prominence + min-separation filtered)."""
+    """Return peak and trough indices, filtered by prominence and spacing."""
     y = np.asarray(y, dtype=float)
     n = len(y)
     if n < 7:
@@ -372,8 +388,8 @@ def _local_extrema(y):
     if not np.isfinite(rng) or rng <= 0 or rng <= 6.0 * resid_mad:
         return [], []
     prom = EXTREMA_PROM_FRAC * rng
-    w = max(5, n // 100)            # min separation / "is local max" window
-    wp = max(w, n // 10)            # prominence measured over a wider window
+    w = max(5, n // 100)            # local window and minimum spacing
+    wp = max(w, n // 10)            # wider window for prominence
     s = pd.Series(ys)
     rmax = s.rolling(2 * w + 1, center=True, min_periods=1).max().to_numpy()
     rmin = s.rolling(2 * w + 1, center=True, min_periods=1).min().to_numpy()
@@ -410,14 +426,14 @@ def analyze_cp(df, params, errs):
         edge_n = CP_EDGE_N
     k = max(1, min(edge_n, n))
 
-    # start/end = center (median) of the first/last k datapoints
+    # Use endpoint medians to reduce noise.
     i_start, i_end = float(np.median(i[:k])), float(np.median(i[-k:]))
     v_start, v_end = float(np.median(v[:k])), float(np.median(v[-k:]))
     dur = float(t[-1] - t[0])
     slope = (v_end - v_start) / dur if dur > 0 else float("nan")
     slope_fit = _try(errs, "slope_fit", lambda: float(np.polyfit(t, v, 1)[0]))
 
-    # failure: first drop below threshold after having been at/above it; "live" if it reaches end of run
+    # Failure starts at the first drop below threshold after reaching it.
     absi = np.abs(i)
     armed = absi >= CP_FAILURE_I_A
     ttf = float("nan")
@@ -461,12 +477,11 @@ def analyze_cp(df, params, errs):
 
 
 def analyze_ca(df, params, errs):
-    """CA / CA Cycle. Emits ONLY the spec fields: slope (begin -> end of run),
-    start/end current (median of first/last edge_n pts), delta-I, time-to-failure
-    at CP_FAILURE_I_A ("live" if end of run reached), and Im min/max + local
-    extrema. Internals: timebase prefers gap-free t_hold; on cyclic data (>=2
-    Cycle values) failure is judged per cycle (max|Im| per cycle) so polarity
-    flips through zero don't fire false failures."""
+    """Summarize CA current drift, change, failure time, and extrema.
+
+    Prefer t_hold. For cyclic data, failure requires all remaining cycles'
+    peak absolute currents to stay below threshold.
+    """
     i = _col(df, "im")
     try:
         tb = _col(df, "t_hold")
@@ -553,14 +568,12 @@ _DISPATCH = {
 }
 
 
-# Fields kept in the Mongo "analysis" subdocument -- the spec metrics only.
-# The *_meta.csv files always keep everything (methods, knobs, version, errors);
-# edit these tuples to change what lands in Mongo. Note: *_json names appear
-# here WITHOUT the suffix (they become real arrays in Mongo).
+# Metrics saved to Mongo; metadata CSVs keep the full analysis.
+# List fields drop their _json suffix when stored in Mongo.
 MONGO_ANALYSIS_FIELDS = {
     "peis": ("peis_r_xintercept_ohm",),
     "cv": ("cv_onset_v", "cv_ox_peaks", "cv_i_max_a", "cv_v_at_i_max_v",
-           "cv_capacitance_width_v"),
+           "cv_width_v"),
     "cp": ("cp_slope_v_per_s", "cp_i_start_a", "cp_i_end_a",
            "cp_delta_i_start_minus_end_a", "cp_time_to_failure_s", "cp_status",
            "cp_vf_min", "cp_vf_max", "cp_im_min", "cp_im_max",
@@ -571,14 +584,14 @@ MONGO_ANALYSIS_FIELDS = {
 }
 _MONGO_KEEP = frozenset(
     f for fields in MONGO_ANALYSIS_FIELDS.values() for f in fields
-) | {"error", "note"}   # whole-analysis failures stay visible in Mongo
+) | {"error", "note"}   # Keep analysis failures visible.
 
 
 def analysis_subdoc(test, data, params=None):
-    """Mongo-ready analysis subdocument: spec metrics only (MONGO_ANALYSIS_FIELDS).
-    *_json fields become real lists (suffix dropped) and blank values are omitted,
-    so e.g. a live run simply has no ca_time_to_failure_s key. Methods, knobs,
-    counts, and version stay in the *_meta.csv only."""
+    """Return selected metrics for Mongo, omitting blank values.
+
+    Decode *_json fields into lists and drop the suffix.
+    """
     out = {}
     for k, v in compute_default_analysis(test, data, params).items():
         if v is None or v == "":
@@ -596,9 +609,10 @@ def analysis_subdoc(test, data, params=None):
 
 
 def upsert_meta(meta_path, updates):
-    """Upsert field/value rows into a *_meta.csv (creates it if missing).
-    Existing fields are updated in place, new fields append at the bottom;
-    all other rows and their order are preserved. Atomic write (tmp + os.replace)."""
+    """Update or create a field/value CSV, preserving unrelated rows.
+
+    Remove matching legacy analysis_ fields and replace the file atomically.
+    """
     meta_path = str(meta_path)
     rows = []
     if os.path.exists(meta_path):
@@ -642,8 +656,7 @@ def upsert_meta(meta_path, updates):
 
 
 def analyze_into_meta(test, data, params, meta_path):
-    """Compute default analysis for one run and upsert it into its *_meta.csv.
-    Use for backfilling existing runs or recomputing after a tunable change."""
+    """Compute a run's metrics and update its metadata CSV."""
     return upsert_meta(meta_path, compute_default_analysis(test, data, params))
 
 
@@ -658,7 +671,7 @@ def _test_token(stem):
 
 
 def _params_from_meta(meta_path):
-    """field/value meta CSV -> dict (stored area_cm2 / cp_edge_n etc. get applied)."""
+    """Read stored parameters from a field/value metadata CSV."""
     try:
         df = pd.read_csv(meta_path, dtype=str).fillna("")
         return dict(zip(df["field"], df["value"]))
@@ -667,9 +680,10 @@ def _params_from_meta(meta_path):
 
 
 def backfill(root):
-    """Recompute analysis for every run under `root` and upsert into each
-    *_meta.csv. Idempotent; per-file failures print and don't stop the sweep.
-    Usage: backfill(r"C:/.../ciara_new_data/data") -- forward slashes work on Windows."""
+    """Refresh metadata for supported runs under root.
+
+    Continue after file errors and return the number of successful updates.
+    """
     ok = bad = 0
     for p in sorted(Path(root).rglob("*.csv")):
         if p.name.endswith("_meta.csv"):
@@ -689,7 +703,7 @@ def backfill(root):
 
 
 def compute_default_analysis(test, data, params=None):
-    """Rows to append to the meta CSV for `test`. Never raises."""
+    """Return formatted metrics, recording analysis errors in the result."""
     out = {}
     try:
         if data is None or len(data) == 0:

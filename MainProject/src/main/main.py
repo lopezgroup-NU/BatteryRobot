@@ -21,7 +21,8 @@ for i in paths:
 # FOLDER ANALYSIS (copy and paste and replace [file name] with folder path copied from file explorer)
 # rob.folder_analysis(r"[file name]")
 
-rob = BatteryRobot('A', network_serial='AU06EZ1P', home= False)
+rob = BatteryRobot('A', network_serial='AU06EZ1P', home = False)
+
 #rob.robot_servo(True)
 #rob.open_gripper()
 #rob.open_clamp()

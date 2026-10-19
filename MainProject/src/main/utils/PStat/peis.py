@@ -55,15 +55,15 @@ def initialize_pstat(pstat):
      pstat.set_ca_speed(tkp.CASPEED_NORM)
      pstat.set_ground(tkp.FLOAT)
      pstat.set_i_convention(tkp.ICONVENTION.ANODIC)
-     pstat.set_ich_range(3.0)
+     pstat.set_ich_range(5.0) #3
      pstat.set_ich_range_mode(False)
      pstat.set_ich_filter(3.0)
-     pstat.set_vch_range(3.0)
+     pstat.set_vch_range(5.0) #5
      pstat.set_vch_range_mode(False)
      pstat.set_ich_offset_enable(True)
      pstat.set_vch_offset_enable(True)
      pstat.set_vch_filter(2.50)
-     pstat.set_ach_range(3.0)
+     pstat.set_ach_range(5.0) #3
      pstat.set_ie_range(0.03)
      pstat.set_ie_range_mode(False)
      pstat.set_ie_range_lower_limit(0)
@@ -415,3 +415,198 @@ if __name__ == "__main__":
         'dc_voltage': 0.0,
     }
     zcurve = run_peis(parameter_list=parameter_list)
+
+# FULL-only runner; the original PEIS path above is unchanged.
+def run_peis_full(cell, output_file_name = "potentiostatic_eis", parameter_list = None, save_to_db_folder = True, standard = False, hardware=None, stop_event=None):
+    """Run one PEIS sweep on `cell` (0-23) through its block's MUX + pstat and return
+    the curve as a DataFrame. Nothing is written to disk here (the caller owns storage).
+
+    `output_file_name`, `save_to_db_folder`, and `standard` are accepted so existing
+    callers don't break, but they are unused now that this function doesn't write files.
+    """
+    parameter_list = parameter_list or {}
+
+    if not 0 <= cell <= 23:
+        raise ValueError(f"cell must be 0-23, got {cell}")
+
+    mux_pstat_index = cell // 8
+    if hardware is None:
+        _ensure_tkp("potentiostatic_eis.py")
+        device_list = tkp.enum_sections()
+
+        imx_list = []
+        pstat_list = []
+
+        for device_name in device_list:
+            tag = device_name[0:3]
+            if tag == 'IMX':
+                imx_list.append(device_name)
+            elif tag == 'IFC':
+                pstat_list.append(device_name)
+            else:
+                print(f"!!!!! Found a non-IMX or IFC type device. It is called: {device_name}")
+
+        imx_list.sort()
+        pstat_list.sort()
+        mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+        if mux_pstat_index >= len(pstat_list) or mux_pstat_index >= len(imx_list):
+            raise RuntimeError(
+                f"cell {cell} needs pstat/mux #{mux_pstat_index} but visible devices are "
+                f"pstats={pstat_list}, muxes={imx_list}. "
+                f"Is that block powered / plugged in?")
+        print(pstat_list)
+        print(mux_pstat_index)
+
+    initial_freq = abs(parameter_list.get("initial_freq", 5000))
+    final_freq = abs(parameter_list.get("final_freq", 10))
+    ac_voltage = parameter_list.get("ac_voltage", 0.02)
+    dc_voltage = parameter_list.get("dc_voltage", 0.0)
+    estimated_z = parameter_list.get("estimated_z", 100)
+    points_per_decade = parameter_list.get("points_per_decade", 10)
+    MAX_TRIES = int(parameter_list.get("max_bad_reads", 3))
+
+    gain = 1.0
+    inoise = 0.0
+    vnoise = 0.0
+    ienoise = 0.0
+
+    if hardware is None:
+        pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+        mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
+    else:
+        pstat, mux = hardware.pstat, hardware.mux
+
+    steps = []
+
+    try:
+        if hardware is None:
+            mux.open()
+            active_ch = cell - mux_pstat_index * 8
+            for ch in range(8):
+                if ch != active_ch:
+                    mux.set_off_mode(ch, tkp.MUX_CELL_LOCAL)
+                    mux.set_dac(ch, dc_voltage)
+            mux.set_cell(active_ch)
+
+        else:
+            hardware.select(cell)
+
+        final_freq = abs(final_freq)
+        initial_freq = abs(initial_freq)
+
+        freq_lim_lower = pstat.freq_limit_lower()
+        freq_lim_upper = pstat.freq_limit_upper()
+        if(initial_freq > freq_lim_upper):
+            print("Inital frequency exceeds upper frequency limit")
+            initial_freq = freq_lim_upper
+        if(final_freq > freq_lim_upper):
+            final_freq = freq_lim_upper
+            print("Final frequency exceeds upper frequency limit")
+        if(initial_freq < freq_lim_lower):
+            initial_freq = freq_lim_lower
+            print("Inital frequency exceeds lower frequency limit")
+        if(final_freq < freq_lim_lower):
+            final_freq = freq_lim_lower
+            print("Final frequency exceeds lower frequency limit")
+
+        initialize_pstat(pstat)
+        pstat.set_ctrl_mode(tkp.PSTATMODE)
+        pstat.set_i_convention(tkp.ICONVENTION.ANODIC)
+        Sdc = dc_voltage
+        Sac = ac_voltage
+        pstat.set_voltage(Sdc)
+        pstat.set_cell(tkp.CELL_ON)
+        dc_current = pstat.measure_i()
+        ac_current = ac_voltage / max(abs(estimated_z), 1e-6)
+        ie_range = pstat.test_ie_range(abs(dc_current) + 1.414*abs(ac_current))
+        pstat.set_ie_range(ie_range)
+
+        readz = tkp.ReadZ(pstat)
+        readz.set_gain(gain)
+        readz.set_inoise(inoise)
+        readz.set_vnoise(vnoise)
+        readz.set_ienoise(ienoise)
+        readz.set_zmod(estimated_z)
+        readz.set_vdc(dc_voltage)
+        readz.set_speed(1)
+        readz.set_drift_cor(False)
+        readz.set_idc(dc_current)
+
+        log_increment = 1.0/points_per_decade
+        if initial_freq > final_freq:
+            log_increment = -log_increment
+        max_points = check_eis_points(initial_freq, final_freq, points_per_decade)
+        zcurve = tkp.ZCurve(max_points)
+
+        step = 0
+        while step < max_points:
+            if stop_event is not None and stop_event.is_set():
+                break
+            freq = math.pow(10.0, math.log10(initial_freq) + step * log_increment)
+            ok = False
+            for attempt in range(1, MAX_TRIES + 1):
+                if stop_event is not None and stop_event.is_set():
+                    break
+                if readz.Measure(freq, ac_voltage, dc_voltage):
+                    ok = True
+                    break
+                print(f"Bad value at {freq:.1f} Hz (attempt {attempt}/{MAX_TRIES})")
+                time.sleep(0.01)
+            if ok:
+                zcurve.add_point(readz)
+                if LIVE_HOOK:
+                    try:
+                        _d = zcurve.acq_data()
+                        LIVE_HOOK("PEIS", _d['zreal'][zcurve.point - 1], -_d['zimag'][zcurve.point - 1])
+                    except Exception:
+                        pass
+            steps.append((freq, ok))
+            step += 1
+            time.sleep(0.01)
+    finally:
+
+        try:
+            pstat.set_cell(False)
+        except Exception:
+            pass
+        if hardware is None:
+            try:
+                mux.close()
+            except Exception:
+                pass
+            try:
+                pstat.close()
+            except Exception:
+                pass
+
+    n_bad = sum(1 for _, ok in steps if not ok)
+    if n_bad:
+        print(f"PEIS finished -- {n_bad} of {len(steps)} point(s) flagged bad.")
+
+    n_good = sum(ok for _, ok in steps)
+    zdata = pd.DataFrame(zcurve.acq_data()).iloc[:n_good].reset_index(drop=True)
+
+    rows, gi = [], 0
+    for freq, ok in steps:
+        if ok:
+            rows.append(zdata.iloc[gi]); gi += 1
+        else:
+            r = pd.Series(np.nan, index=zdata.columns)
+            if "zfreq" in r.index:
+                r["zfreq"] = freq
+            rows.append(r)
+    df = pd.DataFrame(rows).reset_index(drop=True)
+    df["bad_value"] = [0 if ok else 1 for _, ok in steps]
+    if "zimag" in df.columns:
+        df["reflected_zimag"] = -df["zimag"]
+
+    try:
+        temper = TemperWindows(vendor_id=0x3553, product_id=0xa001)
+        df["temp(C)"] = temper.get_temperature()[1]
+    except Exception as e:
+        print("temp read failed: {}".format(e))
+        df["temp(C)"] = float("nan")
+    df["datetime"] = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+
+    return df
+

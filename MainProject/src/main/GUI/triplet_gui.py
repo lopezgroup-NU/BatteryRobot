@@ -4,6 +4,7 @@ import ast
 import inspect
 import queue
 import threading
+import time
 import tkinter as tk
 from tkinter import messagebox, ttk
 
@@ -20,6 +21,17 @@ except ImportError:
         import dataanalysis
     except ImportError:
         dataanalysis = None
+
+# FIX (mux cycle): arm fills (draw / simulate). If it can't load (e.g. a typo in
+# plate_locations.py) the rest of the GUI still works and Mux Cycle runs "none" only.
+try:
+    from utils.PStat import plate_robot
+except Exception as _e:
+    try:
+        import plate_robot
+    except Exception:
+        plate_robot = None
+        print("[gui] plate_robot not loaded ({!r}) - Mux Cycle can only run 'none'".format(_e))
 
 RUNNER_MODS = {}
 for _name in ("peis", "cv", "ca"):
@@ -57,9 +69,15 @@ RELEASE_SHELL = False
 # NOT stable with the current toolkitpy behavior.
 HARDWARE_WORKERS = 1
 
+# FIX (mux cycle): gap between starting the per-mux workers. Puts the arm's first
+# round in mux order (mux0, mux1, mux2) and staggers the first pstat opens; after
+# that the arm serves whichever mux asks first.
+MUX_LANE_GAP_S = 1.0
+
 # Established status colors
 C_IDLE = None            # filled with the platform default button bg at startup
-C_BUSY = "#FFF59D"       # queued / running
+C_BUSY = "#F2752D"       # running
+C_QUEUE = "#FFF59D"      # queued
 C_DONE = "#A5D6A7"
 C_FAIL = "#EF9A9A"
 
@@ -484,6 +502,7 @@ class PlateGrid:
         # and only persistence for cell notes now.
         tk.Button(button_frame, text="Clear Status", command=self.clear_statuses).pack(side=tk.LEFT, padx=5)
         tk.Button(button_frame, text="CA Cycle", command=self.ca_cycle).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="Mux Cycle", command=self.mux_cycle).pack(side=tk.LEFT, padx=5)  # FIX (mux cycle)
         tk.Button(button_frame, text="Log Notes",
                   command=self.log_notes_to_plate_log).pack(side=tk.LEFT, padx=5)
         tk.Button(button_frame, text="New Plate", command=self.new_plate_button).pack(side=tk.LEFT, padx=5)
@@ -511,7 +530,7 @@ class PlateGrid:
         if not cell.history:
             tk.Label(win, text="No tests run yet.", padx=14, pady=10).pack()
             return
-        colors = {"running": C_BUSY, "queued": C_BUSY, "complete": C_DONE,
+        colors = {"running": C_BUSY, "queued": C_QUEUE, "complete": C_DONE,
                   "failed": C_FAIL, "skipped": C_IDLE, "stopped": C_IDLE}
         for k, rec in enumerate(cell.history):
             row = tk.Frame(win, padx=8, pady=2)
@@ -534,7 +553,7 @@ class PlateGrid:
 
     def _set_cell_ui(self, i, j, state):
         """UI-thread only: color + text on the merged RUN/status button."""
-        colors = {"idle": C_IDLE, "queued": C_BUSY, "running": C_BUSY,
+        colors = {"idle": C_IDLE, "queued": C_QUEUE, "running": C_BUSY,
                   "done": C_DONE, "failed": C_FAIL, "stopped": C_IDLE}
         btn = self.run_buttons[i][j]  # FIX: status light lives on RUN now
         btn.config(bg=colors.get(state, C_IDLE))
@@ -545,8 +564,9 @@ class PlateGrid:
 
     # ---- running tests ----
 
-    def parse_tests(self):
-        raw = self.tests_entry.get().replace(",", " ").split()
+    def parse_tests(self, raw=None):
+        # FIX (mux cycle): raw = the Mux Cycle dialog's text; default is the main entry
+        raw = (self.tests_entry.get() if raw is None else raw).replace(",", " ").split()
         tests = [_canon_test(t) for t in raw if t.strip()]   # FIX: "CAP" -> "CAPACITANCE"
         valid = list(getattr(triplet, "TEST_RUNNERS", {})) or list(getattr(triplet, "test_types", ("PEIS", "CV", "CA")))
         unknown = [t for t in tests if t not in valid]
@@ -557,6 +577,8 @@ class PlateGrid:
         return tests
 
     def run_cell(self, i, j):
+        if self._mux_cycle_running():  # FIX (mux cycle): the muxes are busy
+            return
         tests = self.parse_tests()
         if tests is None:
             return
@@ -574,6 +596,8 @@ class PlateGrid:
         self.jobs.put((i, j, tests, self.gen, self.stop_on_fail.get()))
 
     def run_all(self):
+        if self._mux_cycle_running():  # FIX (mux cycle): the muxes are busy
+            return
         tests = self.parse_tests()
         if tests is None:
             return
@@ -627,7 +651,8 @@ class PlateGrid:
         same Tk root -- identical flow to new_plate(), minus the new Tk()."""
         busy = any(cell.state in ("queued", "running")
                    for row in self.cells for cell in row)
-        if busy or any(t.is_alive() for t in getattr(self, "ca_cycle_threads", [])):
+        if busy or any(t.is_alive() for t in getattr(self, "ca_cycle_threads", []) +
+                       getattr(self, "mux_threads", [])):  # FIX (mux cycle)
             messagebox.showerror("Error", "Tests are running - Stop Run first")
             return
         self._closed = True                  # stops _poll_ui rescheduling
@@ -853,12 +878,14 @@ class PlateGrid:
             return "graph -> {}".format(os.path.dirname(p))
         return "no graph (off or see shell)"
 
-    def _worker(self, worker_id):
+    def _worker(self, worker_id, jobs=None):
+        jobs = self.jobs if jobs is None else jobs  # FIX (mux cycle): a Mux Cycle worker gets its mux's queue
         while True:
-            job = self.jobs.get()
+            job = jobs.get()
             if job is None:  # FIX: shutdown sentinel from New Plate
                 return
-            i, j, tests, gen, stop_on_fail = job
+            i, j, tests, gen, stop_on_fail = job[:5]
+            fill = job[5] if len(job) > 5 else None  # FIX (mux cycle): arm fill before the tests
             cell = self.cells[i][j]
             if gen != self.gen or cell.stop_event.is_set():
                 cell.state = "stopped" if cell.stop_event.is_set() else "idle"
@@ -874,6 +901,26 @@ class PlateGrid:
                 auto=True, ensure_cells=[cid]))
             failed = []
             stopped = False
+            # FIX (mux cycle): fill this cell first (waits its turn for the arm);
+            # the tests start the moment the fill returns and the arm moves on
+            if fill is not None:
+                rec = {"test": "FILL", "status": "running", "note": ""}
+                cell.history.append(rec)
+                self._ui(lambda row=row, col=col, m=mux_of(i, j): self.status_var.set(
+                    "filling {}{} (mux{}) ...".format(row, col, m)))
+                try:
+                    rec["note"] = fill(i * 4 + j, lambda: gen != self.gen or cell.stop_event.is_set()) or ""
+                    rec["status"] = "complete" if rec["note"] else "stopped"
+                    stopped = not rec["note"]
+                except Exception as e:
+                    rec["status"] = "failed"
+                    rec["note"] = str(e)[:120]
+                    failed.append("FILL")
+                    print("[gui] {}{} not filled: {}".format(row, col, e))
+                if rec["status"] != "complete":
+                    for rest in tests:
+                        cell.history.append({"test": rest, "status": "skipped", "note": "not filled"})
+                    tests = []
             ident = threading.get_ident()
             for k, t in enumerate(tests):
                 if gen != self.gen or cell.stop_event.is_set():
@@ -998,6 +1045,8 @@ class PlateGrid:
                   command=lambda: _set_all(False)).grid(row=ROWS, column=2, columnspan=2, pady=(4, 0))
 
         def start():
+            if self._mux_cycle_running():  # FIX (mux cycle)
+                return
             if any(t.is_alive() for t in getattr(self, "ca_cycle_threads", [])):
                 messagebox.showerror("Error", "A CA cycle run is already going - Stop Run first")
                 return
@@ -1036,7 +1085,7 @@ class PlateGrid:
             for c in cells:
                 i, j = c // 4, c % 4
                 self.cells[i][j].history.append({"test": "CA_CYCLE", "status": "running", "note": ""})
-                self.run_buttons[i][j].config(bg=C_BUSY)  # FIX: merged status light
+                self.run_buttons[i][j].config(bg=C_BUSY) 
             self.status_var.set("CA cycle: {} cells on mux {}".format(len(cells), sorted(by_mux)))
             done = {"n": 0, "total": len(by_mux)}
 
@@ -1095,6 +1144,200 @@ class PlateGrid:
         tk.Button(frame, text="Start", command=start, bg="#4CAF50", fg="white").grid(
             row=len(fields), column=0, columnspan=2, pady=8)
         win.grab_set()
+
+    # ---- Mux cycle (FIX: arm fill + test list per cell, one worker per mux) ----
+
+    def _mux_cycle_running(self):
+        """FIX (mux cycle): True (with an error box) while a Mux Cycle owns the muxes."""
+        if any(t.is_alive() for t in getattr(self, "mux_threads", [])):
+            messagebox.showerror("Error", "A Mux Cycle is running - Stop Run first")
+            return True
+        return False
+
+    def mux_cycle(self):
+        """FIX (mux cycle): each mux works through its selected cells in channel
+        order on its own worker. The arm fills a cell and that cell's tests start
+        right away while the arm moves on to the next mux; when a cell's tests
+        end, the arm fills the next selected cell on that mux. Each test uses its
+        own Settings tab; CA hold here is Settings -> CA -> time_run."""
+        try:
+            d = triplet._resolve_params(self.plate, "MUX_CYCLE", None)
+        except Exception:
+            d = dict(getattr(triplet, "PARAM_DEFAULTS", {}).get("MUX_CYCLE", {}))
+        if not d:
+            self.status_var.set("MUX_CYCLE defaults not found - is the triplet.py block pasted in?")
+            return
+        try:
+            hold = triplet._resolve_params(self.plate, "CA", None).get("time_run", "")
+        except Exception:
+            hold = ""
+
+        win = tk.Toplevel(self.root)
+        win.title("Mux Cycle - " + self.plate.plate_id)
+        frame = tk.Frame(win, padx=10, pady=10)
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        tests = d.get("tests", ["PEIS", "CV", "CA"])
+        fields = [("Tests (order)", tests if isinstance(tests, str) else ", ".join(tests)),
+                  ("CA hold (s)", str(hold))]
+        entries = {}
+        for i, (label, default) in enumerate(fields):
+            tk.Label(frame, text=label).grid(row=i, column=0, sticky="e", padx=5, pady=3)
+            e = tk.Entry(frame, width=16)
+            e.grid(row=i, column=1, padx=5, pady=3)
+            e.insert(0, default)
+            entries[label] = e
+        # liquid handling: dropdown, volume box under it (used by draw only)
+        mode_var = tk.StringVar(master=win, value=str(d.get("liquid_mode", "none")).lower())
+        tk.Label(frame, text="Liquid").grid(row=2, column=0, sticky="e", padx=5, pady=3)
+        ttk.Combobox(frame, textvariable=mode_var, values=("draw", "simulate", "none"),
+                     state="readonly", width=13).grid(row=2, column=1, padx=5, pady=3)
+        tk.Label(frame, text="Volume (mL)").grid(row=3, column=0, sticky="e", padx=5, pady=3)
+        vol_e = tk.Entry(frame, width=16)
+        vol_e.grid(row=3, column=1, padx=5, pady=3)
+        vol_e.insert(0, str(d.get("volume_ml", 1.0)))
+
+        def _mode_changed(*_):
+            vol_e.config(state=tk.NORMAL if mode_var.get() == "draw" else tk.DISABLED)
+        mode_var.trace_add("write", _mode_changed)
+        _mode_changed()
+        tk.Label(frame, justify=tk.LEFT, fg="gray35",
+                 text="draw: the volume above into each cell\n"
+                      "simulate: 1 mL of air, approaches only\n"
+                      "none: tests only, the arm stays put").grid(
+            row=4, column=0, columnspan=2, sticky="w", padx=5)
+
+        picker = tk.LabelFrame(frame, text="Cells", padx=6, pady=6)
+        picker.grid(row=0, column=2, rowspan=6, padx=(12, 0), sticky="n")
+        checks = {}
+        for r in range(ROWS):
+            for ci in range(COLS):
+                v = tk.BooleanVar(master=win, value=False)
+                tk.Checkbutton(picker, text="{}{}".format(r + 1, COL_LETTERS[ci]),
+                               variable=v).grid(row=r, column=ci, sticky="w")
+                checks[r * 4 + ci] = v
+
+        def _set_all(val):
+            for v in checks.values():
+                v.set(val)
+        tk.Button(picker, text="All", width=4,
+                  command=lambda: _set_all(True)).grid(row=ROWS, column=0, columnspan=2, pady=(4, 0))
+        tk.Button(picker, text="None", width=4,
+                  command=lambda: _set_all(False)).grid(row=ROWS, column=2, columnspan=2, pady=(4, 0))
+
+        def start():
+            busy = any(cell.state in ("queued", "running") for row in self.cells for cell in row)
+            if busy or any(t.is_alive() for t in getattr(self, "ca_cycle_threads", []) +
+                           getattr(self, "mux_threads", [])):
+                messagebox.showerror("Error", "Tests are running - Stop Run first", parent=win)
+                return
+            tests = self.parse_tests(entries["Tests (order)"].get())
+            if tests is None:
+                return
+            mode = mode_var.get()
+            try:
+                hold = float(entries["CA hold (s)"].get())
+                volume = float(vol_e.get())
+            except ValueError:
+                messagebox.showerror("Error", "Bad number in CA hold or Volume.", parent=win)
+                return
+            cells = [c for c, v in checks.items() if v.get()]
+            problem = None
+            if hold <= 0:
+                problem = "CA hold must be above 0 s."
+            elif not cells:
+                problem = "No cells selected."
+            elif mode != "none":
+                if plate_robot is None:
+                    problem = "plate_robot.py did not load - see the shell."
+                elif plate_robot.get_robot() is None:
+                    problem = ("No arm found. Create `rob` in the shell first, or call "
+                               "plate_robot.set_robot(<your robot>).")
+                elif mode == "draw" and not 0 < volume <= plate_robot.MAX_FILL_ML:
+                    problem = "Volume must be above 0 and at most {:g} mL.".format(plate_robot.MAX_FILL_ML)
+                else:
+                    missing = plate_robot.location_problems(mode, cells)
+                    if missing:
+                        problem = "Fill these in plate_locations.py:\n" + "\n".join(missing[:10]) + \
+                            ("\n(+{} more)".format(len(missing) - 10) if len(missing) > 10 else "")
+            if problem:
+                messagebox.showerror("Error", problem, parent=win)
+                return
+            arm = None
+            if mode != "none":
+                text = ("Draw {:g} mL from the source vial into each of {} cell(s), one pipette tip "
+                        "for the run.\n\nSource vial uncapped and deck clear?".format(volume, len(cells))
+                        if mode == "draw" else
+                        "Simulate on {} cell(s): 1 mL of air at the source vial approach, then each "
+                        "cell's approach. Nothing is drawn.\n\nDeck clear?".format(len(cells)))
+                if not messagebox.askokcancel("Arm will move", text, parent=win):
+                    return
+                arm = plate_robot.PlateArm(plate_robot.get_robot(), mode, volume)
+                arm.on_fault = lambda msg: self._ui(lambda: messagebox.showerror(
+                    "Arm fault", "The arm stopped while filling {}\n\nNo more fills this run; tests "
+                    "already running finish. Check the arm before moving it.".format(msg)))
+            # remembered for next time (also visible in Settings -> MUX_CYCLE / CA)
+            self.plate.config["mux_cycle_params"] = {"tests": tests, "liquid_mode": mode,
+                                                     "volume_ml": volume}
+            ca = dict(self.plate.config.get("ca_params") or {})
+            ca["time_run"] = hold
+            self.plate.config["ca_params"] = ca
+            win.destroy()
+            self._start_mux_cycle(cells, tests, arm)
+
+        tk.Button(frame, text="Start", command=start, bg="#4CAF50", fg="white").grid(
+            row=5, column=0, columnspan=2, pady=8)
+        win.grab_set()
+
+    def _start_mux_cycle(self, cells, tests, arm=None):
+        """FIX (mux cycle): one job queue + worker per mux, jobs in channel order
+        carrying arm.fill. Workers start MUX_LANE_GAP_S apart in mux order; a
+        coordinator waits for all of them, then lets the arm drop its tip / park.
+        Stop Run works as for Run All (the current test finishes)."""
+        self.log_notes_to_plate_log(auto=True)  # notes now; ran cells get rows when they start
+        sof = self.stop_on_fail.get()
+        lanes = {}
+        for c in sorted(cells):
+            i, j = c // 4, c % 4
+            cell = self.cells[i][j]
+            cell.state = "queued"
+            cell.stop_event = threading.Event()
+            cell.history = []
+            self._set_cell_ui(i, j, "queued")
+            lanes.setdefault(c // 8, queue.Queue()).put(
+                (i, j, tests, self.gen, sof, arm.fill if arm is not None else None))
+        go = threading.Event()
+
+        def lane(name, q, delay):
+            go.wait()  # FIX (mux cycle): every thread of the run exists before any mux
+            time.sleep(delay)  # touches a pstat; the mux stagger happens in here
+            self._worker(name, q)
+
+        workers = []
+        for k, (mi, q) in enumerate(lanes.items()):
+            q.put(None)  # the worker exits after its mux's last cell
+            workers.append(threading.Thread(target=lane, args=("mux{}".format(mi), q, k * MUX_LANE_GAP_S),
+                                            daemon=True, name="mux_cycle_mux{}".format(mi)))
+
+        def coordinator():
+            for t in workers:
+                t.join()
+            note = ""
+            if arm is not None:
+                try:
+                    note = arm.finish()
+                except Exception as e:
+                    note = "end-of-run arm move failed: {!r}".format(e)
+                    import traceback
+                    traceback.print_exc()
+            self._ui(lambda note=note: self.status_var.set(
+                "Mux cycle finished" + (" - " + note if note else "")))
+
+        self.mux_threads = [threading.Thread(target=coordinator, daemon=True, name="mux_cycle")]
+        for t in workers + self.mux_threads:
+            t.start()
+        go.set()  # FIX (mux cycle): only now may the muxes start (thread creation mid-test crashed PEIS)
+        self.status_var.set("Mux cycle: {} cells on mux {}".format(len(cells), sorted(lanes)))
 
     # ---- settings ----
 
@@ -1205,8 +1448,146 @@ def new_plate():
     return holder.get("plate")
 
 
+
+
+class FullPlateGrid(PlateGrid):
+    """FULL is an opt-in extension; all original controls remain inherited."""
+
+    def parse_tests(self, raw=None):
+        if raw is not None:
+            names = [_canon_test(t) for t in raw.replace(",", " ").split()]
+            if "FULL" in names:
+                unknown = [t for t in names if t != "FULL" and t not in triplet.TEST_RUNNERS]
+                if unknown:
+                    messagebox.showerror("Error", "Unknown tests: " + ", ".join(unknown))
+                    return None
+                return ["FULL"]
+        return super().parse_tests(raw)
+
+    def mux_cycle(self):
+        super().mux_cycle()
+        for win in self.root.winfo_children():
+            if isinstance(win, tk.Toplevel) and win.title() == "Mux Cycle - " + self.plate.plate_id:
+                tk.Label(win, justify=tk.LEFT, padx=12, pady=6,
+                         text="FULL: PEIS, CV, initial CA hold; then 60 s over earlier cells.\n"
+                              "Type FULL in Tests. CA hold (s) sets the initial CA duration.\n"
+                              "Uses CA voltage/sample period; idle cells stay voltage-held.\n"
+                              "A cell STOP stops its FULL mux; Stop Run stops all muxes.").pack(fill=tk.X)
+
+    def _start_mux_cycle(self, cells, tests, arm=None):
+        if "FULL" not in tests:
+            return super()._start_mux_cycle(cells, tests, arm)
+        try:
+            groups, params, devices = triplet.prepare_full_run(self.plate, cells)
+        except Exception as exc:
+            messagebox.showerror("FULL", str(exc))
+            return
+        self.log_notes_to_plate_log(auto=True)
+        go = threading.Event()
+        events = {mi: threading.Event() for mi in groups}
+        for mi, positions in groups.items():
+            for row, col, hw in positions:
+                i, j = row - 1, COL_LETTERS.index(col)
+                cell = self.cells[i][j]
+                cell.state, cell.history, cell.stop_event = "queued", [], events[mi]
+                self._set_cell_ui(i, j, "queued")
+        outcomes = {}
+
+        def lane(mi, positions, delay):
+            go.wait()
+            event = events[mi]
+            ident = threading.get_ident()
+            active_records = {}
+
+            def notify(row, col, test, state, measurement, note):
+                i, j = row - 1, COL_LETTERS.index(col)
+                cell = self.cells[i][j]
+                if test == "CA_SAVED":
+                    cell.kind = "CA"
+                    cell.final_df = measurement.data
+                    for rec in cell.history:
+                        if rec["test"] == "CA":
+                            rec["df"] = measurement.data
+                    return
+                key = (row, col, test)
+                if state == "running":
+                    cell.state = "running"
+                    rec = {"test": test, "status": state, "note": note}
+                    cell.history.append(rec)
+                    active_records[key] = rec
+                    cell.begin_test("CA" if test == "CA_REVISIT" else test)
+                    if test in ("PEIS", "CV"):
+                        LIVE_ROUTES[ident] = cell
+                    else:
+                        LIVE_ROUTES.pop(ident, None)
+                    self._ui(lambda i=i, j=j: self._set_cell_ui(i, j, "running"))
+                    self._ui(lambda cid=f"{row}{col}": self.log_notes_to_plate_log(auto=True, ensure_cells=[cid]))
+                else:
+                    rec = active_records.pop(key, None)
+                    if rec is not None:
+                        rec.update(status=state, note=note)
+                        if measurement is not None:
+                            rec["df"] = measurement.data
+                            cell.final_df = measurement.data
+                    LIVE_ROUTES.pop(ident, None)
+                self._ui(lambda row=row, col=col, test=test, state=state: self.status_var.set(
+                    f"FULL mux{mi}: {row}{col} {test} {state}"))
+
+            def sample(row, col, elapsed, current):
+                self.cells[row - 1][COL_LETTERS.index(col)].push(elapsed, current)
+
+            error = None
+            try:
+                if not event.wait(delay):
+                    triplet.run_full_mux(self.plate, mi, positions, params, devices,
+                                         stop_event=event, fill=arm.fill if arm is not None else None,
+                                         notify=notify, sample_hook=sample)
+            except Exception as exc:
+                error = str(exc)
+                import traceback
+                traceback.print_exc()
+            finally:
+                LIVE_ROUTES.pop(ident, None)
+                state = "failed" if error else "stopped" if event.is_set() else "done"
+                outcomes[mi] = error or state
+                for rec in active_records.values():
+                    rec.update(status="failed" if error else "stopped", note=error or "stopped")
+                for row, col, _ in positions:
+                    i, j = row - 1, COL_LETTERS.index(col)
+                    cell = self.cells[i][j]
+                    cell.state = state if cell.history or error else "stopped"
+                    self._ui(lambda i=i, j=j, s=cell.state: self._set_cell_ui(i, j, s))
+
+        workers = [threading.Thread(target=lane, args=(mi, positions, k * MUX_LANE_GAP_S),
+                                    daemon=True, name=f"full_mux{mi}")
+                   for k, (mi, positions) in enumerate(groups.items())]
+
+        def coordinator():
+            for worker in workers:
+                worker.join()
+            note = ""
+            if arm is not None:
+                try:
+                    note = arm.finish() or ""
+                except Exception as exc:
+                    note = str(exc)
+            result = "; ".join(f"mux{mi}: {outcomes.get(mi, 'stopped')}" for mi in groups)
+            self._ui(lambda: self.status_var.set("FULL finished - " + result + (" - " + note if note else "")))
+
+        coordinator_thread = threading.Thread(target=coordinator, daemon=True, name="full_coordinator")
+        self.mux_threads = workers + [coordinator_thread]
+        for thread in self.mux_threads:
+            thread.start()
+        go.set()
+        self.status_var.set(f"FULL: {len(cells)} cells on independent muxes {list(groups)}")
+
+
+PlateGrid = FullPlateGrid
+
+
 if __name__ == "__main__":
     new_plate()
 
 
 # NOTE: dev menu, somewhere else  (Debug tab in Settings covers this for now?)
+# NOTE: auto pop up and auto close subwindows 

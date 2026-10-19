@@ -92,7 +92,7 @@ class SourceRack():
                     if vial in self.vials:
                         print(vial)
                         raise InitializationError(f"{self.name}: No duplicate vial names!")
-                    print(f"attributes: {vial} {vol} {conc}")
+                    #print(f"attributes: {vial} {vol} {conc}")
 
                     # map vial name to pos 
                     #print(vial)

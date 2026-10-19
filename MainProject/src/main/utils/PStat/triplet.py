@@ -395,8 +395,42 @@ def _resolve_cell(plate, row, column) -> int:
 
 TEST_RUNNERS = {"PEIS": _run_peis, "CV": _run_cv, "CA": _run_ca}
 
+from utils.PStat.capacitance import run_capacitance_cell
+
+PARAM_DEFAULTS["CAPACITANCE"] = {
+    "v_low": 0.8, "v_high": 1.0,
+    "scan_rates_mV_s": [5, 10, 25, 50, 100, 150, 200, 250],
+    "hold_s": 0.05, "target_voltage": None,
+}
+
+def _run_capacitance(cell, params, name):
+    return run_capacitance_cell(cell, output_file_name=name,
+                                v_low=params["v_low"], v_high=params["v_high"],
+                                scan_rates_mV_s=params["scan_rates_mV_s"],
+                                hold_s=params.get("hold_s", 0.05),
+                                target_voltage=params.get("target_voltage"))
+
+TEST_RUNNERS["CAPACITANCE"] = _run_capacitance
+
+# FIX (mux cycle): defaults for the GUI's Mux Cycle dialog (also shows up as a
+# MUX_CYCLE tab in Settings). Each test still runs with its own tab's params,
+# e.g. the CA hold is CA -> time_run. Arm points live in plate_locations.py.
+PARAM_DEFAULTS["MUX_CYCLE"] = {
+    "tests": ["PEIS", "CV", "CA"],   # run in this order on every selected cell
+    "liquid_mode": "none",           # "draw" | "simulate" | "none"
+    "volume_ml": 1.0,                # draw: mL into each cell (1 mL per pipette trip)
+}
+
+TEST_ALIASES = {"CAP": "CAPACITANCE"}
+
+def canon_test(name):
+    """Canonical test name, e.g. "CAP" -> "CAPACITANCE"."""
+    t = str(name).strip().upper()
+    return TEST_ALIASES.get(t, t)
+
 def measure(plate, row, column, test, params=None, root="."):
     """Run a single `test` on one cell, store it on `plate`, and write it to disk."""
+    test = canon_test(test)
     cell = _resolve_cell(plate, row, column)
     cell_id = f"{row}{column}"
     output_name = f"{plate.plate_id}_{cell_id}_{test}"
@@ -858,3 +892,319 @@ def backfill_plate_data(root=".", upload=True):
                 n += 1
     print("[backfill] uploaded {} runs into {}.{}".format(n, MONGO_DB, MONGO_COLLECTION))
     return n
+
+# FULL-only protocol.
+import math
+import time
+from datetime import timedelta
+from utils.PStat import ca as _ca_driver
+
+FULL_REVISIT_S = 60.0
+FULL_VISIT_S = 0.1
+
+
+def _full_runners():
+    from importlib import import_module
+    runners = {}
+    for test, name in (("PEIS", "peis"), ("CV", "cv")):
+        module = import_module("utils.PStat." + name)
+        runner = getattr(module, "run_" + name + "_full", None)
+        if not callable(runner):
+            location = getattr(module, "__file__", name + ".py")
+            raise RuntimeError(f"FULL runner missing from {location}. Replace utils/PStat/{name}.py "
+                               "from the FULL package and restart the entire Python process.")
+        runners[test] = runner
+    if not callable(getattr(_ca_driver, "FullMuxSession", None)):
+        raise RuntimeError("Replace utils/PStat/ca.py from the FULL package and restart Python.")
+    return runners
+
+
+def full_mux_groups(plate, grid_cells):
+    groups, seen = {}, set()
+    for grid in sorted(set(grid_cells)):
+        if not 0 <= int(grid) < 24 or int(grid) != grid:
+            raise ValueError("Grid cells must be integers from 0 to 23")
+        row, col = int(grid) // 4 + 1, "ABCD"[int(grid) % 4]
+        hw = _resolve_cell(plate, row, col)
+        if isinstance(hw, bool) or int(hw) != hw or not 0 <= int(hw) < 24:
+            raise ValueError(f"Invalid hardware mapping for {row}{col}: {hw}")
+        hw = int(hw)
+        if hw in seen:
+            raise ValueError(f"Duplicate hardware channel in selection: {hw}")
+        seen.add(hw)
+        groups.setdefault(hw // 8, []).append((row, col, hw))
+    if not groups:
+        raise ValueError("No cells selected")
+    return {mi: sorted(cs, key=lambda c: c[2]) for mi, cs in sorted(groups.items())}
+
+
+def prepare_full_run(plate, grid_cells, root="."):
+    _full_runners()
+    groups = full_mux_groups(plate, grid_cells)
+    params = {t: copy.deepcopy(_resolve_params(plate, t)) for t in ("PEIS", "CV", "CA")}
+    voltage, period = float(params["CA"]["voltage"]), float(params["CA"]["sample_period"])
+    duration = float(params["CA"]["time_run"])
+    if not math.isfinite(voltage) or abs(voltage) > 4.9:
+        raise ValueError("FULL local hold requires a finite CA voltage within +/-4.9 V")
+    if not math.isfinite(duration) or duration <= 0:
+        raise ValueError("CA hold (s) must be finite and above 0 s")
+    if not math.isfinite(period) or not 0 < period <= duration:
+        raise ValueError("CA sample_period must be positive and no greater than CA hold (s)")
+    params["CA"].update(voltage=voltage, sample_period=period, time_run=duration)
+    for cells in groups.values():
+        for row, col, _ in cells:
+            cell_id = f"{row}{col}"
+            folder = Path(root) / DATA_DIRECTORY / _stem(plate.plate_id, cell_id)
+            for test in ("PEIS", "CV", "CA"):
+                path = folder / _data_filename(plate.plate_id, cell_id, test)
+                if path.exists():
+                    raise FileExistsError(f"FULL would overwrite {path}. Use a new plate ID or move that run first.")
+    from utils.PStat.cv import _ensure_tkp
+    _ensure_tkp("FULL")
+    devices = _ca_driver._plate_devices()
+    selected_muxes, selected_pstats = set(), set()
+    for mi in groups:
+        if mi >= len(devices[0]) or mi >= len(devices[1]):
+            raise RuntimeError(f"Mux/pstat pair {mi} is unavailable")
+        mux, pstat = devices[0][mi], devices[1][mi]
+        if mux in selected_muxes or pstat in selected_pstats:
+            raise RuntimeError(f"FULL mux {mi} would reuse a device assigned to another mux")
+        selected_muxes.add(mux)
+        selected_pstats.add(pstat)
+    return groups, params, devices
+
+
+class _FullCALog:
+    columns = ["Point", "time", "Vf", "Im", "Cycle", "segment_id", "phase",
+               "hw_cell", "mux", "channel", "datetime", "read_duration_s", "late_by_s"]
+
+    def __init__(self, plate, position, params, root):
+        self.plate, self.root = plate, root
+        self.row, self.col, self.hw = position
+        self.params = {**copy.deepcopy(params), "protocol": "FULL", "idle_mode": "local",
+                       "revisit_duration_s": FULL_REVISIT_S, "visit_interval_s": FULL_VISIT_S,
+                       "hw_cell": self.hw, "mux": self.hw // 8,
+                       "time_basis": "seconds since this cell's initial CA acquisition",
+                       "current_unit": "A", "charge_scope": "measured_segments_only"}
+        self.rows = []
+        self.origin = self.wall = None
+        self.segment = 0
+        self.last_time = -float("inf")
+        self.measurement = None
+        folder = Path(root) / DATA_DIRECTORY / _stem(plate.plate_id, f"{self.row}{self.col}")
+        folder.mkdir(parents=True, exist_ok=True)
+        self.path = folder / _data_filename(plate.plate_id, f"{self.row}{self.col}", "CA")
+        with self.path.open("x", newline="") as f:
+            csv.DictWriter(f, self.columns).writeheader()
+
+    def start(self, monotonic_time, wall_time):
+        self.origin, self.wall = monotonic_time, wall_time
+
+    def _row(self, elapsed, vf, im, phase, segment, cycle=0, read_s=0.0, late_s=0.0):
+        if not all(math.isfinite(float(x)) for x in (elapsed, vf, im)):
+            raise ValueError("Invalid CA time/voltage/current")
+        if elapsed <= self.last_time:
+            raise ValueError("CA timestamps must strictly increase")
+        self.last_time = float(elapsed)
+        return dict(zip(self.columns, [len(self.rows), float(elapsed), float(vf), float(im), cycle,
+                    segment, phase, self.hw, self.hw // 8, self.hw % 8,
+                    (self.wall + timedelta(seconds=float(elapsed))).isoformat(),
+                    read_s, late_s]))
+
+    def append_initial(self, df):
+        names = {str(c).strip().lower(): c for c in df.columns}
+        period = self.params["sample_period"]
+        if "time" in names:
+            times = pd.to_numeric(df[names["time"]], errors="raise").to_numpy()
+        elif "time/s" in names:
+            times = pd.to_numeric(df[names["time/s"]], errors="raise").to_numpy()
+        elif "t" in names:
+            times = pd.to_numeric(df[names["t"]], errors="raise").to_numpy()
+        else:
+            first = df.attrs.get("first_point", len(self.rows))
+            times = [(first + i) * period for i in range(len(df))]
+        if "stop_test" in names and (pd.to_numeric(df[names["stop_test"]]) != 0).any():
+            self.params["instrument_stop"] = True
+        new = []
+        for elapsed, vf, im in zip(times, df[names["vf"]], df[names["im"]]):
+            row = self._row(float(elapsed), vf, im, "initial", 0)
+            self.rows.append(row)
+            new.append(row)
+        self._append(new)
+
+    def append_revisit(self, timestamp, vf, im, cycle, read_s, late_s):
+        row = self._row(timestamp - self.origin, vf, im, "revisit", self.segment, cycle, read_s, late_s)
+        self.rows.append(row)
+        self._append([row])
+
+    def _append(self, rows):
+        if rows:
+            with self.path.open("a", newline="") as f:
+                csv.DictWriter(f, self.columns).writerows(rows)
+
+    def finish(self, status):
+        self.params["status"] = status
+        self.params["initial_points"] = sum(r["phase"] == "initial" for r in self.rows)
+        self.params["revisit_points"] = len(self.rows) - self.params["initial_points"]
+        self.params["late_visits"] = sum(r["late_by_s"] > 0 for r in self.rows)
+        m = Measurement(self.row, self.col, "CA", start_time=self.wall or dt.now(), finish_time=dt.now(),
+                        params=self.params, data=pd.DataFrame(self.rows, columns=self.columns))
+        self.plate.measurements.append(m)
+        self.measurement = m
+        write_full_ca(m, self.plate.plate_id, self.root)
+        return m
+
+
+def run_full_mux(plate, mux_idx, positions, params, devices, root=".", stop_event=None,
+                 fill=None, notify=None, sample_hook=None):
+    """PEIS/CV/configured CA hold, then 60 s over earlier cells on this mux."""
+    stop_event = stop_event if stop_event is not None else threading.Event()
+    positions = sorted(positions, key=lambda p: p[2])
+    if any(hw // 8 != mux_idx for _, _, hw in positions):
+        raise ValueError("FULL lane contains a cell from another mux")
+    params = copy.deepcopy(params)
+    initial_duration = float(params["CA"]["time_run"])
+    runners = _full_runners()
+    completed, logs, results = [], {}, []
+    status = "complete"
+
+    def report(pos, test, state, measurement=None, note=""):
+        if notify:
+            notify(pos[0], pos[1], test, state, measurement, note)
+
+    try:
+        with _ca_driver.FullMuxSession(mux_idx, params["CA"]["voltage"], devices) as session:
+            for pos in positions:
+                row, col, hw = pos
+                if stop_event.is_set():
+                    break
+                if fill is not None:
+                    report(pos, "FILL", "running")
+                    note = fill((row - 1) * 4 + "ABCD".index(col), stop_event.is_set)
+                    if not note:
+                        stop_event.set()
+                        report(pos, "FILL", "stopped")
+                        break
+                    report(pos, "FILL", "complete", note=str(note))
+                for test in ("PEIS", "CV"):
+                    if stop_event.is_set():
+                        break
+                    report(pos, test, "running")
+                    started = dt.now()
+                    name = f"{plate.plate_id}_{row}{col}_{test}"
+                    if test == "PEIS":
+                        data = runners["PEIS"](hw, output_file_name=name, parameter_list=copy.deepcopy(params[test]),
+                                               hardware=session, stop_event=stop_event)
+                    else:
+                        p = params[test]
+                        values = [copy.deepcopy(p[k]) for k in ("voltage_list", "scan_rates", "hold_times",
+                                                               "maxcycle", "sample_period")]
+                        data = runners["CV"](hw, output_file_name=name, values=values,
+                                             hardware=session, stop_event=stop_event)
+                    if data is None or data.empty:
+                        if stop_event.is_set():
+                            break
+                        raise RuntimeError(f"{test} returned no data for {row}{col}")
+                    if test == "PEIS" and "bad_value" in data and data["bad_value"].eq(1).all():
+                        raise RuntimeError(f"PEIS returned no valid points for {row}{col}")
+                    m = Measurement(row, col, test, started, dt.now(), copy.deepcopy(params[test]), data)
+                    plate.measurements.append(m)
+                    results.append(m)
+                    write_measurement(m, plate.plate_id, root)
+                    report(pos, test, "stopped" if stop_event.is_set() else "complete", m)
+                if stop_event.is_set():
+                    break
+                report(pos, "CA", "running")
+                log = _FullCALog(plate, pos, params["CA"], root)
+                logs[hw] = log
+
+                def initial_data(df, log=log, pos=pos):
+                    log.append_initial(df)
+                    if sample_hook and log.rows:
+                        last = log.rows[-1]
+                        sample_hook(pos[0], pos[1], last["time"], last["Im"])
+
+                session.initial_ca(hw, initial_duration, params["CA"]["sample_period"],
+                                   stop_event, log.start, initial_data)
+                if stop_event.is_set():
+                    break
+                if log.params.get("instrument_stop"):
+                    raise RuntimeError(f"CA instrument stop on {row}{col}")
+                report(pos, "CA", "complete", note=f"{initial_duration:g} s complete; voltage hold")
+                if completed:
+                    previous = list(completed)
+                    for prior in previous:
+                        logs[prior[2]].segment += 1
+                        report(prior, "CA_REVISIT", "running")
+
+                    def point(hw, timestamp, vf, im, visit, read_s, late_s):
+                        dest = logs[hw]
+                        if len(previous) > 1:
+                            dest.segment += 1
+                        dest.append_revisit(timestamp, vf, im, visit // len(previous), read_s, late_s)
+                        if sample_hook:
+                            sample_hook(dest.row, dest.col, timestamp - dest.origin, im)
+
+                    session.revisit([p[2] for p in previous], FULL_REVISIT_S, FULL_VISIT_S, stop_event, point)
+                    for prior in previous:
+                        report(prior, "CA_REVISIT", "stopped" if stop_event.is_set() else "complete")
+                completed.append(pos)
+    except BaseException:
+        status = "failed"
+        raise
+    finally:
+        if status != "failed" and stop_event.is_set():
+            status = "stopped"
+        errors = []
+        for hw, log in logs.items():
+            try:
+                m = log.finish(status)
+                results.append(m)
+                report((log.row, log.col, hw), "CA_SAVED", status, m)
+            except Exception as exc:
+                errors.append(exc)
+        if errors:
+            raise RuntimeError("FULL data finalization failed: " + "; ".join(map(str, errors)))
+    return results
+
+
+
+def write_full_ca(measurement, plate_id, root="."):
+    cell_dir = Path(root) / DATA_DIRECTORY / _stem(plate_id, measurement.cell_id)
+    cell_dir.mkdir(parents=True, exist_ok=True)
+    stem = _stem(plate_id, measurement.cell_id)
+    data_path = cell_dir / _data_filename(plate_id, measurement.cell_id, "CA")
+    meta_path = cell_dir / _meta_filename(plate_id, measurement.cell_id, "CA")
+    _atomic_csv(measurement.data, data_path)
+    from utils.PStat.triplet_analysis import analyze_full_ca
+    processed, analysis = analyze_full_ca(measurement.data)
+    _atomic_csv(processed, cell_dir / (stem + "_FULL_CA_processed.csv"))
+    _atomic_csv(pd.DataFrame([analysis]), cell_dir / (stem + "_FULL_CA_summary.csv"))
+    fields = {"plateID": plate_id, "cell_id": measurement.cell_id, "row": measurement.row,
+              "column": measurement.column, "cell_num": measurement.cell_num,
+              "electrochemical_test": "CA", "start_time": measurement.start_time.isoformat(),
+              "finish_time": measurement.finish_time.isoformat(), "n_points": len(measurement.data),
+              **measurement.params, **analysis}
+    with meta_path.open("w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["field", "value"])
+        writer.writerows(fields.items())
+    if MONGO_LIVE_UPLOAD:
+        try:
+            coll = _get_collection()
+            if coll is not None:
+                sample = _log_row(SAMPLE_LOG_DIRECTORY, {"plateID": plate_id})
+                cell = _log_row(PLATE_LOG_DIRECTORY, {"PlateID": plate_id, "Cell Position": measurement.cell_id})
+                coll.update_one({"_id": stem}, {"$set": {
+                    "plate_id": plate_id, "cell": measurement.cell_id,
+                    "mux": measurement.params["hw_cell"] // 8,
+                    "material_name": cell.get("Material Name", ""),
+                    "hypothesis": sample.get("Hypothesis", ""), "notes": sample.get("Notes", ""),
+                    "runs.CA": {"params": _mongo_safe(measurement.params),
+                                "time_ran": _fmt_time(measurement.start_time), "path": str(data_path),
+                                "analysis": _mongo_safe(analysis)},
+                    "last_upload": _fmt_time(dt.now()),
+                }}, upsert=True)
+        except Exception as exc:
+            print(f"[mongo] FULL upsert failed {stem}: {exc!r}")
+    return data_path, meta_path

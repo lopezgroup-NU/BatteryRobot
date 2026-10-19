@@ -173,7 +173,6 @@ def _save_fig(fig, path, dpi):
 
 # ======================================================
 # PEIS: R_s from positive-slope x-intercept
-# (algorithm ported unchanged; plotting now saves a PNG)
 # ======================================================
 
 def estimate_rs_from_positive_slope(
@@ -1098,3 +1097,43 @@ if __name__ == "__main__":
                   "  python triplet_analysis.py <data_root> <plate_id> (one plate)")
     except Exception:
         traceback.print_exc()
+
+def analyze_full_ca(data, params=None):
+    """Integrate only connected measurement segments; never bridge idle holds."""
+    import math
+    p = _resolve_analysis_params(params)
+    df = data.copy()
+    if df.empty:
+        return df, {"CA_points": 0, "charge_scope": "measured_segments_only"}
+    t = [float(x) for x in df["time"]]
+    current = [float(x) for x in df["Im"]]
+    segment = list(df["segment_id"])
+    if not all(math.isfinite(x) for x in t + current) or any(b <= a for a, b in zip(t, t[1:])):
+        raise ValueError("FULL CA data must have finite, increasing timestamps and finite current")
+    mode = p["ca_charge_mode"]
+    if mode not in ("positive_only", "raw", "absolute"):
+        raise ValueError("Unknown CA charge mode")
+    amperes = [max(i, 0.0) if mode == "positive_only" else abs(i) if mode == "absolute" else i
+               for i in current]
+    charge, connected_s, gaps_s = [0.0], 0.0, 0.0
+    for k in range(1, len(t)):
+        delta = t[k] - t[k - 1]
+        connected = segment[k] == segment[k - 1]
+        charge.append(charge[-1] + (amperes[k - 1] + amperes[k]) * 0.5 * delta if connected else charge[-1])
+        if connected:
+            connected_s += delta
+        else:
+            gaps_s += delta
+    df["cumulative_measured_charge_C"] = charge
+    df["cumulative_measured_O2_umol"] = [q / (4.0 * FARADAY_C_PER_MOL) * 1e6 for q in charge]
+    initial_n = sum(phase == "initial" for phase in df["phase"])
+    summary = {
+        "CA_points": len(df), "CA_elapsed_span_s": t[-1] - t[0],
+        "CA_integrated_span_s": connected_s, "CA_unmeasured_gaps_s": gaps_s,
+        "CA_measured_charge_C": charge[-1],
+        "CA_measured_O2_umol": charge[-1] / (4.0 * FARADAY_C_PER_MOL) * 1e6,
+        "charge_scope": "measured_segments_only; single-point visits add no inferred charge",
+        "CA_charge_mode": mode, "CA_initial_points": initial_n,
+        "CA_revisit_points": len(df) - initial_n,
+    }
+    return df, summary

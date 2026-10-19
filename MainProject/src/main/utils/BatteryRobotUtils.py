@@ -53,6 +53,7 @@ class BatteryRobot(NorthC9):
         Startup procedures
         setup_gui will prompt user to check on disp and source rack csvs. Set to false for closed loop, so that robot doesnt get blocked
         """
+        
         super().__init__(address, network_serial=network_serial)
 
         with open(config_path, 'r') as f:
@@ -99,6 +100,8 @@ class BatteryRobot(NorthC9):
             self.home_pump(3)  #Pipette pump homing
             self.home_pump(0) #Pump system sensing homing
             self.set_pump_valve(3, 0) #Set pump system valve at input position
+            print("Homing complete")
+        print("Robot initialization completed")
 
     def prompt_user_check_conditions(self, conditions):
         """
@@ -1304,7 +1307,9 @@ class BatteryRobot(NorthC9):
         self.goto_safe([position[0], position[1]-250, position[2]-200, position[3]-150])
 
 
+    def formulate_in_order(self, list_of_components):
 
+        pass
     
 
     def dispense_vol(self, dest_id, source_id, target_vol, collect=False, ret=True, speed = 8):
@@ -1377,7 +1382,7 @@ class BatteryRobot(NorthC9):
         return data
 
     
-    def ciara_dispense_mass(self, mg_target, density=0.001, tolerance=1, zero_scale=True):
+    def ciara_dispense_mass(self, source, mg_target, density=0.001, tolerance=1, zero_scale=True):
         print("note that this function uses the density of water in mg/mL (0.001). Set density=x for whatever fluid you are using")
         """
         Dispenses liquid into the vial being held in the carousel clamp by mass
@@ -1388,86 +1393,59 @@ class BatteryRobot(NorthC9):
             density (float): Density of the liquid being dispensed
             zero_scale (bool): Whether to zero the scale before starting
         """
-        self.goto_safe(carousel_dispense)
-        mg_togo = mg_target
-        
-        #intialize
 
-        prev_mass = 0
-        delta_mass = 0
-        
         if zero_scale:
             self.zero_scale()
             self.delay(0.5)
-        tare = self.read_steady_scale() * 1000
+            tare = self.read_steady_scale() * 1000
 
-        
-
-        
+        super_count = 0
         mg_togo = mg_target
-        #density = 0.001#min_dispense_volume / meas_mass #density here is not real density, but accounts for any amount that the robot is "off" in dispensing volume and such
-        #print(meas_mass)
-        #print(density)
-        self.goto(carousel_aspirate)
-        count = 0
-        vol_to_go = mg_togo*density
-        self.dispense_ml(3, vol_to_go)
-        self.goto(carousel_dispense)
-        self.delay(0.5)
-        self.read_steady_scale()  # dummy read to wait for steady
-        self.delay(0.5)  # delay after steady to allow for more settling time
-        meas_mass = self.read_steady_scale() * 1000 - tare
-
-        mg_togo = mg_target - meas_mass
-        count=0
-        while mg_togo > tolerance and count < 5:
-            count+=1
-            vol_to_go = mg_togo*density
-            self.goto(carousel_aspirate)
-            self.dispense_ml(3, vol_to_go)
-            self.goto(carousel_dispense)
+        while mg_togo > tolerance and super_count < 3:
+            super_count += 1
+            self.goto_safe(source)
             meas_mass = self.read_steady_scale() * 1000 - tare
             mg_togo = mg_target - meas_mass
+            self.delay(1)
+            self.move_pump(3, 0)
+            self.delay(0.5)
+            self.aspirate_ml(3, min(1, 0.1+mg_togo*density))
+            self.delay(1)
 
-
-        meas_mass = self.read_steady_scale() * 1000 - tare
-        """while mg_togo > tolerance:  #TODO should have a max count condition? other timeout?
-            count += 1                
-            vol_to_go = 0.9*mg_togo*density
-
-            self.dispense_ml(3, vol_to_go)
+            self.goto_safe(carousel_dispense)
             
+            #density = 0.001#min_dispense_volume / meas_mass #density here is not real density, but accounts for any amount that the robot is "off" in dispensing volume and such
+            #print(meas_mass)
+            #print(density)
+            self.goto(carousel_aspirate)
+            count = 0
+            vol_to_go = mg_togo*density
+            self.dispense_ml(3, vol_to_go)
+            self.goto(carousel_dispense)
             self.delay(0.5)
             self.read_steady_scale()  # dummy read to wait for steady
             self.delay(0.5)  # delay after steady to allow for more settling time
             meas_mass = self.read_steady_scale() * 1000 - tare
-            
+
             mg_togo = mg_target - meas_mass
-            delta_mass = meas_mass - prev_mass
-            prev_mass = meas_mass
+            count=0
+            while mg_togo > tolerance and count < 3:
+                count+=1
+                vol_to_go = mg_togo*density
+                self.goto(carousel_aspirate)
+                self.dispense_ml(3, vol_to_go)
+                self.goto(carousel_dispense)
+                meas_mass = self.read_steady_scale() * 1000 - tare
+                mg_togo = mg_target - meas_mass
 
-            if delta_mass < 10:
-                #if delta is this low, nothing was dispensed, so it is likely that we ran out of fluid. we'll break the loop under this condition
-                break
-            #if delta_mass <= 0:
-            #    shake_t = max_new_t
-            #else:
-            #    shake_t *= (iter_target/delta_mass)
-            #shake_t = min(max_new_t, shake_t)  # no larger than max growth allows
-            #shake_t = max(ps.min_shake_t, shake_t)  # no shorter than min time
-            #shake_t = min(ps.max_shake_t, shake_t)  # no longer than max time
+
+            #meas_mass = self.read_steady_scale() * 1000 - tare
             
-            print(f'Iteration {count}:')
-            print(f'\tJust dispensed:  {delta_mass:.1f} mg')
-            print(f'\tRemaining:       {mg_togo:.1f} mg')
-            #print(f'\tNext target:     {iter_target:.1f} mg')
-            #print(f'\tNext time:       {int(shake_t)} ms')
-            print('')
-        #self.set_opening(100)
-        #self.set_opening(0)
-
-        if mg_togo < tolerance and mg_togo > 15:
-            self.dispense_ml(3, 0.035)"""
+            if count > 2 and mg_togo > tolerance:
+                print("Going to get more fluid")
+        self.goto_safe(source)
+        self.delay(1)
+        self.move_pump(3, 0)
         
         print(f'Result:')
         #print(f'\tLast iter:  {delta_mass:.1f} mg')
@@ -1480,18 +1458,12 @@ class BatteryRobot(NorthC9):
 
     def mass_accuracy_test(self, mg_target):
         self.delay(1)
-        self.goto_safe(safe_zone)
-        self.delay(3)
-        self.move_pump(3, 0)
-        self.delay(0.5)
-        self.move_pump(3, 3000)
+        self.goto_safe(safe_zone)        
         self.close_clamp()
         self.delay(0.5)
         self.open_clamp()
         self.delay(0.5)
-        self.goto_safe(carousel_aspirate)
-        self.delay(0.5)
-        self.ciara_dispense_mass_new(mg_target)
+        self.ciara_dispense_mass(safe_zone, mg_target)
         self.delay(0.5)
         self.goto_safe(safe_zone)
 
