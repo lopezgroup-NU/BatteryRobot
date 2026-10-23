@@ -866,9 +866,37 @@ class BatteryRobot(NorthC9):
         return self.plate
 
     def new_formulation(self):
-            from GUI.formulate_app import setup_gui
-            self.plate = setup_gui()
-            return self.plate
+        from GUI.formulate_app import setup_gui
+        self.plate = setup_gui(self)
+        return self.plate
+
+    def formulate_in_order(self, list_of_components):
+        for action in list_of_components:
+            action_name = action[0]
+            location = action[1]
+            value = action[2]
+            sub_setting = action[3]
+            print(action)
+            if location[0] == 'd':
+                print(ord(location[1]))
+                col_ind = 2-(ord(location[1]) - 65 )
+                row_ind = int(location[2])-1
+                num_loc = col_ind*6 + row_ind
+            elif location[0] == 's':
+                col_ind = 5-(ord(location[1]) - 65 )
+                row_ind = int(location[2])-1
+                num_loc = col_ind*5 + row_ind
+            if action_name == "move_vial_to_carousel":
+                print(num_loc)
+                self.move_vial(ciara_disp_rack[num_loc], vial_carousel)
+            if action_name == "pipette_into_carousel" and sub_setting == 'm':
+                self.ciara_dispense_mass(num_loc)
+            if action_name == "pipette_into_carousel" and sub_setting == 'v':
+                self.ciara_dispense_vol(0, num_loc, value, collect=False, ret=False)
+            self.goto_safe(safe_zone)
+
+                
+
 
     def run_tests_new(self, row, column):
         run_test_cell(self.Global_Plate, row, column, self.Plate_Properties)
@@ -974,101 +1002,10 @@ class BatteryRobot(NorthC9):
         t1.join()
         """
         
-        # t0 = threading.Thread(target=run_cp_cell, args=(0, 1.5, 60))
-        # t0.start()
-        # t1 = threading.Thread(target=run_cp_cell, args=(8, 1.5, 60))
-        # t1.start()
-        # t0.join()
-        # t1.join()
-
-
-        #run_cv_cell(8, "simultest1",  [[0, 3, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1])
-        
-        #for i in range(0,3):
-
-            #data0 = run_cv_cell(0, mux, f"dummycelltest0c{i}",  [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1])
-            
-
-            #mux.set_dac(0, 0.5)
-            #data1 = run_cv_cell(1, mux, f"dummycelltest1c{i}",  [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1])
-            # t1 = threading.Thread(target=run_cv_cell, args=(1, f"chronovoltometrycycledummy1c{i}",  [[0, 2, -2, 0], [0.1, 0.1, 0.1], [1, 1, 1], 1, 0.1]))
-            # t1.start()
-            # t1.join()
-            #mux.set_dac(1, 0.5)
-        
-
-        """
-        pstat_list = []
-        ps1 = tkp.Pstat("PSTAT")
-        ps1.set_ctrl_mode(tkp.PSTATMODE)#for some reason unable to connect to pstats?
-        print(ps1.label())
-        for i in range(0,len(pstat_list_names)):
-            pstat_list[i] = tkp.Pstat(pstat_list_names[i])
-            print(pstat_list_names[i])
-        """
-        #values = [[0, 2, -2, 0], [0.1, 0.1, 0.1], [0.05, 0.05, 0.05], 1, 0.1]
-        #cv = CV(values[0],values[1],values[2],values[3],values[4], tkp.PSTATMODE, imax = 10)
-        #data = run_cv_cell("dummycelltest1", 0)
-        #data2 = run_geis_cell("dummygeistest1", pstat_index=1)
-        #print(data)
-        #print(data)
-
-
-        """
-        df = pd.read_csv(run_file)
-        run_standard = standard is not None
-        if run_standard:
-            # perform checks on disp rack and ensure vial has been added. 
-            name = standard.get("name", "standard")
-            try:
-                pos = standard.get("pos")
-            except:
-                raise Exception("Need to provide a pos for standard!")
-            
-            tup = self.disp_rack.get_vial_by_pos(pos)
-            if tup is None:
-                raise Exception("Add standard vial to disp_rack.csv first!")
-
-            if tup[0] != name:
-                raise Exception(f"Make sure vial name at {pos} on disp_rack.csv is the same \
-                                as what you provide to run_test()")
-            
-            #  add row before and after run file
-            
-            name = name + "_" + formatted_date
-            row = [name, pos, standard.get("electrode_used"),True, "250000 1 0.00001", True, "2 -2 0.020", False, False]
-            new_row = pd.DataFrame([row], columns=df.columns)
-            df = pd.concat([new_row, df, new_row], ignore_index=True)
-
-
-
-        # pass point1, pooint2, rate to run_cv_output 
-        point1, point2, rate = [float(i) for i in test.CV_Conditions.split()]
-
-        self.set_output(6, True)
-        self.set_output(7, True)
-        self.set_output(8, True)
-        for j in range(3):
-            self.move_vial(rack_disp_official[target_idx], vial_carousel)
-            self.draw_to_sensor(target_idx, second_sensor=True)
-            ocv = RunOCV_lastV()
-            run_cv_output(output_file_name=output_file_name + f"_cv{i}",
-                    values=[[ocv, point1, point2, 0],
-                            [rate, rate, rate],
-                            [0.05, 0.05, 0.05],
-                            1,
-                            0.1],
-                    electrode_used = electrode_used,
-                    save_to_db_folder = save_to_db,
-                    standard=row_is_standard)
-        self.set_output(6, False)
-        self.set_output(7, False)
-        self.set_output(8, False)
-        """
 
     def cell_test_cp(self, cells, channels, set_voltages):
         """
-        Docstring for cell_test_24
+        Docstring for cell_test_cp
         
         :param self: Description
         :param cells: takes in a list with the indices of cells to run tests on
@@ -1307,9 +1244,6 @@ class BatteryRobot(NorthC9):
         self.goto_safe([position[0], position[1]-250, position[2]-200, position[3]-150])
 
 
-    def formulate_in_order(self, list_of_components):
-
-        pass
     
 
     def dispense_vol(self, dest_id, source_id, target_vol, collect=False, ret=True, speed = 8):
@@ -1381,8 +1315,65 @@ class BatteryRobot(NorthC9):
         data["Real(ml)"] = dispensed
         return data
 
-    
-    def ciara_dispense_mass(self, source, mg_target, density=0.001, tolerance=1, zero_scale=True):
+
+    def ciara_dispense_vol(self, dest_id, source_id, target_vol, collect=False, ret=True, speed = 8):
+        """
+        Dispense {target_vol} ml from vial with id {source_id} into vial with id {dest_id}
+        Destination vials are from rack_dispense_official while source_vials are from
+        rack_pipette_aspirate respectively (see Locators)
+        """
+        self.check_remove_pipette()
+        self.goto_safe(ciara_source_rack[source_id], vel=speed)
+        cap_holder_id = self.ciara_move_cap_to_holder()
+
+        if collect:
+            self.move_vial(ciara_disp_rack[dest_id], vial_carousel)
+        else:
+            self.goto_safe(vial_carousel, vel=speed)
+
+        self.uncap_vial_in_carousel()
+        self.get_pipette()
+        self.zero_scale()
+
+        remaining = target_vol
+        
+
+        while remaining > 0:
+            rack = ciara_p_asp
+            
+            amount = min(remaining, 1)
+            
+            self.goto_safe(rack[source_id], vel=speed)
+            self.aspirate_ml(3, amount)
+            self.delay(3)
+            self.goto_safe(carousel_dispense, vel=speed)
+            self.move_pump(3, 0)
+            self.delay(3)
+            remaining -= amount
+        
+        self.set_pump_speed(3, 15)
+        dispensed = self.read_steady_scale()
+        self.goto_safe(safe_zone, vel=speed)
+        self.remove_pipette()
+
+        if ret:
+            self.cap_and_return_vial_to_rack(dest_id)
+        else:
+            self.close_clamp()
+            self.goto_safe(vial_carousel_approach, vel=speed)
+            self.cap(torque_thresh=500)
+            self.open_gripper()
+            self.open_clamp()
+
+        self.ciara_move_cap_from_holder(source_id, cap_holder_id)
+
+        data = {}
+        data["Vial ID"] = dest_id
+        data["Intended(ml)"] = target_vol
+        data["Real(ml)"] = dispensed
+        return data
+
+    def ciara_dispense_mass(self, source_id, mg_target, density=0.001, tolerance=1, zero_scale=True):
         print("note that this function uses the density of water in mg/mL (0.001). Set density=x for whatever fluid you are using")
         """
         Dispenses liquid into the vial being held in the carousel clamp by mass
@@ -1393,6 +1384,15 @@ class BatteryRobot(NorthC9):
             density (float): Density of the liquid being dispensed
             zero_scale (bool): Whether to zero the scale before starting
         """
+        self.check_remove_pipette()
+        self.goto_safe(ciara_source_rack[source_id])
+        cap_holder_id = self.ciara_move_cap_to_holder()
+
+        self.goto_safe(vial_carousel)
+
+        self.uncap_vial_in_carousel()
+        self.get_pipette()
+        self.zero_scale()
 
         if zero_scale:
             self.zero_scale()
@@ -1403,7 +1403,7 @@ class BatteryRobot(NorthC9):
         mg_togo = mg_target
         while mg_togo > tolerance and super_count < 3:
             super_count += 1
-            self.goto_safe(source)
+            self.goto_safe(ciara_p_asp[source_id])
             meas_mass = self.read_steady_scale() * 1000 - tare
             mg_togo = mg_target - meas_mass
             self.delay(1)
@@ -1443,9 +1443,21 @@ class BatteryRobot(NorthC9):
             
             if count > 2 and mg_togo > tolerance:
                 print("Going to get more fluid")
-        self.goto_safe(source)
+        self.goto_safe(ciara_source_rack[source_id])
         self.delay(1)
         self.move_pump(3, 0)
+
+        self.goto_safe(safe_zone)
+        self.remove_pipette()
+
+        
+        self.close_clamp()
+        self.goto_safe(vial_carousel_approach)
+        self.cap(torque_thresh=500)
+        self.open_gripper()
+        self.open_clamp()
+
+        self.ciara_move_cap_from_holder(source_id, cap_holder_id)
         
         print(f'Result:')
         #print(f'\tLast iter:  {delta_mass:.1f} mg')
@@ -1986,6 +1998,53 @@ class BatteryRobot(NorthC9):
         self.open_gripper()
         # self.goto_safe(safe_zone)
 
+
+    def ciara_move_cap_to_holder(self):
+        """
+        Helper function to move cap to a free cap holder.
+        Assumes gripper is at target vial's cap's location
+        """
+        self.close_gripper()
+        self.delay(.5)
+        self.uncap(pitch = 1.35, revs=7)
+
+        if self.cap_holder_1_free:
+            self.goto_safe(ciara_cap_holder_1_approach)
+            self.cap_holder_1_free = False
+            cap_holder_id = 1
+
+        elif self.cap_holder_2_free:
+            self.goto_safe(ciara_cap_holder_2_approach)
+            self.cap_holder_2_free = False
+            cap_holder_id = 2
+
+        else:
+            raise Exception("Cap holders are taken!")
+
+        self.cap(revs=4, torque_thresh=400)
+        self.open_gripper()
+        self.delay(.5)
+        return cap_holder_id
+
+    def ciara_move_cap_from_holder(self, source_id, cap_holder_id):
+        """
+        Helper function to move cap from holder back to source vial
+        """
+        if cap_holder_id == 1:
+            self.goto_safe(ciara_cap_holder_1)
+            self.cap_holder_1_free = True
+        else:
+            self.goto_safe(ciara_cap_holder_2)
+            self.cap_holder_2_free = True
+
+        self.close_gripper()
+        self.delay(.5)
+        self.uncap(pitch = 1.35, revs=7)
+        self.goto_safe(ciara_source_rack[source_id])
+        self.cap(revs=4, torque_thresh=400)
+        self.open_gripper()
+        # self.goto_safe(safe_zone)
+
     def rack_source_official_test(self, source_id = [0, 1, 2, 3, 4]):
         for i in source_id:
             self.move_cap_to_holder_rack_src(i)
@@ -2027,6 +2086,7 @@ class BatteryRobot(NorthC9):
         """
         Move vial between two different locations
         """
+        self.open_gripper()
         self.goto_safe(src_loc)
         self.close_gripper()
         self.delay(1.5)

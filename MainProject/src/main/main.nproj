@@ -889,6 +889,130 @@
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null
+    },
+    "ciara_disp_rack": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        4288,
+        5672,
+        22051,
+        22481
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0.0,
+      "n": [
+        6,
+        5,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "ciara_disp_rack_approach": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        4288,
+        5672,
+        22051,
+        21981
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0.0,
+      "n": [
+        6,
+        5,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "ciara_cap_holder_1": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        2748,
+        26429,
+        41127,
+        22232
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "ciara_cap_holder_2": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        3118,
+        15671,
+        29182,
+        22232
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "ciara_cap_holder_2_approach": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        3116,
+        15671,
+        29182,
+        21632
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "ciara_cap_holder_1_approach": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        2748,
+        26429,
+        41127,
+        21715
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "ciara_p_asp": {
+      "type": "Grid",
+      "tool": 1,
+      "counts": [
+        1885,
+        38149,
+        57392,
+        21500
+      ],
+      "ik_soln": 1,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0.0,
+      "n": [
+        6,
+        5,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
     }
   },
   "sim_inputs": {
