@@ -1,7 +1,6 @@
 #NOTE: include individual machine status lights
 
 import ast
-import inspect
 import queue
 import threading
 import time
@@ -57,12 +56,6 @@ COLS = 4
 COL_LETTERS = ["A", "B", "C", "D"]  # plate columns run A-D left->right (no Excel mirror)
 N_MUX = 3
 
-# RELEASE_SHELL=True frees the IDE shell after Create Plate (root.quit()).
-# The Gamry access violations only ever occurred in that mode -- the COM layer
-# seems to rely on the real Tk mainloop pumping messages on the main thread --
-# ideally it stays False.
-RELEASE_SHELL = False
-
 # Number of hardware worker threads. 1 = tests run one cell at a time in a
 # single dedicated thread (matches the intended workflow and keeps the Gamry
 # layer on one thread). Raising it restores parallel per-mux testing but is
@@ -102,17 +95,8 @@ for _m in RUNNER_MODS.values():
     if _m is not None:
         _m.LIVE_HOOK = _live_hook
 
-TEST_ALIASES = {"CAP": "CAPACITANCE"}
-
 def _canon_test(name):
-    t = str(name).strip().upper()
-    fn = getattr(triplet, "conon_test", None)
-    if fn is not None:
-        try:
-            return fn(t)
-        except Exception:
-            pass
-    return TEST_ALIASES.get(t, t)
+    return triplet.canon_test(name)  # FIX (cleanup): was getattr "conon_test" (typo) + a duplicate alias table
 
 def mux_of(i, j):
     return (i * 4 + j) // 8  # rows 1-2 -> mux0, 3-4 -> mux1, 5-6 -> mux2
@@ -171,6 +155,7 @@ class CellState:
         self.run_serial = 0            # bumped each test so views know to reset
         self.buffer = []               # (x, y) live points, bounded
         self.final_df = None
+        self.lane = None               # FIX (cleanup): FULL mux index while its lane runs
 
     def push(self, x, y):
         self.buffer.append((x, y))
@@ -364,7 +349,7 @@ class PlateSetup:
         root.resizable(False, False)
         frame = tk.Frame(root, padx=10, pady=10)
         frame.pack(fill=tk.BOTH, expand=True)
-        default_tests = ",".join(getattr(triplet, "ACTIVE_TESTS", ["PEIS", "CV", "CA"]))
+        default_tests = ",".join(triplet.ACTIVE_TESTS)
         self.vars = {}
         fields = [("Plate ID", ""), ("Operator", ""), ("Hypothesis", ""), ("Notes", ""),
                   ("Tests (order)", default_tests)]
@@ -390,31 +375,22 @@ class PlateSetup:
         else:
             plate = triplet.Plate(config=config)  # uuid default_factory
         self.holder["plate"] = plate
-        rs = getattr(triplet, "record_sample", None)
-        if rs is not None:
-            try:
-                kwargs = {"notes": config["notes"]}
-                params = inspect.signature(rs).parameters
-                if "hypothesis" in params:
-                    kwargs["hypothesis"] = config["hypothesis"]
-                if "operator" in params:
-                    kwargs["operator"] = config["operator"]
-                rs(plate.plate_id, plate.created_at, **kwargs)
-            except Exception as e:
-                print("sample log auto-record failed: {!r}".format(e))
+        try:
+            triplet.record_sample(plate.plate_id, plate.created_at, operator=config["operator"],
+                                  hypothesis=config["hypothesis"], notes=config["notes"])
+        except Exception as e:
+            print("sample log auto-record failed: {!r}".format(e))
         # reuse the same Tk root for the grid (a second Tk() instance leaves
         # tkinter without a valid default root, which confuses the IDE's pump)
         for child in list(self.root.winfo_children()):
             child.destroy()
         PlateGrid(self.root, plate, tests_string, self.holder)
-        if RELEASE_SHELL:
-            self.root.quit()
 
 
 class PlateGrid:
-    """6x4 cell grid: per-cell RUN/STOP + STATUS + VIEW, one worker per MUX
-    (3 concurrent runs max), stop-on-fail toggle, tabbed test settings,
-    on-demand live graphs."""
+    """6x4 cell grid: per-cell RUN/STOP (right-click = status) + VIEW. Run /
+    Run All use HARDWARE_WORKERS worker(s); Mux Cycle and FULL run one lane per
+    mux. Stop-on-fail toggle, tabbed test settings, on-demand live graphs."""
 
     def __init__(self, root, plate, tests_string, holder):
         self.root = root
@@ -517,6 +493,11 @@ class PlateGrid:
     def toggle_cell(self, i, j):
         cell = self.cells[i][j]
         if cell.state in ("queued", "running"):
+            # FIX (cleanup): a FULL cell shares its mux's stop event
+            if cell.lane is not None and not messagebox.askyesno(
+                    "Stop FULL mux", "This stops every cell on mux {} (including CA back / "
+                    "CA end on finished cells). Stop mux {}?".format(cell.lane, cell.lane)):
+                return
             cell.stop_event.set()
             self.run_buttons[i][j].config(text="STOPPING", state=tk.DISABLED)
             self.status_var.set("Stopping {}{} ...".format(i + 1, COL_LETTERS[j]))
@@ -568,7 +549,7 @@ class PlateGrid:
         # FIX (mux cycle): raw = the Mux Cycle dialog's text; default is the main entry
         raw = (self.tests_entry.get() if raw is None else raw).replace(",", " ").split()
         tests = [_canon_test(t) for t in raw if t.strip()]   # FIX: "CAP" -> "CAPACITANCE"
-        valid = list(getattr(triplet, "TEST_RUNNERS", {})) or list(getattr(triplet, "test_types", ("PEIS", "CV", "CA")))
+        valid = list(triplet.TEST_RUNNERS)
         unknown = [t for t in tests if t not in valid]
         if not tests or unknown:
             messagebox.showerror("Error", "Unknown/empty tests: {}. Available: {} "
@@ -682,14 +663,8 @@ class PlateGrid:
         pops a modal dialog -- a log problem must not block hardware."""
         import os
         import pandas as pd
-        path = getattr(triplet, "PLATE_LOG_DIRECTORY", None)
-        if not path:
-            self.status_var.set("PLATE_LOG_DIRECTORY not found in triplet.py")
-            return
-        cols = list(getattr(triplet, "PLATE_LOG_COLS",
-                            ["PlateID", "Cell Position", "Material Name",
-                             "Catalyst Loading", "Nafion Loading",
-                             "Carbon Black Loading", "Extracted Data", "Comments"]))
+        path = triplet.PLATE_LOG_DIRECTORY
+        cols = list(triplet.PLATE_LOG_COLS)
         notes = {}
         for i in range(ROWS):
             for j in range(COLS):
@@ -751,25 +726,6 @@ class PlateGrid:
             self.status_var.set("Plate log: {} row(s) added, {} updated -> {}".format(
                 added, updated, path))
 
-    def analyze_plate_now(self):
-        try:
-            from triplet_analysis import analyze_plate
-        except ImportError:
-            self.status_var.set("triplet_analysis.py not found")
-            return
-        self.status_var.set("Plate analysis running ...")
-
-        def job():
-            try:
-                analyze_plate(triplet.DATA_DIRECTORY, self.plate.plate_id)
-                self._ui(lambda: self.status_var.set(
-                    "Plate analysis done -> {}_analysis".format(self.plate.plate_id)))
-            except Exception as e:
-                self._ui(lambda e=e: self.status_var.set("Plate analysis failed: {!r}".format(e)))
-                import traceback
-                traceback.print_exc()
-        threading.Thread(target=job, daemon=True).start()
-
     def _ui(self, fn):
         self.ui_q.put(fn)  # worker threads must never touch tkinter directly
 
@@ -788,41 +744,13 @@ class PlateGrid:
             pass
         self.root.after(100, self._poll_ui)
 
-    def _measure(self, row, col, t, stop_event):
-        """Call triplet.measure, passing stop_event only if it accepts one."""
-        kwargs = {}
-        try:
-            if "stop_event" in inspect.signature(triplet.measure).parameters:
-                kwargs["stop_event"] = stop_event
-        except (TypeError, ValueError):
-            pass
-        return triplet.measure(self.plate, row, col, t, **kwargs)
-
     def _measurement_base(self, meas, row, col, test):
-        """FIX: resolve <cellfolder>/<stem>_<TEST> exactly the way
-        write_measurement builds it. Prefers an explicit path attribute if
-        the dataclass ever grows one; otherwise reconstructs from
-        triplet.DATA_DIRECTORY + _stem. Returns (base, None) or
-        (None, short_reason); details go to the shell."""
+        """<cellfolder>/<stem>_<TEST>, built the way write_measurement builds it.
+        Returns (base, None) or (None, short_reason); details go to the shell."""
         import os
-        for attr in ("path", "filepath", "file_path", "csv_path", "data_path",
-                     "filename", "fname"):
-            v = getattr(meas, attr, None)
-            if v:
-                base = str(v)
-                if os.path.isdir(base):
-                    return os.path.join(base, "{}{}_{}".format(row, col, test)), None
-                return os.path.splitext(base)[0], None
-        data_dir = getattr(triplet, "DATA_DIRECTORY", None)
-        if not data_dir:
-            print("[gui] test outputs skipped: triplet.DATA_DIRECTORY not found")
-            return None, "no DATA_DIRECTORY (see shell)"
-        cell_id = getattr(meas, "cell_id", None) or "{}{}".format(row, col)
-        tname = getattr(meas, "electrochemical_test", None) or test
-        stem_fn = getattr(triplet, "_stem", None)
-        stem = stem_fn(self.plate.plate_id, cell_id) if stem_fn else \
-            "{}_{}".format(self.plate.plate_id, cell_id)
-        cell_dir = os.path.join(str(data_dir), stem)
+        stem = triplet._stem(self.plate.plate_id, meas.cell_id)
+        cell_dir = os.path.join(str(triplet.DATA_DIRECTORY), stem)
+        tname = meas.electrochemical_test
         if not os.path.isdir(cell_dir):
             print("[gui] test outputs skipped: expected cell folder "
                   "not found: {}".format(cell_dir))
@@ -845,10 +773,7 @@ class PlateGrid:
         if base is None:
             return "graphs skipped: " + err
         import os
-        try:
-            p = triplet._resolve_params(self.plate, "CAPACITANCE", None)
-        except Exception:
-            p = dict(getattr(triplet, "PARAM_DEFAULTS", {}).get("CAPACITANCE", {}))
+        p = triplet._resolve_params(self.plate, "CAPACITANCE", None)
         tv = p.get("target_voltage")
         if tv is None and "v_low" in p and "v_high" in p:
             tv = (float(p["v_low"]) + float(p["v_high"])) / 2.0
@@ -936,7 +861,9 @@ class PlateGrid:
                 LIVE_ROUTES[ident] = cell
                 df = None
                 try:
-                    meas = self._measure(row, col, t, cell.stop_event)
+                    # NOTE: measure() takes no stop_event yet, so a cell STOP
+                    # takes effect between tests, not mid-test
+                    meas = triplet.measure(self.plate, row, col, t)
                     df = getattr(meas, "data", None) if meas is not None else None
                     if cell.stop_event.is_set():
                         rec["status"] = "stopped"
@@ -1001,13 +928,7 @@ class PlateGrid:
     # ---- CA cycle (kept as its own separate flow) ----
 
     def ca_cycle(self):
-        try:
-            d = triplet._resolve_params(self.plate, "CA_CYCLE", None)
-        except Exception:
-            d = dict(getattr(triplet, "PARAM_DEFAULTS", {}).get("CA_CYCLE", {}))
-        if not d:
-            self.status_var.set("CA_CYCLE defaults not found - is the triplet.py block pasted in?")
-            return
+        d = triplet._resolve_params(self.plate, "CA_CYCLE", None)
 
         win = tk.Toplevel(self.root)
         win.title("CA Cycle - " + self.plate.plate_id)
@@ -1160,17 +1081,8 @@ class PlateGrid:
         right away while the arm moves on to the next mux; when a cell's tests
         end, the arm fills the next selected cell on that mux. Each test uses its
         own Settings tab; CA hold here is Settings -> CA -> time_run."""
-        try:
-            d = triplet._resolve_params(self.plate, "MUX_CYCLE", None)
-        except Exception:
-            d = dict(getattr(triplet, "PARAM_DEFAULTS", {}).get("MUX_CYCLE", {}))
-        if not d:
-            self.status_var.set("MUX_CYCLE defaults not found - is the triplet.py block pasted in?")
-            return
-        try:
-            hold = triplet._resolve_params(self.plate, "CA", None).get("time_run", "")
-        except Exception:
-            hold = ""
+        d = triplet._resolve_params(self.plate, "MUX_CYCLE", None)
+        hold = triplet._resolve_params(self.plate, "CA", None).get("time_run", "")
 
         win = tk.Toplevel(self.root)
         win.title("Mux Cycle - " + self.plate.plate_id)
@@ -1178,37 +1090,48 @@ class PlateGrid:
         frame.pack(fill=tk.BOTH, expand=True)
 
         tests = d.get("tests", ["PEIS", "CV", "CA"])
-        fields = [("Tests (order)", tests if isinstance(tests, str) else ", ".join(tests)),
-                  ("CA hold (s)", str(hold))]
         entries = {}
-        for i, (label, default) in enumerate(fields):
-            tk.Label(frame, text=label).grid(row=i, column=0, sticky="e", padx=5, pady=3)
+
+        def _field(r, label, default):
+            tk.Label(frame, text=label).grid(row=r, column=0, sticky="e", padx=5, pady=3)
             e = tk.Entry(frame, width=16)
-            e.grid(row=i, column=1, padx=5, pady=3)
+            e.grid(row=r, column=1, padx=5, pady=3)
             e.insert(0, default)
             entries[label] = e
+            return e
+        _field(0, "Tests (order)", tests if isinstance(tests, str) else ", ".join(tests))
+        # FIX (FULL toggle): FULL is a checkbox; the Tests list is its sequence
+        full_var = tk.BooleanVar(master=win, value=bool(d.get("full", False)))
+        tk.Checkbutton(frame, text="FULL cycle", variable=full_var).grid(
+            row=1, column=1, sticky="w", padx=5, pady=3)
+        _field(2, "CA hold (s)", str(hold))
+        back_e = _field(3, "CA back (s)", str(d.get("ca_back_s", 60.0)))  # FIX (CA_Back)
+        end_e = _field(4, "CA end (s)", str(d.get("ca_end_s", 0.0)))      # FIX (CA_End)
+
+        def _full_changed(*_):  # FIX (FULL toggle): back/end only apply to FULL
+            st = tk.NORMAL if full_var.get() else tk.DISABLED
+            back_e.config(state=st)
+            end_e.config(state=st)
+        full_var.trace_add("write", _full_changed)
+        _full_changed()
         # liquid handling: dropdown, volume box under it (used by draw only)
         mode_var = tk.StringVar(master=win, value=str(d.get("liquid_mode", "none")).lower())
-        tk.Label(frame, text="Liquid").grid(row=2, column=0, sticky="e", padx=5, pady=3)
+        tk.Label(frame, text="Liquid").grid(row=5, column=0, sticky="e", padx=5, pady=3)
         ttk.Combobox(frame, textvariable=mode_var, values=("draw", "simulate", "none"),
-                     state="readonly", width=13).grid(row=2, column=1, padx=5, pady=3)
-        tk.Label(frame, text="Volume (mL)").grid(row=3, column=0, sticky="e", padx=5, pady=3)
+                     state="readonly", width=13).grid(row=5, column=1, padx=5, pady=3)
+        tk.Label(frame, text="Volume (mL)").grid(row=6, column=0, sticky="e", padx=5, pady=3)
         vol_e = tk.Entry(frame, width=16)
-        vol_e.grid(row=3, column=1, padx=5, pady=3)
+        vol_e.grid(row=6, column=1, padx=5, pady=3)
         vol_e.insert(0, str(d.get("volume_ml", 1.0)))
 
         def _mode_changed(*_):
             vol_e.config(state=tk.NORMAL if mode_var.get() == "draw" else tk.DISABLED)
         mode_var.trace_add("write", _mode_changed)
         _mode_changed()
-        tk.Label(frame, justify=tk.LEFT, fg="gray35",
-                 text="draw: the volume above into each cell\n"
-                      "simulate: 1 mL of air, approaches only\n"
-                      "none: tests only, the arm stays put").grid(
-            row=4, column=0, columnspan=2, sticky="w", padx=5)
+        # FIX (UI cleanup): draw/simulate/none help text removed
 
         picker = tk.LabelFrame(frame, text="Cells", padx=6, pady=6)
-        picker.grid(row=0, column=2, rowspan=6, padx=(12, 0), sticky="n")
+        picker.grid(row=0, column=2, rowspan=8, padx=(12, 0), sticky="n")
         checks = {}
         for r in range(ROWS):
             for ci in range(COLS):
@@ -1238,13 +1161,24 @@ class PlateGrid:
             try:
                 hold = float(entries["CA hold (s)"].get())
                 volume = float(vol_e.get())
+                back = float(entries["CA back (s)"].get())  # FIX (CA_Back)
+                end = float(entries["CA end (s)"].get())    # FIX (CA_End)
             except ValueError:
-                messagebox.showerror("Error", "Bad number in CA hold or Volume.", parent=win)
+                messagebox.showerror("Error", "Bad number in CA hold, CA back, CA end or Volume.", parent=win)
                 return
             cells = [c for c, v in checks.items() if v.get()]
             problem = None
             if hold <= 0:
                 problem = "CA hold must be above 0 s."
+            elif not back >= 0 or back == float("inf"):  # FIX (CA_Back): also rejects nan
+                problem = "CA back must be 0 s or more (0 = no revisits)."
+            elif not end >= 0 or end == float("inf"):  # FIX (CA_End)
+                problem = "CA end must be 0 s or more (0 = off)."
+            elif full_var.get() and (tests[-1] != "CA" or len(set(tests)) != len(tests) or
+                                     any(t not in ("PEIS", "CV") for t in tests[:-1])):
+                # FIX (FULL toggle)
+                problem = ("FULL cycle runs PEIS/CV (optional, any order) then CA, each once, "
+                           "e.g. PEIS, CV, CA.")
             elif not cells:
                 problem = "No cells selected."
             elif mode != "none":
@@ -1278,18 +1212,20 @@ class PlateGrid:
                     "already running finish. Check the arm before moving it.".format(msg)))
             # remembered for next time (also visible in Settings -> MUX_CYCLE / CA)
             self.plate.config["mux_cycle_params"] = {"tests": tests, "liquid_mode": mode,
-                                                     "volume_ml": volume}
+                                                     "volume_ml": volume, "ca_back_s": back,
+                                                     "ca_end_s": end,
+                                                     "full": bool(full_var.get())}  # FIX (FULL toggle)
             ca = dict(self.plate.config.get("ca_params") or {})
             ca["time_run"] = hold
             self.plate.config["ca_params"] = ca
             win.destroy()
-            self._start_mux_cycle(cells, tests, arm)
+            self._start_mux_cycle(cells, tests, arm, full=bool(full_var.get()))  # FIX (FULL toggle)
 
         tk.Button(frame, text="Start", command=start, bg="#4CAF50", fg="white").grid(
-            row=5, column=0, columnspan=2, pady=8)
+            row=7, column=0, columnspan=2, pady=8)
         win.grab_set()
 
-    def _start_mux_cycle(self, cells, tests, arm=None):
+    def _start_mux_cycle(self, cells, tests, arm=None, full=False):  # FIX (FULL toggle): full is FullPlateGrid's
         """FIX (mux cycle): one job queue + worker per mux, jobs in channel order
         carrying arm.fill. Workers start MUX_LANE_GAP_S apart in mux order; a
         coordinator waits for all of them, then lets the arm drop its tip / park.
@@ -1356,10 +1292,7 @@ class PlateGrid:
 
     def open_settings(self):
         # NOTE: change time to minutes from seconds
-        defaults = getattr(triplet, "PARAM_DEFAULTS", None)
-        if not defaults:
-            self.status_var.set("PARAM_DEFAULTS not found in triplet.py")
-            return
+        defaults = triplet.PARAM_DEFAULTS
         win = tk.Toplevel(self.root)
         win.title("Settings - " + self.plate.plate_id)
         nb = ttk.Notebook(win)
@@ -1421,10 +1354,7 @@ class PlateGrid:
     # ---- mongo ----
 
     def upsert_mongo(self):
-        fn = getattr(triplet, "backfill_plate_data", None)
-        if fn is None:
-            self.status_var.set("backfill_plate_data not found in triplet.py")
-            return
+        fn = triplet.backfill_plate_data
         self.status_var.set("Mongo upsert running ...")
 
         def job():  # own thread: file reads + network only, never toolkitpy
@@ -1453,32 +1383,27 @@ def new_plate():
 class FullPlateGrid(PlateGrid):
     """FULL is an opt-in extension; all original controls remain inherited."""
 
-    def parse_tests(self, raw=None):
-        if raw is not None:
-            names = [_canon_test(t) for t in raw.replace(",", " ").split()]
-            if "FULL" in names:
-                unknown = [t for t in names if t != "FULL" and t not in triplet.TEST_RUNNERS]
-                if unknown:
-                    messagebox.showerror("Error", "Unknown tests: " + ", ".join(unknown))
-                    return None
-                return ["FULL"]
-        return super().parse_tests(raw)
+    # FIX (FULL toggle): FULL is now the dialog's checkbox, so the typed-"FULL"
+    # parse_tests override and the FULL help label are gone.
 
-    def mux_cycle(self):
-        super().mux_cycle()
-        for win in self.root.winfo_children():
-            if isinstance(win, tk.Toplevel) and win.title() == "Mux Cycle - " + self.plate.plate_id:
-                tk.Label(win, justify=tk.LEFT, padx=12, pady=6,
-                         text="FULL: PEIS, CV, initial CA hold; then 60 s over earlier cells.\n"
-                              "Type FULL in Tests. CA hold (s) sets the initial CA duration.\n"
-                              "Uses CA voltage/sample period; idle cells stay voltage-held.\n"
-                              "A cell STOP stops its FULL mux; Stop Run stops all muxes.").pack(fill=tk.X)
+    def _full_graph(self, measurement, row, col, test):
+        """FIX (FULL graphs): the FULL lanes bypass _worker, so call its PNG step
+        here. Runs on the lane thread like the normal worker; never raises."""
+        try:
+            df = getattr(measurement, "data", None)
+            if df is None or len(df) == 0:
+                return ""
+            return self._test_graph_output(measurement, df, row, col, test)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            return ""
 
-    def _start_mux_cycle(self, cells, tests, arm=None):
-        if "FULL" not in tests:
+    def _start_mux_cycle(self, cells, tests, arm=None, full=False):
+        if not full:  # FIX (FULL toggle)
             return super()._start_mux_cycle(cells, tests, arm)
         try:
-            groups, params, devices = triplet.prepare_full_run(self.plate, cells)
+            groups, params, devices = triplet.prepare_full_run(self.plate, cells, tests=tests)
         except Exception as exc:
             messagebox.showerror("FULL", str(exc))
             return
@@ -1490,6 +1415,7 @@ class FullPlateGrid(PlateGrid):
                 i, j = row - 1, COL_LETTERS.index(col)
                 cell = self.cells[i][j]
                 cell.state, cell.history, cell.stop_event = "queued", [], events[mi]
+                cell.lane = mi  # FIX (cleanup): toggle_cell confirms a whole-mux stop
                 self._set_cell_ui(i, j, "queued")
         outcomes = {}
 
@@ -1505,9 +1431,14 @@ class FullPlateGrid(PlateGrid):
                 if test == "CA_SAVED":
                     cell.kind = "CA"
                     cell.final_df = measurement.data
+                    # FIX (FULL graphs): CA PNG once the cell's CA file is final
+                    # (initial hold + CA_back + CA_end); never raises
+                    graph_note = self._full_graph(measurement, row, col, "CA")
                     for rec in cell.history:
                         if rec["test"] == "CA":
                             rec["df"] = measurement.data
+                            if graph_note:
+                                rec["note"] = (rec.get("note") or "") + ("; " if rec.get("note") else "") + graph_note
                     return
                 key = (row, col, test)
                 if state == "running":
@@ -1515,7 +1446,7 @@ class FullPlateGrid(PlateGrid):
                     rec = {"test": test, "status": state, "note": note}
                     cell.history.append(rec)
                     active_records[key] = rec
-                    cell.begin_test("CA" if test == "CA_REVISIT" else test)
+                    cell.begin_test("CA" if test in ("CA_REVISIT", "CA_END") else test)  # FIX (CA_End)
                     if test in ("PEIS", "CV"):
                         LIVE_ROUTES[ident] = cell
                     else:
@@ -1529,6 +1460,9 @@ class FullPlateGrid(PlateGrid):
                         if measurement is not None:
                             rec["df"] = measurement.data
                             cell.final_df = measurement.data
+                            # FIX (FULL graphs): same per-test PNG as the normal worker
+                            if test in ("PEIS", "CV") and state == "complete":
+                                rec["note"] = self._full_graph(measurement, row, col, test) or rec["note"]
                     LIVE_ROUTES.pop(ident, None)
                 self._ui(lambda row=row, col=col, test=test, state=state: self.status_var.set(
                     f"FULL mux{mi}: {row}{col} {test} {state}"))
@@ -1556,6 +1490,7 @@ class FullPlateGrid(PlateGrid):
                     i, j = row - 1, COL_LETTERS.index(col)
                     cell = self.cells[i][j]
                     cell.state = state if cell.history or error else "stopped"
+                    cell.lane = None  # FIX (cleanup)
                     self._ui(lambda i=i, j=j, s=cell.state: self._set_cell_ui(i, j, s))
 
         workers = [threading.Thread(target=lane, args=(mi, positions, k * MUX_LANE_GAP_S),
@@ -1590,4 +1525,4 @@ if __name__ == "__main__":
 
 
 # NOTE: dev menu, somewhere else  (Debug tab in Settings covers this for now?)
-# NOTE: auto pop up and auto close subwindows 
+# NOTE: auto pop up and auto close subwindows

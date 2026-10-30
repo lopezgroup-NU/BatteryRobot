@@ -1134,6 +1134,8 @@ def analyze_full_ca(data, params=None):
         "CA_measured_O2_umol": charge[-1] / (4.0 * FARADAY_C_PER_MOL) * 1e6,
         "charge_scope": "measured_segments_only; single-point visits add no inferred charge",
         "CA_charge_mode": mode, "CA_initial_points": initial_n,
-        "CA_revisit_points": len(df) - initial_n,
+        # FIX (CA_End): CA_back ("revisit") and CA_end ("end") counted separately
+        "CA_revisit_points": sum(phase == "revisit" for phase in df["phase"]),
+        "CA_end_points": sum(phase == "end" for phase in df["phase"]),
     }
     return df, summary

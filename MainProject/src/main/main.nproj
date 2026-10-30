@@ -902,7 +902,7 @@
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null,
-      "rotation": 0.0,
+      "rotation": 0,
       "n": [
         6,
         5,
@@ -926,7 +926,7 @@
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null,
-      "rotation": 0.0,
+      "rotation": 0,
       "n": [
         6,
         5,
@@ -1002,7 +1002,7 @@
       "ik_soln": 1,
       "reference": false,
       "linked_parent_name": null,
-      "rotation": 0.0,
+      "rotation": 0,
       "n": [
         6,
         5,
@@ -1013,6 +1013,19 @@
         26,
         0.0
       ]
+    },
+    "dropcast_test_0": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        515,
+        9775,
+        31832,
+        21514
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
     }
   },
   "sim_inputs": {

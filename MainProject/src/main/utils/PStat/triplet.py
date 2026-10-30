@@ -24,9 +24,9 @@ except ImportError:
 
 import csv
 import pandas as pd
-import uuid
-import base64
 import copy
+import logging  # FIX (cleanup): used by run_test_cell; was only via star imports
+import uuid
 
 # ======= Data Types =======
 
@@ -128,24 +128,15 @@ def write_measurement(measurement, plate_id: str, root: str | Path = ".") -> tup
 
     # ---- auto-analysis: regenerate this cell's plots after every test ----
     if AUTO_ANALYZE:
+        try:
             try:
-                try:
-                    from utils.PStat.triplet_analysis import analyze_cell_folder
-                except ImportError:
-                    from triplet_analysis import analyze_cell_folder
-                analyze_cell_folder(cell_dir)
-            except Exception as e:
-                print(f"[analysis] plot generation failed for {cell_dir}: {e}")
+                from utils.PStat.triplet_analysis import analyze_cell_folder
+            except ImportError:
+                from triplet_analysis import analyze_cell_folder
+            analyze_cell_folder(cell_dir)
+        except Exception as e:
+            print(f"[analysis] plot generation failed for {cell_dir}: {e}")
     return data_path, meta_path
-
-# ts deprecated
-def write_plate(plate, root: str | Path = ".", notes: str = "") -> None:
-    """Write every measurement on a Plate and upsert its Sample Log row."""
-    for m in plate.measurements:
-        write_measurement(m, plate.plate_id, root)
-    note_input = input("Notes for Sample Log (who, hypothesis, what): ")
-    record_sample(plate.plate_id, plate.created_at, notes or plate.config.get("notes", "") or note_input, root)
-
 
 # Logs
 def _upsert_csv_row(path: Path, columns: list[str], key_cols: list[str], row: dict) -> Path:
@@ -160,7 +151,7 @@ def _upsert_csv_row(path: Path, columns: list[str], key_cols: list[str], row: di
         for c in columns:
             if c not in df.columns:
                 df[c] = ""
-        df = df[columns]
+        df = df[columns + [c for c in df.columns if c not in columns]]  # FIX (cleanup): keep extra columns (GUI Cell Notes)
     else:
         df = pd.DataFrame(columns=columns)
 
@@ -225,29 +216,7 @@ def set_tests(*names):
     print(f"Active tests: {ACTIVE_TESTS}")
     return ACTIVE_TESTS
 
-def choose_tests():
-    """Interactive picker for the default test list."""
-    avail = list(TEST_RUNNERS)
-    print("Available:", ", ".join(f"[{i+1}] {t}" for i, t in enumerate(avail)))
-    raw = input("Tests to run (names or numbers, space/comma separated): ").replace(",", " ").split()
-    picked = []
-    for tok in raw:
-        if tok.isdigit() and 1 <= int(tok) <= len(avail):
-            picked.append(avail[int(tok) - 1])
-        elif tok.upper() in TEST_RUNNERS:
-            picked.append(tok.upper())
-        else:
-            print(f"  ignoring unknown: {tok}")
-    return set_tests(*picked) if picked else ACTIVE_TESTS
-
-
-def all_cells() -> list[tuple[int, str]]:
-    """Every cell on a 6x4 plate, as (row, column) pairs."""
-    return [(r, c) for r in range(1, 7) for c in "ABCD"]
-
-
-
-# Each runner: (cell, params, name) -> (DataFrame, resolved_params)
+# Each runner: (cell, params, name) -> DataFrame (None/raise on failure)
 # NOTE: these also pass output_file_name to the hardware function, which writes its OWN copy
 # in its own folder (PEIS/CV only; CA saves nothing itself -- write_measurement is its only writer).
 # Default measurement parameters per test. Override per plate via config["peis_params"] etc.
@@ -267,7 +236,6 @@ PARAM_DEFAULTS = {
 
 import os
 import threading
-import traceback
  
 PARAM_DEFAULTS["CA_CYCLE"] = {
     "voltage": 1.8, 
@@ -294,7 +262,7 @@ def _atomic_csv(df, path):
 def run_ca_cycle_mux(plate, mux_idx, hw_cells, params=None, root=".", stop_event=None):
     """One mux's share of a cycling-CA run: drives ca_cycle_mux() and records
     one CA_CYCLE Measurement per cell through the normal pipeline. Call from
-    one thread per mux (the GUI does this), or use run_ca_cycle_plate()."""
+    one thread per mux (the GUI's CA Cycle does this)."""
     resolved = _resolve_params(plate, "CA_CYCLE", params)
     hw_cells = sorted({int(c) for c in hw_cells})
     for c in hw_cells:
@@ -337,35 +305,6 @@ def run_ca_cycle_mux(plate, mux_idx, hw_cells, params=None, root=".", stop_event
     return out
  
  
-def run_ca_cycle_plate(plate, hw_cells, params=None, root=".", stop_event=None):
-    """Cycling CA over any subset of the 24 cells: groups by mux, runs all
-    muxes concurrently (one thread each), blocks until every mux finishes."""
-    by_mux = {}
-    for c in sorted({int(c) for c in hw_cells}):
-        by_mux.setdefault(c // 8, []).append(c)
- 
-    results, errors, threads = [], [], []
- 
-    def work(mi, cs):
-        try:
-            results.extend(run_ca_cycle_mux(plate, mi, cs, params, root, stop_event))
-        except Exception as e:
-            errors.append((mi, e))
-            traceback.print_exc()
- 
-    for mi, cs in sorted(by_mux.items()):
-        t = threading.Thread(target=work, args=(mi, cs), daemon=True,
-                             name=f"ca_cycle_mux{mi}")
-        t.start()
-        threads.append(t)
-    for t in threads:
-        t.join()
- 
-    if errors:
-        raise RuntimeError("CA cycle failed on mux(es): "
-                           + ", ".join(f"{mi}: {e!r}" for mi, e in errors))
-    return results
-
 # ---- Utils ---- #
 
 def _run_peis(cell, params, name):
@@ -384,11 +323,7 @@ def _run_ca(cell, params, name):
                        sample_period=params.get("sample_period", 0.1))
 
 def _resolve_cell(plate, row, column) -> int:
-    """Hardware/MUX index for a plate position. Uses config['cell_mapping'] if present,
-    else falls back to the row-major plate index."""
-    mapping = plate.config.get("cell_mapping")
-    if mapping is not None:
-        return mapping[(row, column)]
+    """Hardware index (0-23, mux = index // 8) for a plate position: row-major."""
     return (row - 1) * 4 + ord(column.upper()) - ord("A")
 
 # ---- Things that actually make things run ---- #
@@ -419,6 +354,9 @@ PARAM_DEFAULTS["MUX_CYCLE"] = {
     "tests": ["PEIS", "CV", "CA"],   # run in this order on every selected cell
     "liquid_mode": "none",           # "draw" | "simulate" | "none"
     "volume_ml": 1.0,                # draw: mL into each cell (1 mL per pipette trip)
+    "ca_back_s": 60.0,               # FIX (CA_Back): FULL only -- s spent revisiting every finished cell on the mux after each new CA hold
+    "ca_end_s": 0.0,                 # FIX (CA_End): FULL only -- s cycling ALL the mux's cells once its last cell is done (0 = off)
+    "full": False,                   # FIX (FULL toggle): Mux Cycle's "FULL cycle" checkbox
 }
 
 TEST_ALIASES = {"CAP": "CAPACITANCE"}
@@ -455,24 +393,6 @@ def run_cell(plate, row, column, tests=None, params_by_test=None, root="."):
     params_by_test = params_by_test or {}
     return [measure(plate, row, column, t, params_by_test.get(t), root) for t in tests]
 
-def run_plate(plate, cells=None, tests=None, params_by_test=None, root="."):
-    tests = ACTIVE_TESTS if tests is None else tests
-    for (row, column) in (cells if cells is not None else all_cells()):
-        run_cell(plate, row, column, tests, params_by_test, root)
-
-
-# ====== Triplet ======
-TRIPLET_TESTS = ["PEIS", "CV", "CA"] #specifically for the triplet stuff; SHOULD PROBABLY CHANGE INTO LIST
-
-def run_triplet_cell(plate: Plate, row: int, column: str, root: str | Path = ".") -> list:
-    """Run the full triplet (PEIS, CV, CA) on one cell."""
-    return run_cell(plate, row, column, tests=TRIPLET_TESTS, root=root)
-
-def run_triplet_plate(plate: Plate, root: str | Path = ".") -> None:
-    """Run the full triplet on all 24 cells."""
-    run_plate(plate, tests=TRIPLET_TESTS, root=root)
-
-
 # ====== Overnight CA calibration ======
 
 def run_overnight_ca(cells=(0, 8, 16), voltage=1.0, time_run=4 * 3600,
@@ -505,14 +425,11 @@ def run_overnight_ca(cells=(0, 8, 16), voltage=1.0, time_run=4 * 3600,
 # ======= Testing =======
 # Helpers to exercise the export path.
 
-def make_short_uuid(data):
-    return base64.urlsafe_b64encode(data).rstrip(b'=').decode('utf-8')
-
 def createPlate(id=None, config_notes: dict = None) -> Plate:
     plate = Plate(
         plate_id=id or uuid.uuid4().hex,
         created_at=dt.now(),
-        config=config_notes,
+        config=config_notes or {},  # FIX (cleanup): None crashed _resolve_params
     )
     print(f"Plate {plate.plate_id} has been created at {plate.created_at}")
     return plate
@@ -558,169 +475,14 @@ if __name__ == "__main__":
     plate = createPlate(id="TEST01")
     run_test_cell(plate, row=1, column="A")   # plate_properties=None -> prompts
 
-# NOTE: Must run rob.create_new_plate() first, 
-# change the "DEFAULT_TESTS" to the tests you want to run (in sequential order)
-# and then run rob.run_tests_new(row, column).
-# There IS NO CODE FOR FULL PLATE RUNS, these are cell only.
+# Shell workflow (BatteryRobotUtils): rob.create_new_plate(), optionally
+# rob.set_tests_list("PEIS", "CV"), then rob.run_tests_new(row, column).
+# Plate-wide runs (Run All / Mux Cycle / FULL) go through the GUI: rob.new_plate().
 # Overnight CA: plate = run_overnight_ca(cells=(0, 8, 16), voltage=1.0,
 #               time_run=4*3600, sample_period=1.0)
 
 
-# ---- MongoDB ----
-
-from pymongo import MongoClient
-
-MONGO_URI = "mongodb://localhost:27017/"
-MONGO_DB_NAME = "Ciara_v2"
-PLATES_COLLECTION = "plates"
-MEASUREMENTS_COLLECTION = "measurements"
-class MongoConn:
-    """Same shape as DBUtils.MongoConn, pointed at the triplet database."""
- 
-    def __init__(self, uri=MONGO_URI, db_name=MONGO_DB_NAME):
-        self.uri = uri
-        self.db_name = db_name
-        self.client = None
-        self.db = None
-        self.connect()
- 
-    def connect(self):
-        # if not _HAS_PYMONGO:
-        #     raise RuntimeError("pymongo is not installed in this environment")
-        self.client = MongoClient(self.uri)
-        self.db = self.client[self.db_name]
- 
-    def get_collection(self, collection_name, db_name=None):
-        if db_name:
-            return self.client[db_name][collection_name]
-        return self.db[collection_name]
- 
- 
-_MONGO_CONN = None
- 
-def _get_conn() -> MongoConn:
-    """One client per process (same idea as ensure_toolkit_init in pstat.py)."""
-    global _MONGO_CONN
-    if _MONGO_CONN is None:
-        _MONGO_CONN = MongoConn()
-    return _MONGO_CONN
- 
- 
-def _mongo_safe(value):
-    """Coerce params/config values into BSON-storable ones.
-    Non-string dict keys (e.g. cell_mapping's (row, column) tuples) become str;
-    datetimes become isoformat; all unknown falls back to str()."""
-    if isinstance(value, dict):
-        return {str(k): _mongo_safe(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_mongo_safe(v) for v in value]
-    if isinstance(value, dt):
-        return value.isoformat()
-    if isinstance(value, (str, int, float, bool)) or value is None:
-        return value
-    return str(value)
- 
- 
-# ---- dataclass -> document ----
- 
-def measurement_doc(m: Measurement, plate_id: str, data_path=None, meta_path=None) -> dict:
-    """key: value straight off the Measurement dataclass, plus file pointers.
-    Mirrors the rows written to the _meta.csv."""
-    return {
-        "plate_id": plate_id,
-        "cell_id": m.cell_id,
-        "row": m.row,
-        "column": m.column,
-        "cell_num": m.cell_num,
-        "electrochemical_test": m.electrochemical_test,
-        "start_time": m.start_time.isoformat() if m.start_time else "",
-        "finish_time": m.finish_time.isoformat() if m.finish_time else "",
-        "n_points": 0 if m.data is None else len(m.data),
-        "params": _mongo_safe(m.params),
-        "analysis": analysis_subdoc(m.electrochemical_test, m.data, m.params) if m.data is not None else None,
-        "data_path": str(data_path) if data_path else None,  # None = aborted/empty run
-        "meta_path": str(meta_path) if meta_path else None,
-    }
- 
- 
-def plate_doc(plate: Plate) -> dict:
-    """key: value off the Plate dataclass. Measurements live in their own
-    collection; config carries operator/hypothesis/notes, so this doc is the
-    Mongo equivalent of the sample_log row."""
-    return {
-        "plate_id": plate.plate_id,
-        "created_at": plate.created_at.isoformat(),
-        "config": _mongo_safe(plate.config or {}),
-        "n_measurements": len(plate.measurements),
-    }
- 
- 
-def _measurement_paths(m: Measurement, plate_id: str, root: str | Path = "."):
-    """Recreate the canonical paths write_measurement used. Returns None for
-    files that don't exist on disk (e.g. no data CSV for an aborted run)."""
-    cell_dir = Path(root) / DATA_DIRECTORY / _stem(plate_id, m.cell_id)
-    data_path = cell_dir / _data_filename(plate_id, m.cell_id, m.electrochemical_test)
-    meta_path = cell_dir / _meta_filename(plate_id, m.cell_id, m.electrochemical_test)
-    return (data_path if data_path.exists() else None,
-            meta_path if meta_path.exists() else None)
- 
- 
-# ---- upserts ----
- 
-def db_index_measurement(m: Measurement, plate_id: str, root: str | Path = ".",
-                         data_path=None, meta_path=None):
-    """Upsert one pointer document. Never raises: an unreachable Mongo prints
-    a warning instead of killing a hardware run."""
-    if data_path is None and meta_path is None:
-        data_path, meta_path = _measurement_paths(m, plate_id, root)
-    doc = measurement_doc(m, plate_id, data_path, meta_path)
-    key = {k: doc[k] for k in ("plate_id", "cell_id", "electrochemical_test", "start_time")}
-    try:
-        col = _get_conn().get_collection(MEASUREMENTS_COLLECTION)
-        col.update_one(key, {"$set": doc}, upsert=True)
-        return doc
-    except Exception as e:
-        print(f"[mongo] index failed for {plate_id} {m.cell_id} {m.electrochemical_test}: {e!r}")
-        return None
- 
- 
-def db_index_plate(plate: Plate, root: str | Path = "."):
-    """Upsert the plate doc plus every measurement currently on the plate.
-    Run after run_plate / run_triplet_plate to sync a whole run in one call."""
-    try:
-        col = _get_conn().get_collection(PLATES_COLLECTION)
-        col.update_one({"plate_id": plate.plate_id}, {"$set": plate_doc(plate)}, upsert=True)
-    except Exception as e:
-        print(f"[mongo] plate index failed for {plate.plate_id}: {e!r}")
-    n = 0
-    for m in plate.measurements:
-        if db_index_measurement(m, plate.plate_id, root) is not None:
-            n += 1
-    print(f"[mongo] indexed plate {plate.plate_id}: {n}/{len(plate.measurements)} measurements")
- 
- 
-# ---- queries ----
- 
-def db_get_measurements(plate_id=None, cell_id=None, test=None) -> list:
-    """Pointer docs matching whatever filters are given."""
-    q = {}
-    if plate_id:
-        q["plate_id"] = plate_id
-    if cell_id:
-        q["cell_id"] = cell_id
-    if test:
-        q["electrochemical_test"] = test.upper()
-    col = _get_conn().get_collection(MEASUREMENTS_COLLECTION)
-    return list(col.find(q))
- 
- 
-def db_load_data(doc) -> pd.DataFrame | None:
-    """Follow a pointer document back to its data CSV."""
-    p = doc.get("data_path")
-    if not p or not Path(p).exists():
-        return None
-    return pd.read_csv(p)
-
+# ---- MongoDB (Ciara_v2.cells: one doc per plate cell, runs.<test> per run) ----
 
 MONGO_URI = "mongodb://localhost:27017"
 MONGO_DB = "Ciara_v2"
@@ -745,10 +507,13 @@ def _get_collection(uri=MONGO_URI, db_name=MONGO_DB, coll_name=MONGO_COLLECTION)
  
  
 def _mongo_safe(obj):
+    """Coerce params into BSON-storable values (keys -> str, datetimes -> ISO)."""
     if isinstance(obj, dict):
         return {str(k): _mongo_safe(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
         return [_mongo_safe(v) for v in obj]
+    if isinstance(obj, dt):  # FIX (cleanup): from the deleted duplicate
+        return obj.isoformat()
     if isinstance(obj, (str, int, float, bool)) or obj is None:
         return obj
     return str(obj)
@@ -762,54 +527,6 @@ def _fmt_time(t):
     except Exception:
         return str(t)
     
-def _zr_refl(df):
-    if "freq" in df.columns:                     # guarantee high->low frequency order
-        df = df.sort_values("freq", ascending=False)
-    zr = pd.to_numeric(df["zreal"], errors="coerce")
-    refl = -pd.to_numeric(df["zimag"], errors="coerce")
-    ok = zr.notna() & refl.notna()
-    return zr[ok].to_numpy(), refl[ok].to_numpy()
-
-def x_intercept_nofit(df):
-    """Legacy value (R1_nofit): zreal of the sample nearest the axis from above."""
-    try:
-        zr, refl = _zr_refl(df)
-        m = refl >= 0
-        if not m.any():
-            return None
-        return float(zr[m][np.argmin(refl[m])])
-    except Exception:
-        return None
-
-def x_intercept(df, fit_points=4):
-    try:
-        zr, refl = _zr_refl(df)
-        near = x_intercept_nofit(df)
-        if near is None or len(zr) < 2:
-            return near
-        cross = np.where(np.diff(np.sign(refl)) != 0)[0]
-        if len(cross):
-            i = int(cross[0])
-            zw, rw = zr[max(0, i - 1):i + 3], refl[max(0, i - 1):i + 3]
-        else:
-            apex = int(np.argmax(refl))          # no crossing: fit only the
-            hf = np.arange(0, apex + 1)          # high-frequency branch, so a
-            if len(hf) < 2:                      # low-freq touchdown near the axis
-                return near                      # cannot masquerade as Rs
-            sel = hf[np.argsort(refl[hf])[:max(2, fit_points)]]
-            zw, rw = zr[sel], refl[sel]
-        if len(zw) < 2 or np.ptp(rw) == 0:
-            return near
-        c, d = np.polyfit(rw, zw, 1)          # zreal = c*refl + d -> intercept = d
-        span = max(np.ptp(zr), 1e-12)
-        if not np.isfinite(d) or d < zr.min() - span or d > zr.max() + span:
-            return near
-        return float(d)
-    except Exception:
-        return None
-
- 
- 
 def _log_row(path, keys):
     """Last row of a log csv matching all key columns; {} if absent/unreadable."""
     try:
@@ -894,8 +611,7 @@ def backfill_plate_data(root=".", upload=True):
     return n
 
 # FULL-only protocol.
-import math
-import time
+import math  # NOTE: BatteryRobotUtils uses math.* via `from triplet import *` -- keep
 from datetime import timedelta
 from utils.PStat import ca as _ca_driver
 
@@ -919,28 +635,27 @@ def _full_runners():
     return runners
 
 
-def full_mux_groups(plate, grid_cells):
-    groups, seen = {}, set()
-    for grid in sorted(set(grid_cells)):
-        if not 0 <= int(grid) < 24 or int(grid) != grid:
+def full_mux_groups(grid_cells):
+    """{mux: [(row, col, hw), ...]} in channel order. FIX (cleanup): no cell_mapping."""
+    groups = {}
+    for hw in sorted({int(c) for c in grid_cells}):
+        if not 0 <= hw < 24:
             raise ValueError("Grid cells must be integers from 0 to 23")
-        row, col = int(grid) // 4 + 1, "ABCD"[int(grid) % 4]
-        hw = _resolve_cell(plate, row, col)
-        if isinstance(hw, bool) or int(hw) != hw or not 0 <= int(hw) < 24:
-            raise ValueError(f"Invalid hardware mapping for {row}{col}: {hw}")
-        hw = int(hw)
-        if hw in seen:
-            raise ValueError(f"Duplicate hardware channel in selection: {hw}")
-        seen.add(hw)
-        groups.setdefault(hw // 8, []).append((row, col, hw))
+        groups.setdefault(hw // 8, []).append((hw // 4 + 1, "ABCD"[hw % 4], hw))
     if not groups:
         raise ValueError("No cells selected")
-    return {mi: sorted(cs, key=lambda c: c[2]) for mi, cs in sorted(groups.items())}
+    return groups
 
 
-def prepare_full_run(plate, grid_cells, root="."):
+def prepare_full_run(plate, grid_cells, root=".", tests=None):
     _full_runners()
-    groups = full_mux_groups(plate, grid_cells)
+    # FIX (FULL toggle): the dialog's Tests list is the FULL sequence --
+    # PEIS/CV in any order (each optional, once), then CA
+    tests = [canon_test(t) for t in (tests or ("PEIS", "CV", "CA"))]
+    if (not tests or tests[-1] != "CA" or len(set(tests)) != len(tests)
+            or any(t not in ("PEIS", "CV") for t in tests[:-1])):
+        raise ValueError(f"FULL runs PEIS/CV (optional) then CA, each once; got {tests}")
+    groups = full_mux_groups(grid_cells)
     params = {t: copy.deepcopy(_resolve_params(plate, t)) for t in ("PEIS", "CV", "CA")}
     voltage, period = float(params["CA"]["voltage"]), float(params["CA"]["sample_period"])
     duration = float(params["CA"]["time_run"])
@@ -951,11 +666,24 @@ def prepare_full_run(plate, grid_cells, root="."):
     if not math.isfinite(period) or not 0 < period <= duration:
         raise ValueError("CA sample_period must be positive and no greater than CA hold (s)")
     params["CA"].update(voltage=voltage, sample_period=period, time_run=duration)
+    # FIX (CA_Back): revisit duration comes from the Mux Cycle dialog / MUX_CYCLE tab
+    back = float(_resolve_params(plate, "MUX_CYCLE").get("ca_back_s", FULL_REVISIT_S))
+    if not math.isfinite(back) or back < 0:
+        raise ValueError("CA back (s) must be finite and 0 s or more (0 = no revisits)")
+    params["CA"]["revisit_duration_s"] = back
+    # FIX (CA_End): final all-cell cycle once a mux has finished every cell
+    end = float(_resolve_params(plate, "MUX_CYCLE").get("ca_end_s", 0.0))
+    if not math.isfinite(end) or end < 0:
+        raise ValueError("CA end (s) must be finite and 0 s or more (0 = off)")
+    params["CA"]["end_duration_s"] = end
+    params["FULL_TESTS"] = list(tests)  # FIX (FULL toggle): read by run_full_mux
+    print(f"[FULL] {', '.join(tests)} | CA hold {duration:g} s | CA_back {back:g} s | CA_end {end:g} s | "
+          f"mux(es) {list(groups)}")  # FIX (CA_End): confirms what the lanes will use
     for cells in groups.values():
         for row, col, _ in cells:
             cell_id = f"{row}{col}"
             folder = Path(root) / DATA_DIRECTORY / _stem(plate.plate_id, cell_id)
-            for test in ("PEIS", "CV", "CA"):
+            for test in tests:  # FIX (FULL toggle)
                 path = folder / _data_filename(plate.plate_id, cell_id, test)
                 if path.exists():
                     raise FileExistsError(f"FULL would overwrite {path}. Use a new plate ID or move that run first.")
@@ -982,7 +710,9 @@ class _FullCALog:
         self.plate, self.root = plate, root
         self.row, self.col, self.hw = position
         self.params = {**copy.deepcopy(params), "protocol": "FULL", "idle_mode": "local",
-                       "revisit_duration_s": FULL_REVISIT_S, "visit_interval_s": FULL_VISIT_S,
+                       # FIX (CA_Back): record the duration actually used
+                       "revisit_duration_s": float(params.get("revisit_duration_s", FULL_REVISIT_S)),
+                       "visit_interval_s": FULL_VISIT_S,
                        "hw_cell": self.hw, "mux": self.hw // 8,
                        "time_basis": "seconds since this cell's initial CA acquisition",
                        "current_unit": "A", "charge_scope": "measured_segments_only"}
@@ -1032,8 +762,8 @@ class _FullCALog:
             new.append(row)
         self._append(new)
 
-    def append_revisit(self, timestamp, vf, im, cycle, read_s, late_s):
-        row = self._row(timestamp - self.origin, vf, im, "revisit", self.segment, cycle, read_s, late_s)
+    def append_revisit(self, timestamp, vf, im, cycle, read_s, late_s, phase="revisit"):  # FIX (CA_End): phase
+        row = self._row(timestamp - self.origin, vf, im, phase, self.segment, cycle, read_s, late_s)
         self.rows.append(row)
         self._append([row])
 
@@ -1045,7 +775,8 @@ class _FullCALog:
     def finish(self, status):
         self.params["status"] = status
         self.params["initial_points"] = sum(r["phase"] == "initial" for r in self.rows)
-        self.params["revisit_points"] = len(self.rows) - self.params["initial_points"]
+        self.params["revisit_points"] = sum(r["phase"] == "revisit" for r in self.rows)  # FIX (CA_End): CA_back only
+        self.params["end_points"] = sum(r["phase"] == "end" for r in self.rows)          # FIX (CA_End)
         self.params["late_visits"] = sum(r["late_by_s"] > 0 for r in self.rows)
         m = Measurement(self.row, self.col, "CA", start_time=self.wall or dt.now(), finish_time=dt.now(),
                         params=self.params, data=pd.DataFrame(self.rows, columns=self.columns))
@@ -1057,13 +788,18 @@ class _FullCALog:
 
 def run_full_mux(plate, mux_idx, positions, params, devices, root=".", stop_event=None,
                  fill=None, notify=None, sample_hook=None):
-    """PEIS/CV/configured CA hold, then 60 s over earlier cells on this mux."""
+    """PEIS/CV/configured CA hold, then CA_Back s cycling (0.1 s per visit) over
+    every finished cell on this mux, including the one that just finished.
+    After the mux's last cell: CA_End s cycling over all of its cells."""
     stop_event = stop_event if stop_event is not None else threading.Event()
     positions = sorted(positions, key=lambda p: p[2])
     if any(hw // 8 != mux_idx for _, _, hw in positions):
         raise ValueError("FULL lane contains a cell from another mux")
     params = copy.deepcopy(params)
     initial_duration = float(params["CA"]["time_run"])
+    back_s = float(params["CA"].get("revisit_duration_s", FULL_REVISIT_S))  # FIX (CA_Back)
+    end_s = float(params["CA"].get("end_duration_s", 0.0))                  # FIX (CA_End)
+    pre_tests = [t for t in params.get("FULL_TESTS", ("PEIS", "CV", "CA")) if t != "CA"]  # FIX (FULL toggle)
     runners = _full_runners()
     completed, logs, results = [], {}, []
     status = "complete"
@@ -1071,6 +807,27 @@ def run_full_mux(plate, mux_idx, positions, params, devices, root=".", stop_even
     def report(pos, test, state, measurement=None, note=""):
         if notify:
             notify(pos[0], pos[1], test, state, measurement, note)
+
+    def cycle_cells(session, cells, duration, label):
+        """FIX (CA_End): one revisit pass (0.1 s per visit) over `cells` for
+        `duration` s -- shared by CA_Back (label CA_REVISIT) and CA_End (CA_END).
+        CA_End rows are written with phase "end", CA_Back rows with "revisit"."""
+        phase = "end" if label == "CA_END" else "revisit"
+        for prior in cells:
+            logs[prior[2]].segment += 1
+            report(prior, label, "running")
+
+        def point(hw, timestamp, vf, im, visit, read_s, late_s):
+            dest = logs[hw]
+            if len(cells) > 1:
+                dest.segment += 1
+            dest.append_revisit(timestamp, vf, im, visit // len(cells), read_s, late_s, phase)
+            if sample_hook:
+                sample_hook(dest.row, dest.col, timestamp - dest.origin, im)
+
+        session.revisit([p[2] for p in cells], duration, FULL_VISIT_S, stop_event, point)
+        for prior in cells:
+            report(prior, label, "stopped" if stop_event.is_set() else "complete")
 
     try:
         with _ca_driver.FullMuxSession(mux_idx, params["CA"]["voltage"], devices) as session:
@@ -1086,7 +843,7 @@ def run_full_mux(plate, mux_idx, positions, params, devices, root=".", stop_even
                         report(pos, "FILL", "stopped")
                         break
                     report(pos, "FILL", "complete", note=str(note))
-                for test in ("PEIS", "CV"):
+                for test in pre_tests:  # FIX (FULL toggle): dialog order, was fixed PEIS, CV
                     if stop_event.is_set():
                         break
                     report(pos, test, "running")
@@ -1131,24 +888,21 @@ def run_full_mux(plate, mux_idx, positions, params, devices, root=".", stop_even
                 if log.params.get("instrument_stop"):
                     raise RuntimeError(f"CA instrument stop on {row}{col}")
                 report(pos, "CA", "complete", note=f"{initial_duration:g} s complete; voltage hold")
-                if completed:
-                    previous = list(completed)
-                    for prior in previous:
-                        logs[prior[2]].segment += 1
-                        report(prior, "CA_REVISIT", "running")
-
-                    def point(hw, timestamp, vf, im, visit, read_s, late_s):
-                        dest = logs[hw]
-                        if len(previous) > 1:
-                            dest.segment += 1
-                        dest.append_revisit(timestamp, vf, im, visit // len(previous), read_s, late_s)
-                        if sample_hook:
-                            sample_hook(dest.row, dest.col, timestamp - dest.origin, im)
-
-                    session.revisit([p[2] for p in previous], FULL_REVISIT_S, FULL_VISIT_S, stop_event, point)
-                    for prior in previous:
-                        report(prior, "CA_REVISIT", "stopped" if stop_event.is_set() else "complete")
+                # FIX (CA_Back): the cell that just finished joins the revisit set
+                # (A done, B just finished -> revisit A and B), for back_s seconds
                 completed.append(pos)
+                if back_s > 0:
+                    cycle_cells(session, list(completed), back_s, "CA_REVISIT")
+            # FIX (CA_End): every cell on this mux is done (tests + CA_Back) ->
+            # keep cycling all of them for end_s seconds
+            ids = ",".join(f"{r}{c}" for r, c, _ in completed)
+            if end_s > 0 and completed and not stop_event.is_set():
+                print(f"[FULL] mux{mux_idx}: CA_end start, {end_s:g} s over {ids}")
+                cycle_cells(session, list(completed), end_s, "CA_END")
+                print(f"[FULL] mux{mux_idx}: CA_end {'stopped' if stop_event.is_set() else 'done'}")
+            else:
+                print(f"[FULL] mux{mux_idx}: CA_end skipped (end_s={end_s:g}, cells done=[{ids}], "
+                      f"stopped={stop_event.is_set()})")
     except BaseException:
         status = "failed"
         raise
