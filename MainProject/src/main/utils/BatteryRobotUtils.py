@@ -708,74 +708,111 @@ class BatteryRobot(NorthC9):
         z = self.counts_to_mm(3, pos_cts[3])
         pos_xyz.append(z)
         print(pos_xyz)
-        self.move_z(pos_xyz[2]-1.5, vel=5)
+        self.move_z(pos_xyz[2]-0.9, vel=5)
         #pos_xyz = [66,70,285]
         #squish_factor = 0.6
         #r = 4
         circle_points = []
         num_steps = 4
-        for index in range(0,num_steps//2):
-            theta = ((index/(num_steps//2)) * 2*math.pi) + math.pi/2
-            circle_points.append([r*math.cos(theta), r*math.sin(theta)*squish_factor])
-        
-            theta = ((index/(num_steps//2)) * 2*math.pi) + math.pi/2
-            circle_points.append([-1*r*math.cos(theta), r*math.sin(theta)*squish_factor])
-        #circle_points.append([-1*r, 0])
-        #circle_points.append([r, 0])
-        # if len(circle_points) % 4 != 0:
-        #     for i in range(len(circle_points) % 4):
-        #         circle_points.pop()
+
         dispense_steps = num_steps + 2
-        print(circle_points)
-        print(len(circle_points))
-        for i in range(0, num_steps//2):
-            circle_points[i][1] += r*squish_factor
-            circle_points[i+int((len(circle_points)/2))][1] -= r*squish_factor
-        already_dispensed_coords = []
+        scaler = 1.5
+
+        size = r
+        dragsize = r*scaler
+        top_bot_scaler = 0.8
 
         self.move_xy(pos_xyz[0], pos_xyz[1])
         self.delay(0.1)
         self.dispense_ml(pump_id, volume/(dispense_steps))
+        self.delay(0.5)
 
-        for coord in circle_points:
-            if [round(coord[0],1), round(coord[1],1)] not in already_dispensed_coords:
-                print(f"{ coord[0]}\t{coord[1]}")
-                self.move_xy(pos_xyz[0] + coord[0], pos_xyz[1] + coord[1])
-                self.delay(0.1)
-                self.dispense_ml(pump_id, volume/(dispense_steps))
-                already_dispensed_coords.append([round(coord[0],1), round(coord[1],1)])
-        self.move_xy(pos_xyz[0] + (r*2), pos_xyz[1])
+        #top right
+        self.move_xy(pos_xyz[0] + size, pos_xyz[1] + size*top_bot_scaler, vel=3)
         self.delay(0.1)
         self.dispense_ml(pump_id, volume/(dispense_steps))
+        #self.move_xy(pos_xyz[0] + circle_points[0][0]*scaler, pos_xyz[1] + circle_points[0][1]*scaler, vel=5)
+        self.delay(0.5)
 
-        self.move_xy(pos_xyz[0] - (r*2), pos_xyz[1])
+        #bottom right
+        self.move_xy(pos_xyz[0] + size, pos_xyz[1] - size*top_bot_scaler, vel=3)
         self.delay(0.1)
         self.dispense_ml(pump_id, volume/(dispense_steps))
+        self.delay(0.5)
+
+        #bottom left
+        self.move_xy(pos_xyz[0] - size, pos_xyz[1] - size*top_bot_scaler, vel=3)
+        #self.move_xy(pos_xyz[0] - circle_points[1][0]*scaler, pos_xyz[1] - circle_points[1][1]*scaler, vel=5)
+        self.delay(0.1)
+        self.dispense_ml(pump_id, volume/(dispense_steps))
+        self.delay(0.5)
+
+
+        self.move_xy(pos_xyz[0] - size, pos_xyz[1] + size*top_bot_scaler, vel=3)
+        self.delay(0.1)
+        self.dispense_ml(pump_id, volume/(dispense_steps))
+        self.delay(0.5)
 
         print("dragging")
-        print(circle_points[0])
-        print(circle_points[1])
-        scaler = 1.25
+        #print(circle_points[0])
+        #print(circle_points[1])
+
 
         for i in range(2):
-            self.move_xy(pos_xyz[0] + circle_points[0][0]*scaler, pos_xyz[1] + circle_points[0][1]*scaler, vel=5)
+
+            
+
+            #top right
+            self.move_xy(pos_xyz[0] + dragsize, pos_xyz[1] + dragsize*top_bot_scaler, vel=3)
             self.delay(0.5)
-            self.move_xy(pos_xyz[0] + (r*2*scaler), pos_xyz[1], vel=5)
+            move_squeezer = 1
+
+            self.move_xy(pos_xyz[0] + dragsize*move_squeezer, pos_xyz[1] + dragsize*top_bot_scaler*move_squeezer, vel=3)
             self.delay(0.5)
-            self.move_xy(pos_xyz[0] - circle_points[1][0]*scaler, pos_xyz[1] - circle_points[1][1]*scaler, vel=5)
-            self.delay(0.5)
-            self.move_xy(pos_xyz[0] - (r*2*scaler), pos_xyz[1], vel=5)
+            self.move_xy(pos_xyz[0] + dragsize*move_squeezer, pos_xyz[1] - dragsize*top_bot_scaler*move_squeezer, vel=3)
             self.delay(0.5)
 
-        self.move_xy(pos_xyz[0] + circle_points[0][0]*scaler, pos_xyz[1] + circle_points[0][1]*scaler, vel=5)
+            #bottom right
+            self.move_xy(pos_xyz[0] + dragsize, pos_xyz[1] - dragsize*top_bot_scaler, vel=3)
+            self.delay(0.5)
+            move_squeezer = 0.8
+
+            self.move_xy(pos_xyz[0] + dragsize*move_squeezer, pos_xyz[1] - dragsize*top_bot_scaler*move_squeezer, vel=3)
+            self.delay(0.5)
+            self.move_xy(pos_xyz[0] - dragsize*move_squeezer, pos_xyz[1] - dragsize*top_bot_scaler*move_squeezer, vel=3)
+            self.delay(0.5)
+    
+            #bottom left
+            self.move_xy(pos_xyz[0] - dragsize, pos_xyz[1] - dragsize*top_bot_scaler, vel=3)
+            self.delay(0.5)
+            move_squeezer = 1
+
+            self.move_xy(pos_xyz[0] - dragsize*move_squeezer, pos_xyz[1] - dragsize*top_bot_scaler*move_squeezer, vel=3)
+            self.delay(0.5)
+            self.move_xy(pos_xyz[0] - dragsize*move_squeezer, pos_xyz[1] + dragsize*top_bot_scaler*move_squeezer, vel=3)
+            self.delay(0.5)
+
+            #top left
+            self.move_xy(pos_xyz[0] - dragsize, pos_xyz[1] + dragsize*top_bot_scaler, vel=3)
+            self.delay(0.5)
+            move_squeezer = 0.8
+
+            self.move_xy(pos_xyz[0] - dragsize*move_squeezer, pos_xyz[1] + dragsize*top_bot_scaler*move_squeezer, vel=3)
+            self.delay(0.5)
+            self.move_xy(pos_xyz[0] + dragsize*move_squeezer, pos_xyz[1] + dragsize*top_bot_scaler*move_squeezer, vel=3)
+            self.delay(0.5)
+            
+
+        
         self.delay(1)
         self.goto_safe(dropcast_aspirate)
         self.home_pump(pump_id)
             #self.pump_helper(length=1250/num_steps, draw=True, pump_address=3,suppress=True) 
 
     def star_dropcast_prep(self, pump_id = 3, empty_pipette = False):
+        self.move_pump(3,0)
         self.home_pump(pump_id)
-        self.goto_safe(dropcast_aspirate)
+        #self.goto_safe(dropcast_aspirate)
         self.set_pump_valve(pump_id, self.PUMP_VALVE_LEFT)
         if empty_pipette:
             self.aspirate_ml(pump_id, 0.5)
@@ -944,7 +981,67 @@ class BatteryRobot(NorthC9):
         self.plate = setup_gui(self)
         return self.plate
 
-    def formulate_in_order(self, list_of_components, dispense_coordinates=None):
+    def formulate_in_order(self, list_of_components):
+        for action in list_of_components:
+            action_name = action[0]
+            location = action[1]
+            value = action[2]
+            sub_setting = action[3]
+            print(action)
+            if location[0] == 'd':
+                print(ord(location[1]))
+                col_ind = 2-(ord(location[1]) - 65 )
+                row_ind = int(location[2])-1
+                num_loc = col_ind*6 + row_ind
+            elif location[0] == 's':
+                col_ind = 5-(ord(location[1]) - 65 ) #we're using ASCII here to convert letters to numbers. 'A' = 65, and is on the left
+                row_ind = int(location[2])-1
+                num_loc = col_ind*5 + row_ind
+            if action_name == "move_vial_to_carousel":
+                print(num_loc)
+                self.move_vial(ciara_disp_rack[num_loc], vial_carousel)
+            elif action_name == "move_vial_from_carousel":
+                print(num_loc)
+                self.open_clamp()
+                self.move_vial(vial_carousel, ciara_disp_rack[num_loc])
+            elif action_name == "pipette_into_source":
+                print(num_loc)
+                #remove cap from sourcerack vial
+                self.goto_safe(ciara_source_rack[num_loc])
+                id = self.ciara_move_cap_to_holder()
+
+                self.close_clamp()
+                self.open_gripper()
+                self.delay(0.5)
+                #goto vial in carousel and uncap it
+                self.goto_safe(vial_carousel)
+                self.close_gripper()
+                self.uncap_vial_in_carousel()
+                #get pipette, draw fluid and dispense into sourcerack vial
+                self.get_pipette()
+                self.goto_safe(carousel_aspirate)
+                self.aspirate_ml(3, value)
+                self.goto_safe(ciara_p_asp[num_loc])
+                self.dispense_ml(3, value)
+                #get rid of pipette, then recap vial in carousel
+                self.remove_pipette()
+                self.close_clamp()
+                self.goto_safe(vial_carousel_approach)
+                self.cap(revs = 2, torque_thresh=500)
+                self.open_gripper()
+
+                #finally, put cap back onto the sourcerack vial
+
+                self.ciara_move_cap_from_holder(num_loc, id)
+                self.goto_safe(safe_zone)
+
+            elif action_name == "pipette_into_carousel" and sub_setting == 'm':
+                self.ciara_dispense_mass(num_loc)
+            elif action_name == "pipette_into_carousel" and sub_setting == 'v':
+                self.ciara_dispense_vol(0, num_loc, value, collect=False, ret=False)
+            self.goto_safe(safe_zone)
+
+    """def formulate_in_order(self, list_of_components, dispense_coordinates=None):
         for action in list_of_components:
             if action[0] == "move_vial_to_carousel":
                 if dispense_coordinates is None:
@@ -974,7 +1071,7 @@ class BatteryRobot(NorthC9):
                     self.ciara_dispense_mass(num_loc)
                 if sub_setting == 'v':
                     self.ciara_dispense_vol(0, num_loc, value, collect=False, ret=False)
-            self.goto_safe(safe_zone)
+            self.goto_safe(safe_zone)"""
 
 
                 
