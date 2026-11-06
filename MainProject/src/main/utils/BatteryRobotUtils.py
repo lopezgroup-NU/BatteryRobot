@@ -29,6 +29,8 @@ from utils.T8Utils import T8
 from utils.ExceptionUtils import *
 from utils.MathUtils import get_time_stamp
 
+from utils.sonicator import open_relay_gui
+
 
 """
 Module for BatteryRobot operation
@@ -699,7 +701,8 @@ class BatteryRobot(NorthC9):
         self.home_pump(pump_id)
             #self.pump_helper(length=1250/num_steps, draw=True, pump_address=3,suppress=True) 
 
-    def square_dropcast(self, position, volume = 0.5, r=4, squish_factor=0.8, pump_id = 3):
+    def square_dropcast(self, position, volume = 0.5, r=10, pump_id = 3):
+        r = r*(4/10) # converts from the pretty meaninglesss units given to mm. So r=10 gives a square with side length roughly equal 10mm
         self.goto_safe(position)
 
         pos_cts = self.get_robot_positions()
@@ -1039,6 +1042,8 @@ class BatteryRobot(NorthC9):
                 self.ciara_dispense_mass(num_loc)
             elif action_name == "pipette_into_carousel" and sub_setting == 'v':
                 self.ciara_dispense_vol(0, num_loc, value, collect=False, ret=False)
+            elif action_name =="dropcast":
+                self.square_dropcast(r=value, volume=sub_setting)
             self.goto_safe(safe_zone)
 
     """def formulate_in_order(self, list_of_components, dispense_coordinates=None):
@@ -2740,3 +2745,21 @@ class BatteryRobot(NorthC9):
         if wait:
             tf.join()
         return tf
+
+    def sonicator(self, parent=None):
+        if parent is None:
+            # Create standalone Tkinter window
+            root = tk.Tk()
+            root.withdraw()
+
+            self.sonicator_gui = open_relay_gui(root)
+
+            # Keep GUI running until popup closes
+            root.wait_window(self.sonicator_gui.master)
+            root.destroy()
+
+        else:
+            # Open as popup within existing GUI
+            self.sonicator_gui = open_relay_gui(parent)
+
+        return self.sonicator_gui
