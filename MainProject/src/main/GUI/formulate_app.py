@@ -7,6 +7,8 @@ import time
 import tkinter as tk
 from tkinter import ttk
 
+from utils.sonicator import Sonicator, SonicatorError
+
 
 SONICATOR_POSITIONS = [
     f"{col}{row}" for col in "ABCD" for row in range(1, 6)
@@ -96,11 +98,18 @@ class FormulationEditor:
         self.sonicator_amount = tk.StringVar(value="0")
         self.sonicator_interval = tk.StringVar(value="0")
         self.sonicator_position = tk.StringVar(value="A1")
+        self.sonicator_temp = tk.StringVar()
+        self.sonicator_minutes = tk.StringVar()
+        self.sonicate_text = tk.StringVar(value="Sonicate")
+        self.sonicator = Sonicator()
+        self.sonicator_busy = False
         self.dispense_position = tk.StringVar(value="A1")
         self.quantity_var = tk.StringVar()
         self.choice_var = tk.StringVar()
         self.mass_var = tk.StringVar()
-
+        self.dropcast_radius = tk.StringVar()
+        self.dropcast_volume = tk.StringVar()
+        self.dropcast_type = tk.StringVar()
         # self.chemLabel = tk.Label(root, text="Add Chemical", font=("Helvetica", 11, "bold underline"))
         # self.chemLabel.place(x=350, y=20, width=160, height=30)
         
@@ -142,8 +151,8 @@ class FormulationEditor:
         self.pipette_carousel = tk.Button(self.action_frame, text="Sonicate Vial", command=lambda: sonicate_popup())
         self.pipette_carousel.place(x=20, y=210, width=90, height=70)
 
-        self.arbitrary_move = tk.Button(self.action_frame, text="Heat vial", command=lambda: print("nothing here yet"))
-        self.arbitrary_move.place(x=120, y=210, width=90, height=70)
+        self.dropcast = tk.Button(self.action_frame, text="Dropcast", command=lambda: dropcast_popup())
+        self.dropcast.place(x=120, y=210, width=90, height=70)
 
         self.action_buttons = tk.Label(self.action_frame, text="Insert Action", font=("Helvetica", 13, "bold"))
         self.action_buttons.place(x=10, y=10, width=210, height=30)
@@ -276,10 +285,39 @@ class FormulationEditor:
             self.close_button = tk.Button(popup, text="Close", command=popup.destroy)
             self.close_button.place(x=350-xshift, y=380, width=250, height=30)
 
+        def dropcast_popup():
+            popup = tk.Toplevel(root)
+            popup.title("Dropcast")
+            popup.geometry("500x300")
+
+            xshift = 300
+            yshift = 50
+            tk.Label(popup, text="Radius(mm)").place(x=350-xshift, y=55-yshift, width=100, height=20)
+            self.rad = tk.Entry(popup, textvariable=self.dropcast_radius)
+            self.rad.place(x=350-xshift, y=70-yshift, width=100, height=30)
+            ToolTip(self.rad, "Side length of the square, in millimeters")
+
+            tk.Label(popup, text="Volume(mL)").place(x=460-xshift, y=55-yshift, width=100, height=20)
+            self.vol = tk.Entry(popup, textvariable=self.dropcast_volume)
+            self.vol.place(x=460-xshift, y=70-yshift, width=100, height=30)
+            ToolTip(self.vol, "volume in mL, like 0.5")
+
+            self.star_radio = tk.Radiobutton(popup, text="Star", variable=self.dropcast_type, value="1")
+            self.star_radio.place(x=620-xshift, y=70-yshift, width=110, height=26)
+
+            self.square_radio = tk.Radiobutton(popup, text="Square", variable=self.dropcast_type, value="0")
+            self.square_radio.place(x=620-xshift, y=100-yshift, width=110, height=26)
+
+            self.addButton = tk.Button(popup, text="Add", command=self.on_dropcast_button)
+            self.addButton.place(x=350-xshift, y=110-yshift, width=250, height=30)
+            
+            self.close_button = tk.Button(popup, text="Close", command=popup.destroy)
+            self.close_button.place(x=350-xshift, y=200, width=250, height=30)
+
         def sonicate_popup():
             popup = tk.Toplevel(root)
             popup.title("Carousel to Sonicator")
-            popup.geometry("560x440")
+            popup.geometry("560x505")
 
             tk.Label(popup, text="Source Rack").place(x=30, y=10, width=110, height=20)
             ttk.Combobox(popup, textvariable=self.sonicator_source,
@@ -294,8 +332,17 @@ class FormulationEditor:
             tk.Label(popup, text="Blank interval: one dose. Interval 10: ten doses, 10s after each dose.").place(
                 x=20, y=70, width=520, height=20)
 
+            tk.Label(popup, text="Temperature (C)").place(x=30, y=105, width=110, height=20)
+            temp_entry = tk.Entry(popup, textvariable=self.sonicator_temp)
+            temp_entry.place(x=30, y=130, width=110, height=30)
+            ToolTip(temp_entry, "Whole degrees C; blank leaves the heater off")
+            tk.Label(popup, text="Sonication time (min)").place(x=165, y=105, width=150, height=20)
+            tk.Entry(popup, textvariable=self.sonicator_minutes).place(x=165, y=130, width=130, height=30)
+            tk.Button(popup, textvariable=self.sonicate_text, command=self.on_sonicate_button).place(
+                x=320, y=130, width=160, height=30)
+
             rack = tk.LabelFrame(popup, text="Sonicator", relief="groove")
-            rack.place(x=65, y=100, width=430, height=265)
+            rack.place(x=65, y=170, width=430, height=265)
             for col_index, col in enumerate("ABCD", 1):
                 tk.Label(rack, text=col, font=("Arial", 10, "bold")).grid(
                     row=0, column=col_index, padx=12, pady=6)
@@ -314,9 +361,9 @@ class FormulationEditor:
                                    value=position).grid(row=row, column=col_index, padx=8, pady=6)
 
             tk.Button(popup, text="Add", command=self.on_sonicator_button).place(
-                x=65, y=385, width=210, height=30)
+                x=65, y=450, width=210, height=30)
             tk.Button(popup, text="Close", command=popup.destroy).place(
-                x=295, y=385, width=200, height=30)
+                x=295, y=450, width=200, height=30)
 
         def resposition_popup():
             popup = tk.Toplevel(root)
@@ -555,7 +602,31 @@ class FormulationEditor:
 
         #self.list_of_components.append(("sonicate_vial", f"d{loc.upper()}", '', ''))
         self.listbox.insert("end", f"{src} -> Sonicator(time={t}, amount={amount})")
-        self.loc.delete(0, tk.END)
+        # self.loc.delete(0, tk.END)
+
+    def on_sonicate_button(self):
+        if self.sonicator_busy:
+            self.sonicator.stop()
+            return
+        try:
+            self.sonicator.start(self.sonicator_minutes.get(), self.sonicator_temp.get())
+        except SonicatorError as exc:
+            messagebox.showerror("Sonicator", str(exc))
+            return
+        self.sonicator_busy = True
+        self.update_sonicator_status()
+
+    def update_sonicator_status(self):
+        snap = self.sonicator.snapshot()
+        if snap["running"]:
+            minutes, seconds = divmod(int(snap["remaining_s"]), 60)
+            self.sonicate_text.set(f"Stop  {minutes:02d}:{seconds:02d}")
+            self.root.after(200, self.update_sonicator_status)
+            return
+        self.sonicator_busy = False
+        self.sonicate_text.set("Sonicate")
+        if snap["error"]:
+            messagebox.showerror("Sonicator", f"{snap['error']}\n\nCheck the sonicator by hand.")
 
     def on_tocarousel_button(self):
         
@@ -572,6 +643,19 @@ class FormulationEditor:
         self.list_of_components.append(("move_vial_from_carousel", f"d{loc.upper()}", '', ''))
         self.listbox.insert("end", f"Carousel -> {loc.upper()}")
         self.loc.delete(0, tk.END)
+
+    def on_dropcast_button(self):
+        rad = float(self.dropcast_radius.get())
+        vol = float(self.dropcast_volume.get())
+        drop_type = int(self.dropcast_type.get())
+        if drop_type == 0:
+            self.list_of_components.append(("sqdropcast",'', rad, vol))
+            self.listbox.insert("end", f"Square dropcast: r={rad}, v={vol}")
+        if drop_type == 1:
+                self.list_of_components.append(("stdropcast",'', rad, vol))
+                self.listbox.insert("end", f"Star dropcast: r={rad}, v={vol}")
+        #self.rad.delete(0, tk.END)
+        #self.vol.delete(0, tk.END)
 
     def on_pipette_into_source_button(self):
             

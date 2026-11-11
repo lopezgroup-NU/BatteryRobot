@@ -29,7 +29,7 @@ from utils.T8Utils import T8
 from utils.ExceptionUtils import *
 from utils.MathUtils import get_time_stamp
 
-from utils.sonicator import open_relay_gui
+from utils.sonicator import Sonicator
 
 
 """
@@ -93,6 +93,8 @@ class BatteryRobot(NorthC9):
         self.vol_purge = resources.get("vol_purge", 19)
         self.water_start = resources.get("water_start", 18)
         self.water_end = resources.get("water_end", 47)
+
+        self.sonicator = Sonicator()
 
         #home before we do anything
         if home:
@@ -1042,8 +1044,18 @@ class BatteryRobot(NorthC9):
                 self.ciara_dispense_mass(num_loc)
             elif action_name == "pipette_into_carousel" and sub_setting == 'v':
                 self.ciara_dispense_vol(0, num_loc, value, collect=False, ret=False)
-            elif action_name =="dropcast":
-                self.square_dropcast(r=value, volume=sub_setting)
+            elif action_name =="sqdropcast":
+                self.get_pipette()
+                self.star_dropcast_prep()
+                self.goto_safe(carousel_aspirate)
+                self.aspirate_ml(sub_setting)
+                self.square_dropcast(position=dropcast_test_0, r=value, volume=sub_setting)
+            elif action_name =="stdropcast":
+                self.get_pipette()
+                self.star_dropcast_prep()
+                self.goto_safe(carousel_aspirate)
+                self.aspirate_ml(sub_setting)
+                self.star_dropcast(position=dropcast_test_0, r=value, volume=sub_setting)
             self.goto_safe(safe_zone)
 
     """def formulate_in_order(self, list_of_components, dispense_coordinates=None):
@@ -2745,21 +2757,3 @@ class BatteryRobot(NorthC9):
         if wait:
             tf.join()
         return tf
-
-    def sonicator(self, parent=None):
-        if parent is None:
-            # Create standalone Tkinter window
-            root = tk.Tk()
-            root.withdraw()
-
-            self.sonicator_gui = open_relay_gui(root)
-
-            # Keep GUI running until popup closes
-            root.wait_window(self.sonicator_gui.master)
-            root.destroy()
-
-        else:
-            # Open as popup within existing GUI
-            self.sonicator_gui = open_relay_gui(parent)
-
-        return self.sonicator_gui

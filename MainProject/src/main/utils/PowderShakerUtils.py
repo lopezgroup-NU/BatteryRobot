@@ -202,14 +202,15 @@ class PowderShaker(NorthC9):
         """
         if n is not None:
             self.activate_powder_channel(n)
+            #print(n)
         #this home_OL_stepper command does a "buzz" action which may be helpful to emulate for future advances in powder dispensation. Check north_c9.py
         #self.home_OL_stepper(0, 300)
 
-    def set_opening(self, deg):
+    def set_opening(self, deg, ax=0):
         """
         Opens the powder dispenser chute by deg degrees. When powder clumps, it may not dispense even with the chute open
         """
-        self.move_axis(0, deg*(1000/360.0), accel=5000)
+        self.move_axis(ax, deg*(1000/360.0), accel=5000)
 
     def shake(self, t, f=120, a=100, wait=True):
         """
@@ -220,6 +221,14 @@ class PowderShaker(NorthC9):
         #a in %
 
         return self.amc_pwm(int(f), int(t), int(a), wait=wait)
+
+    def extreme_shake(self, amount):
+        # the value for amount is the number of degrees beyond the standard position the robot should attempt to spin. 
+        # this value is probably impossible to translate into mg or anything, so I'm not going to try to make this anything but
+        #   an arbitrary unit
+        self.move_axis(0, (90+amount)*(1000/360.0), accel=5000)
+        self.home_OL_stepper(0, 500)
+
     
     def shake_mk2(self, t=50, f=100, a=40, wait=True):
         #TODO The timing on this shake will be off quite a bit because it doesn't account for time spent opening and closing the chute. Investigating this may lead to more accurate dispensing
@@ -270,20 +279,33 @@ class PowderShaker(NorthC9):
         tare = robot.read_steady_scale() * 1000
         
         count = 0
+        extreme_shake_multiplier = 1
         while mg_togo > protocol.tol:  #TODO should have a max count condition? other timeout?
             count += 1                
             #TODO: rewrite below:
             #if write_file:
                 #file.record(shake_t, delta_mass, iter_target, mg_togo)
-            self.set_opening(ps.opening_deg)  
+            #self.set_opening(ps.opening_deg)  
             #print(shake_t)
             #print(ps.freq)
             #print(ps.amplitude)
 
 
-            self.shake_mk2(shake_t, ps.freq, ps.opening_deg*2)
+            #self.shake_mk2(shake_t, ps.freq, ps.opening_deg*2)
             if ps.shut_valve:
                 self.set_opening(0)
+            robot.delay(0.5)
+            robot.read_steady_scale()  # dummy read to wait for steady
+            robot.delay(protocol.scale_delay)  # delay after steady to allow for more settling time
+            meas_mass = robot.read_steady_scale() * 1000 - tare
+            
+            mg_togo = mg_target - meas_mass
+            delta_mass = meas_mass - prev_mass
+            prev_mass = meas_mass
+
+            
+            self.extreme_shake(100*extreme_shake_multiplier)
+
             robot.delay(0.5)
             robot.read_steady_scale()  # dummy read to wait for steady
             robot.delay(protocol.scale_delay)  # delay after steady to allow for more settling time
@@ -311,8 +333,13 @@ class PowderShaker(NorthC9):
             """
             iter_target = (ps.percent_target*mg_togo)
             max_new_t = ps.max_growth*shake_t
+            
             if delta_mass <= 0:
                 shake_t = max_new_t
+                if extreme_shake_multiplier < 5:
+                    extreme_shake_multiplier *= 1.5
+                else:
+                    extreme_shake_multiplier = 5
             else:
                 shake_t *= (iter_target/delta_mass)
             shake_t = min(max_new_t, shake_t)  # no larger than max growth allows
