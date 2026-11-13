@@ -1439,8 +1439,57 @@ class BatteryRobot(NorthC9):
     def goto_microplate(self, position):
         self.goto_safe([position[0], position[1]-250, position[2]-200, position[3]-150])
 
+    def aspirate_dispense_large_vol(self, volume, source, destination):
+        vol_left = volume
+        while vol_left > 1:
+            self.goto_safe(source)
+            self.aspirate_ml(3, 1)
+            self.goto_safe(destination)
+            self.dispense_ml(3, 1)
+            vol_left -= 1
+        self.goto_safe(source)
+        self.aspirate_ml(3, vol_left)
+        self.goto_safe(destination)
+        self.dispense_ml(3, vol_left)
 
-    
+    def wash(self, destination_id, washing_vial_ids = [], washing_vial_vols = [], solution_vial_ids = [], solution_vial_vols = [], vacuum_col=vacuum_col_0):
+
+        for i in range(len(washing_vial_ids)):
+            id = washing_vial_ids[i]
+            volume = washing_vial_vols[i]
+            self.move_vial(ciara_disp_rack[id], vial_carousel)
+            self.uncap_vial_in_carousel()
+            self.get_pipette()
+            self.aspirate_dispense_large_vol(volume, carousel_aspirate, vacuum_col)
+            self.remove_pipette()
+            self.cap_and_return_vial_to_rack(id, ciara_disp_rack)
+
+        root = tk.Tk()
+        root.withdraw() 
+        root.attributes("-topmost", True) 
+        # Program pauses here until OK is clicked
+        messagebox.showinfo("A Human Needs to Do Something Now", "Turn off the vacuum pump manually to continue")  
+        root.destroy()
+
+        for i in range(len(solution_vial_ids)):
+            id = solution_vial_ids[i]
+            volume = solution_vial_vols[i]
+            self.move_vial(ciara_disp_rack[id], vial_carousel)
+            self.uncap_vial_in_carousel()
+            self.get_pipette()
+            self.aspirate_dispense_large_vol(volume, carousel_aspirate, vacuum_col)
+            self.remove_pipette()
+            self.cap_and_return_vial_to_rack(id, ciara_disp_rack)
+
+        self.goto_safe(safe_zone)
+
+        self.move_vial(ciara_disp_rack[destination_id], vial_carousel)
+        self.uncap_vial_in_carousel()
+        self.get_pipette()
+        self.aspirate_dispense_large_vol(sum(solution_vial_vols), vacuum_col_0_aspirate, carousel_dispense)
+        self.remove_pipette()
+        self.cap_and_return_vial_to_rack(destination_id, ciara_disp_rack)
+
 
     def dispense_vol(self, dest_id, source_id, target_vol, collect=False, ret=True, speed = 8):
         """
@@ -2277,6 +2326,7 @@ class BatteryRobot(NorthC9):
         self.open_gripper()
         self.holding_vial = False
         self.move_z(400)
+
 
     def move_vial(self, src_loc, dest_loc):
         """

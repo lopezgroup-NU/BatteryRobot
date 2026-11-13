@@ -110,6 +110,7 @@ class FormulationEditor:
         self.dropcast_radius = tk.StringVar()
         self.dropcast_volume = tk.StringVar()
         self.dropcast_type = tk.StringVar()
+        self.routine_name = tk.StringVar()
         # self.chemLabel = tk.Label(root, text="Add Chemical", font=("Helvetica", 11, "bold underline"))
         # self.chemLabel.place(x=350, y=20, width=160, height=30)
         
@@ -124,7 +125,7 @@ class FormulationEditor:
         self.dleButton.place(x=220, y=20, width=70, height=30)
 
         self.formulateButton = tk.Button(root, text="Formulate", command=self.on_formulateButton, font=("Helvetica", 20, "bold"))
-        self.formulateButton.place(x=350, y=300, width=230, height=200)
+        self.formulateButton.place(x=350, y=500, width=230, height=100)
 
         
 
@@ -134,7 +135,7 @@ class FormulationEditor:
         self.compsLabel.place(x=10, y=20, width=130, height=30)
 
         self.action_frame = tk.Frame(root, relief="groove", bd=2)
-        self.action_frame.place(x=350, y=20, width=230, height=270)
+        self.action_frame.place(x=350, y=20, width=230, height=460)
 
         self.vial_to_carousel = tk.Button(self.action_frame, text="Move Vial\n to Carousel", command=lambda: move_to_carousel_popup())
         self.vial_to_carousel.place(x=20, y=50, width=90, height=70)
@@ -153,6 +154,18 @@ class FormulationEditor:
 
         self.dropcast = tk.Button(self.action_frame, text="Dropcast", command=lambda: dropcast_popup())
         self.dropcast.place(x=120, y=210, width=90, height=70)
+
+        self.placeholder0 = tk.Button(self.action_frame, text="Placeholder", command=lambda: print("nothing here yet"))
+        self.placeholder0.place(x=20, y=290, width=90, height=70)
+
+        self.error_check = tk.Button(self.action_frame, text="Check for \n Errors", command=lambda: print("nothing here yet"))
+        self.error_check.place(x=120, y=290, width=90, height=70)
+
+        self.load_button = tk.Button(self.action_frame, text="Load Routine", command=lambda: load_routine_popup())
+        self.load_button.place(x=20, y=370, width=90, height=70)
+
+        self.save_button = tk.Button(self.action_frame, text="Save Routine", command=lambda: save_routine_popup())
+        self.save_button.place(x=120, y=370, width=90, height=70)
 
         self.action_buttons = tk.Label(self.action_frame, text="Insert Action", font=("Helvetica", 13, "bold"))
         self.action_buttons.place(x=10, y=10, width=210, height=30)
@@ -288,7 +301,7 @@ class FormulationEditor:
         def dropcast_popup():
             popup = tk.Toplevel(root)
             popup.title("Dropcast")
-            popup.geometry("500x300")
+            popup.geometry("420x150")
 
             xshift = 300
             yshift = 50
@@ -303,16 +316,59 @@ class FormulationEditor:
             ToolTip(self.vol, "volume in mL, like 0.5")
 
             self.star_radio = tk.Radiobutton(popup, text="Star", variable=self.dropcast_type, value="1")
-            self.star_radio.place(x=620-xshift, y=70-yshift, width=110, height=26)
+            self.star_radio.place(x=600-xshift, y=70-yshift, width=80, height=26)
 
             self.square_radio = tk.Radiobutton(popup, text="Square", variable=self.dropcast_type, value="0")
-            self.square_radio.place(x=620-xshift, y=100-yshift, width=110, height=26)
+            self.square_radio.place(x=600-xshift, y=100-yshift, width=80, height=26)
 
             self.addButton = tk.Button(popup, text="Add", command=self.on_dropcast_button)
             self.addButton.place(x=350-xshift, y=110-yshift, width=250, height=30)
             
             self.close_button = tk.Button(popup, text="Close", command=popup.destroy)
-            self.close_button.place(x=350-xshift, y=200, width=250, height=30)
+            self.close_button.place(x=350-xshift, y=100, width=250, height=30)
+
+
+        def save_routine_popup():
+            popup = tk.Toplevel(root)
+            popup.title("Save Routine")
+            popup.geometry("420x150")
+
+            yshift = 50
+            tk.Label(popup, text="Enter Routine Name").place(x=50, y=55-yshift, width=250, height=20)
+            self.name = tk.Entry(popup, textvariable=self.routine_name)
+            self.name.place(x=50, y=70-yshift, width=250, height=30)
+            ToolTip(self.name, "Enter the name you would like to save your routine under here!")
+
+            
+
+            self.addButton = tk.Button(popup, text="Save", command=self.on_save_button)
+            self.addButton.place(x=50, y=110-yshift, width=250, height=30)
+            
+            self.close_button = tk.Button(popup, text="Close", command=popup.destroy)
+            self.close_button.place(x=50, y=100, width=250, height=30)
+
+        def load_routine_popup():
+            
+
+            file_path = filedialog.askopenfilename(
+                title="Select a file",
+                filetypes=(("Text files", "*.txt"), ("All files", "*.*"))
+            )
+
+            # Check if a file was selected (not cancelled)
+            if file_path:
+                print("Selected file:", file_path)
+                with open(file_path, "r") as file:
+                    content = file.read()
+                    #print(content)
+                    self.list_of_components = eval(content)
+
+                    for action in self.list_of_components:
+                        self.add_to_listbox(action[4])
+
+            else:
+                print("No file selected.")
+
 
         def sonicate_popup():
             popup = tk.Toplevel(root)
@@ -576,13 +632,13 @@ class FormulationEditor:
         
         if self.quantity_var.get() == "" and self.mass_var.get() != "" and loc != "": # if a mass was entered but no volume
             mass = int(self.mass_var.get())
-            self.list_of_components.append(("pipette_into_carousel", f"s{loc.upper()}", mass, 'm'))
+            self.list_of_components.append(("pipette_into_carousel", f"s{loc.upper()}", mass, 'm', f"{loc.upper()} : {mass}mg"))
             self.listbox.insert("end", f"{loc.upper()} : {mass}mg")
             self.loc.delete(0, tk.END)
             self.mass_entry.delete(0, tk.END)
         elif self.quantity_var.get() != "" and self.mass_var.get() == "" and loc != "": #vice versa
             quant = int(self.quantity_var.get())
-            self.list_of_components.append(("pipette_into_carousel", f"s{loc.upper()}", quant, 'v'))
+            self.list_of_components.append(("pipette_into_carousel", f"s{loc.upper()}", quant, 'v', f"{loc.upper()} : {quant}uL"))
             self.listbox.insert("end", f"{loc.upper()} : {quant}uL")
             self.loc.delete(0, tk.END)
             self.quantity.delete(0, tk.END)
@@ -600,7 +656,7 @@ class FormulationEditor:
         amount = self.sonicator_amount.get()
         sonic_loc = self.sonicator_position.get()
 
-        #self.list_of_components.append(("sonicate_vial", f"d{loc.upper()}", '', ''))
+        self.list_of_components.append(("sonicate_vial", f"d{sonic_loc.upper()}", '', '', f"{src} -> Sonicator(time={t}, amount={amount})"))
         self.listbox.insert("end", f"{src} -> Sonicator(time={t}, amount={amount})")
         # self.loc.delete(0, tk.END)
 
@@ -632,7 +688,7 @@ class FormulationEditor:
         
         loc = self.dispense_position.get()
 
-        self.list_of_components.append(("move_vial_to_carousel", f"d{loc.upper()}", '', ''))
+        self.list_of_components.append(("move_vial_to_carousel", f"d{loc.upper()}", '', '', f"{loc.upper()} -> Carousel"))
         self.listbox.insert("end", f"{loc.upper()} -> Carousel")
         self.loc.delete(0, tk.END)
        
@@ -640,7 +696,7 @@ class FormulationEditor:
         
         loc = self.dispense_position.get()
 
-        self.list_of_components.append(("move_vial_from_carousel", f"d{loc.upper()}", '', ''))
+        self.list_of_components.append(("move_vial_from_carousel", f"d{loc.upper()}", '', '', f"Carousel -> {loc.upper()}"))
         self.listbox.insert("end", f"Carousel -> {loc.upper()}")
         self.loc.delete(0, tk.END)
 
@@ -649,13 +705,29 @@ class FormulationEditor:
         vol = float(self.dropcast_volume.get())
         drop_type = int(self.dropcast_type.get())
         if drop_type == 0:
-            self.list_of_components.append(("sqdropcast",'', rad, vol))
+            self.list_of_components.append(("sqdropcast",'', rad, vol, f"Square dropcast: r={rad}, v={vol}"))
             self.listbox.insert("end", f"Square dropcast: r={rad}, v={vol}")
         if drop_type == 1:
-                self.list_of_components.append(("stdropcast",'', rad, vol))
+                self.list_of_components.append(("stdropcast",'', rad, vol, f"Star dropcast: r={rad}, v={vol}"))
                 self.listbox.insert("end", f"Star dropcast: r={rad}, v={vol}")
-        #self.rad.delete(0, tk.END)
-        #self.vol.delete(0, tk.END)
+        self.rad.delete(0, tk.END)
+        self.vol.delete(0, tk.END)
+
+    def on_save_button(self):
+        from pathlib import Path
+
+        name = str(self.routine_name.get())
+        routine_text = str(self.list_of_components)
+
+
+        file_path = Path("saved_formulation_routines") / f"{name}.txt"
+
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        file_path.write_text(routine_text, encoding="utf-8")
+        
+
+        self.name.delete(0, tk.END)
 
     def on_pipette_into_source_button(self):
             
@@ -670,7 +742,7 @@ class FormulationEditor:
         
         if self.quantity_var.get() != "" and loc != "": # if we get everything needed
             q = int(self.quantity_var.get())
-            self.list_of_components.append(("pipette_into_source", f"s{loc.upper()}", q/1000, ''))
+            self.list_of_components.append(("pipette_into_source", f"s{loc.upper()}", q/1000, '', f"pipette {q} uL into source rack {loc}"))
             self.listbox.insert("end", f"pipette {q} uL into source rack {loc}")
             self.loc.delete(0, tk.END)
             self.quantity.delete(0, tk.END)
@@ -687,14 +759,10 @@ class FormulationEditor:
 
     def on_formulateButton(self):
         self.robot.formulate_in_order(self.list_of_components)
+
+    def add_to_listbox(self, txt):
+        self.listbox.insert("end", txt)
         
-
-    
-
-
-    def add_to_list(self, loc = "", quantity = 50, current_list = []):
-        current_list.append((loc, quantity))
-        return current_list
 
     
     

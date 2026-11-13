@@ -146,6 +146,29 @@
       ],
       "volume": 1.0,
       "address": 0
+    },
+    "5": {
+      "res_id": "carousel_6x_pow.2023_04_17",
+      "name": "carousel_6x_pow",
+      "pyname": "carousel_6x_pow",
+      "enabled": true,
+      "coord_sys": -1,
+      "x": -0.225,
+      "y": -0.075,
+      "z": 0,
+      "rot": 3.1416,
+      "channels": [
+        {
+          "axis_name": "Rotation",
+          "controller_id": 1,
+          "channel_n": 4
+        },
+        {
+          "axis_name": "Height",
+          "controller_id": 1,
+          "channel_n": 5
+        }
+      ]
     }
   },
   "locations": {
@@ -890,54 +913,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "ciara_disp_rack": {
-      "type": "Grid",
-      "tool": 0,
-      "counts": [
-        4288,
-        5672,
-        22051,
-        22481
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0,
-      "n": [
-        6,
-        5,
-        1
-      ],
-      "pitch": [
-        26,
-        26,
-        0.0
-      ]
-    },
-    "ciara_disp_rack_approach": {
-      "type": "Grid",
-      "tool": 0,
-      "counts": [
-        4288,
-        5672,
-        22051,
-        21981
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null,
-      "rotation": 0,
-      "n": [
-        6,
-        5,
-        1
-      ],
-      "pitch": [
-        26,
-        26,
-        0.0
-      ]
-    },
     "ciara_cap_holder_1": {
       "type": "Location",
       "tool": 0,
@@ -1022,6 +997,104 @@
         9775,
         31832,
         21514
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "ciara_source_rack": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        4288,
+        5672,
+        22051,
+        22481
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        6,
+        5,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "ciara_source_rack_approach": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        4288,
+        5672,
+        22051,
+        21981
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0,
+      "n": [
+        6,
+        5,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "ciara_disp_rack": {
+      "type": "Grid",
+      "tool": 0,
+      "counts": [
+        136,
+        42258,
+        27788,
+        22433
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0.0,
+      "n": [
+        3,
+        6,
+        1
+      ],
+      "pitch": [
+        26,
+        26,
+        0.0
+      ]
+    },
+    "vacuum_col_0": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        -2142,
+        11935,
+        44163,
+        9642
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "vacuum_col_0_aspirate": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        -2142,
+        11935,
+        44163,
+        9642
       ],
       "ik_soln": 0,
       "reference": false,
