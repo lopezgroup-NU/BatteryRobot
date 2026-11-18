@@ -358,8 +358,21 @@ def example_cp_test(cell): # not updated to CA tests
         else:
             print(f"!!!!! Found a non IMX or IFC type device. It is called: {device_name}")
     #TODO update so that only a cell number goes in, and the pstat index and imx index are calculated from that
-    mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
-    pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+    imx_list.sort()
+    pstat_list.sort()
+    mux_pstat_index = 0
+    pstat_index = 0 
+    # mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+    if cell < 8:
+        mux_pstat_index = 0
+        pstat_index = 0
+    elif cell < 16:
+        mux_pstat_index = 1
+        pstat_index = 2
+    else:
+        mux_pstat_index = 2
+        pstat_index = 1
+    pstat = tkp.Pstat("Pstat", pstat_list[pstat_index])
     mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
     mux.open()
 
@@ -460,8 +473,19 @@ def run_cp_cell(cell, current, time_run, output_file_name = "chronopotentiometry
             print(f"!!!!! Found a non IMX or IFC type device. It is called: {device_name}")
     imx_list.sort()
     pstat_list.sort()
-    mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
-    pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+    # mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+    mux_pstat_index = 0
+    pstat_index = 0 
+    if cell < 8:
+        mux_pstat_index = 0
+        pstat_index = 0
+    elif cell < 16:
+        mux_pstat_index = 1
+        pstat_index = 2
+    else:
+        mux_pstat_index = 2
+        pstat_index = 1
+    pstat = tkp.Pstat("Pstat", pstat_list[pstat_index])
     mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
     mux.open()
     mux.set_cell(cell-mux_pstat_index*8)
@@ -527,8 +551,19 @@ def run_cp_cell_looping(cells, current=0, time_run=10, output_file_name = "chron
             print(f"!!!!! Found a non IMX or IFC type device. It is called: {device_name}")
     imx_list.sort()
     pstat_list.sort()
-    mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
-    pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+    # mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+    mux_pstat_index = 0
+    pstat_index = 0 
+    if cell < 8:
+        mux_pstat_index = 0
+        pstat_index = 0
+    elif cell < 16:
+        mux_pstat_index = 1
+        pstat_index = 2
+    else:
+        mux_pstat_index = 2
+        pstat_index = 1
+    pstat = tkp.Pstat("Pstat", pstat_list[pstat_index])
     mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
     mux.open()
     mux.set_cell(cell-mux_pstat_index*8)

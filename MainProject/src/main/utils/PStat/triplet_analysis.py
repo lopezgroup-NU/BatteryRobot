@@ -17,6 +17,7 @@ CLI: python triplet_analysis.py <cell_folder> | <data_root> [plate_id]
 
 from __future__ import annotations
 
+import csv  # FIX (plate area): reads area_cm2 from the meta CSVs
 import re
 import sys
 import traceback
@@ -47,7 +48,9 @@ ANALYSIS_DEFAULTS = {
     "apply_reference_correction": False,
     "reference_value": None,                 # V; required only if ref correction ON
     "reference_value_mode": "rhe_crossing_vs_ref",  # or "ref_vs_rhe"
-    "area_cm2": 1.0,
+    # FIX (plate area): None = the plate's area, read from the cell's *_meta.csv
+    # (set in the New Plate dialog); a number here overrides it for every cell
+    "area_cm2": None,
     "mass_g": 1.0,
 
     # --- CA ---
@@ -69,11 +72,32 @@ ANALYSIS_DEFAULTS = {
 }
 
 
+AREA_FALLBACK_CM2 = 0.25  # FIX (plate area): only when no area was recorded (older plates)
+
+
 def _resolve_analysis_params(params=None):
     out = dict(ANALYSIS_DEFAULTS)
     if params:
         out.update(params)
     return out
+
+
+def _area_from_meta(cell_dir):
+    """FIX (plate area): (area_cm2, meta file name) from the newest *_meta.csv in
+    the cell folder that records a valid area; (None, None) if none does."""
+    metas = sorted(Path(cell_dir).glob("*_meta.csv"), key=lambda f: f.stat().st_mtime, reverse=True)
+    for f in metas:
+        try:
+            with open(f, newline="", encoding="utf-8", errors="replace") as fh:
+                for row in csv.reader(fh):
+                    if len(row) >= 2 and row[0] == "area_cm2":
+                        a = float(row[1])
+                        if np.isfinite(a) and a > 0:
+                            return a, f.name
+                        break
+        except (OSError, ValueError):
+            continue
+    return None, None
 
 
 # ======================================================
@@ -516,7 +540,8 @@ def process_cv_csv(cv_csv, R_s, sample_name, out_csv, plot_path, p):
     if ir_skipped_no_rs:
         correction_description += " (iR requested but no valid R_s available)"
 
-    area = float(p["area_cm2"])
+    # FIX (plate area): analyze_cell_folder fills in the plate's area; direct callers get the fallback
+    area = float(p["area_cm2"]) if p.get("area_cm2") is not None else AREA_FALLBACK_CM2
     mass = float(p["mass_g"])
 
     processed = pd.DataFrame({
@@ -909,6 +934,18 @@ def analyze_cell_folder(cell_dir, params=None):
     if m:
         summary["plate_id"] = m.group(1)
         summary["cell_id"] = m.group(2).upper()
+
+    # FIX (plate area): explicit param > plate's area in this cell's meta > fallback
+    if p.get("area_cm2") is not None:
+        p["area_cm2"], source = float(p["area_cm2"]), "explicit"
+    else:
+        area, meta_name = _area_from_meta(cell_dir)
+        if area is not None:
+            p["area_cm2"], source = area, "meta:" + meta_name
+        else:
+            p["area_cm2"], source = AREA_FALLBACK_CM2, "fallback (no area recorded)"
+            print("[analysis] {}: no plate area recorded; using {:g} cm2".format(stem, AREA_FALLBACK_CM2))
+    summary["area_cm2"], summary["area_cm2_source"] = p["area_cm2"], source
 
     R_s = None
 

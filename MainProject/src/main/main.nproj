@@ -709,19 +709,6 @@
       "reference": false,
       "linked_parent_name": null
     },
-    "microplate_test": {
-      "type": "Location",
-      "tool": 0,
-      "counts": [
-        5286,
-        11454,
-        26236,
-        22579
-      ],
-      "ik_soln": 0,
-      "reference": false,
-      "linked_parent_name": null
-    },
     "microplate_test_approach": {
       "type": "Location",
       "tool": 0,
@@ -1062,7 +1049,7 @@
       "ik_soln": 0,
       "reference": false,
       "linked_parent_name": null,
-      "rotation": 0.0,
+      "rotation": 0,
       "n": [
         3,
         6,
@@ -1095,6 +1082,108 @@
         11935,
         44163,
         9642
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "ciara_cell_locations": {
+      "type": "Grid",
+      "tool": 1,
+      "counts": [
+        442,
+        11177,
+        36638,
+        18000
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null,
+      "rotation": 0.0,
+      "n": [
+        6,
+        4,
+        1
+      ],
+      "pitch": [
+        28,
+        31,
+        0.0
+      ]
+    },
+    "ciara_cell_locations_item_copy": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        479,
+        8662,
+        32366,
+        12000
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "ciara_cell_locations_item_copy0": {
+      "type": "Location",
+      "tool": 0,
+      "counts": [
+        477,
+        10810,
+        36531,
+        9200
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "ciara_cell_locations_item_copy1": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        405,
+        11881,
+        37051,
+        18000
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "ciara_cell_locations_item_copy2": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        405,
+        11881,
+        37051,
+        18000
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "ciara_cell_locations_item_copy3": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        430,
+        11483,
+        36900,
+        18000
+      ],
+      "ik_soln": 0,
+      "reference": false,
+      "linked_parent_name": null
+    },
+    "ciara_cell_locations_item_copy4": {
+      "type": "Location",
+      "tool": 1,
+      "counts": [
+        465,
+        10623,
+        36072,
+        18000
       ],
       "ik_soln": 0,
       "reference": false,

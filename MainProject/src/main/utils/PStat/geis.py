@@ -247,11 +247,23 @@ def run_geis_cell(cell, output_file_name = "galvanostatic_eis",  parameter_list 
         else:
             print(f"!!!!! Found a non-IMX or IFC type device. It is called: {device_name}")
 
-    mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
-
+    # mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+    imx_list.sort()
+    pstat_list.sort()
+    mux_pstat_index = 0
+    pstat_index = 0 
+    if cell < 8:
+        mux_pstat_index = 0
+        pstat_index = 0
+    elif cell < 16:
+        mux_pstat_index = 1
+        pstat_index = 2
+    else:
+        mux_pstat_index = 2
+        pstat_index = 1
     print(pstat_list)
     print(mux_pstat_index)
-    pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+    pstat = tkp.Pstat("Pstat", pstat_list[pstat_index])
     print(f"pstat upper frequency limit: {pstat.freq_limit_upper()}")
     mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
     try:

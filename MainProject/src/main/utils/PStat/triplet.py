@@ -26,6 +26,7 @@ import csv
 import pandas as pd
 import copy
 import logging  # FIX (cleanup): used by run_test_cell; was only via star imports
+import threading  # FIX (cell notes): _META_LOCK below is created at import time
 import uuid
 
 # ======= Data Types =======
@@ -69,7 +70,8 @@ PLATE_LOG_DIRECTORY = "C:\\AttomRobotFiles\\Software\\BatteryRobot\\MainProject\
 AUTO_ANALYZE = True  # regenerate plots after every test (triplet_analysis.analyze_cell_folder)
 
 # Headers for log files
-SAMPLE_LOG_COLS = ["plateID", "Date", "Operator", "Hypothesis", "Notes"]
+AREA_COL = "Area (cm2)"  # FIX (plate area): electrode area set in the New Plate dialog
+SAMPLE_LOG_COLS = ["plateID", "Date", "Operator", "Hypothesis", "Notes", AREA_COL]
 PLATE_LOG_COLS = ["PlateID", "Cell Position", "Material Name", "Catalyst Loading",
                   "Nafion Loading", "Carbon Black Loading", "Extracted Data", "Comments"]
 
@@ -111,16 +113,24 @@ def write_measurement(measurement, plate_id: str, root: str | Path = ".") -> tup
         ("finish_time", measurement.finish_time.isoformat() if measurement.finish_time else ""),
         ("n_points", 0 if measurement.data is None else len(measurement.data)),  # data points collected
     ]
+    area = _plate_area(plate_id)  # FIX (plate area): from the New Plate dialog via the sample log
+    rows.append(("area_cm2", "" if area is None else area))
+    head = len(rows)  # FIX (cell notes): cell_notes row goes right after n_points / area_cm2
     rows += [(k, measurement.params[k]) for k in sorted(measurement.params)]
     try:
         rows += list(compute_default_analysis(
             measurement.electrochemical_test, measurement.data, measurement.params).items())
     except Exception as e:
         rows += [("analysis_error", repr(e))]
-    with open(meta_path, "w", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(["field", "value"])
-        w.writerows(rows)
+    # FIX (cell notes): note is read and the meta written under _META_LOCK, so a
+    # GUI "Log Notes" press mid-write can neither clobber this file nor be lost;
+    # utf-8 because the note is free text (cp1252 default can't encode e.g. "Ω")
+    with _META_LOCK:
+        rows.insert(head, ("cell_notes", _cell_notes(plate_id, measurement.cell_id)))
+        with open(meta_path, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["field", "value"])
+            w.writerows(rows)
 
     upload_cell_run(plate_id, measurement.cell_id, measurement.cell_num,
                     measurement.electrochemical_test, measurement.params,
@@ -133,7 +143,9 @@ def write_measurement(measurement, plate_id: str, root: str | Path = ".") -> tup
                 from utils.PStat.triplet_analysis import analyze_cell_folder
             except ImportError:
                 from triplet_analysis import analyze_cell_folder
-            analyze_cell_folder(cell_dir)
+            # FIX (plate area): plate's area for the CV normalisation (the new
+            # triplet_analysis also finds it in the meta CSV on its own)
+            analyze_cell_folder(cell_dir, params={"area_cm2": area} if area is not None else None)
         except Exception as e:
             print(f"[analysis] plot generation failed for {cell_dir}: {e}")
     return data_path, meta_path
@@ -178,12 +190,42 @@ def _resolve_params(plate, test, explicit=None):
     return merged
 
 # records one run
-def record_sample(plate_id: str, date, operator: str = "", hypothesis: str = "", notes: str = "", root: str | Path = ".") -> Path:
+def record_sample(plate_id: str, date, operator: str = "", hypothesis: str = "", notes: str = "", root: str | Path = ".",
+                  area_cm2=None) -> Path:  # FIX (plate area): after root -- run_overnight_ca passes root positionally
     if isinstance(date, dt):
         date = date.strftime("%Y%m%d")
     # input_notes = input("Notes for Sample Log: ")
-    return _upsert_csv_row(Path(root) / SAMPLE_LOG_DIRECTORY, SAMPLE_LOG_COLS, ["plateID"],
-                           {"plateID": plate_id, "Date": date, "Operator" : operator, "Hypothesis" : hypothesis, "Notes": notes})
+    path = Path(root) / SAMPLE_LOG_DIRECTORY
+    if area_cm2 is None:  # FIX (plate area): callers that don't know the area keep the logged one
+        area_cm2 = _log_row(path, {"plateID": plate_id}).get(AREA_COL, "")
+    elif _as_area(area_cm2) is not None:
+        # FIX (plate area): remembered in-process first, so a sample log locked
+        # by Excel at plate creation can't lose the area for this session's runs
+        _PLATE_AREAS[str(plate_id)] = _as_area(area_cm2)
+    return _upsert_csv_row(path, SAMPLE_LOG_COLS, ["plateID"],
+                           {"plateID": plate_id, "Date": date, "Operator" : operator, "Hypothesis" : hypothesis, "Notes": notes,
+                            AREA_COL: area_cm2})
+
+
+def _as_area(value):
+    """FIX (plate area): float area (cm2) if finite and > 0, else None."""
+    try:
+        a = float(value)
+    except (TypeError, ValueError):
+        return None
+    return a if 0 < a < float("inf") else None   # nan fails both comparisons
+
+
+_PLATE_AREAS = {}  # FIX (plate area): plate_id -> area_cm2 recorded by this process
+
+
+def _plate_area(plate_id):
+    """FIX (plate area): this plate's electrode area (this session's record_sample,
+    else the sample log); None if unset."""
+    cached = _PLATE_AREAS.get(str(plate_id))
+    if cached is not None:
+        return cached
+    return _as_area(_log_row(SAMPLE_LOG_DIRECTORY, {"plateID": plate_id}).get(AREA_COL))
 
 
 # records a plate cell
@@ -195,6 +237,97 @@ def record_plate_cell(plate_id: str, cell_id: str, material_name: str = "", cata
                             "Catalyst Loading": catalyst_loading, "Nafion Loading": nafion_loading,
                             "Carbon Black Loading": carbon_black_loading, "Extracted Data": extracted_data,
                             "Comments": comments})
+
+
+# FIX (cell notes): the GUI's per-cell entry box -> plate log "Cell Notes" -> every meta file
+def _cell_notes(plate_id, cell_id):
+    """This cell's 'Cell Notes' from the plate log, '' if none. Read the way the
+    GUI writes it (keep_default_na=False) so notes like 'NA' / 'N/A' survive.
+    The GUI logs notes before each cell starts, so this is current when a meta
+    file is written. Never raises -- a log problem must not lose a measurement."""
+    try:
+        df = pd.read_csv(PLATE_LOG_DIRECTORY, dtype=str, keep_default_na=False)
+        if "Cell Notes" not in df.columns:
+            return ""
+        hit = df[(df["PlateID"] == str(plate_id)) & (df["Cell Position"] == str(cell_id))]
+        return str(hit["Cell Notes"].iloc[-1]) if len(hit) else ""
+    except Exception:
+        return ""
+
+
+# FIX (cell notes): serialises every meta write with sync_meta_cell_notes below
+_META_LOCK = threading.Lock()
+
+
+def _set_meta_field(meta_path, key, value, after=None):
+    """Set `key` in a field,value meta CSV (inserted after the `after` row if
+    absent). True if the file was rewritten; False if unchanged / not a meta."""
+    meta_path = Path(meta_path)
+    value = "" if value is None else str(value)
+    with open(meta_path, newline="", encoding="utf-8") as f:
+        rows = list(csv.reader(f))
+    if not rows or rows[0][:2] != ["field", "value"]:
+        return False                       # not one of ours -- leave it alone
+    for r in rows[1:]:
+        if r and r[0] == key:
+            if r[1:2] == [value]:
+                return False               # already current: no rewrite
+            r[1:] = [value]
+            break
+    else:
+        if not value:
+            return False                   # older meta, no note to add
+        pos = next((k + 1 for k, r in enumerate(rows) if r and r[0] == after), len(rows))
+        rows.insert(pos, [key, value])
+    tmp = meta_path.with_name(meta_path.name + ".tmp")
+    with open(tmp, "w", newline="", encoding="utf-8") as f:
+        csv.writer(f).writerows(rows)
+    try:
+        os.replace(str(tmp), str(meta_path))  # atomic; fails if the meta is open in Excel
+    except Exception:
+        try:
+            os.remove(str(tmp))
+        except OSError:
+            pass
+        raise
+    return True
+
+
+def sync_meta_cell_notes(plate_id, cell_ids=None, root="."):
+    """FIX (cell notes): copy the plate log's Cell Notes into the cell_notes row
+    of every existing <plate>_<cell>_<TEST>_meta.csv of this plate -- the GUI's
+    Log Notes button. cell_ids=None -> every cell of the plate in the log.
+    Only files whose note changed are rewritten. Returns (n_updated, errors);
+    never raises."""
+    try:
+        log = pd.read_csv(PLATE_LOG_DIRECTORY, dtype=str, keep_default_na=False)
+    except FileNotFoundError:
+        return 0, []
+    except Exception as e:
+        return 0, ["plate log unreadable: {!r}".format(e)]
+    if "Cell Notes" not in log.columns:
+        return 0, []
+    log = log[log["PlateID"] == str(plate_id)]
+    notes = dict(zip(log["Cell Position"], log["Cell Notes"]))  # last row wins, as in _cell_notes
+    if cell_ids is not None:
+        notes = {c: notes[c] for c in cell_ids if c in notes}
+    updated, errors = 0, []
+    for cell_id, note in sorted(notes.items()):
+        stem = _stem(plate_id, cell_id)
+        cell_dir = Path(root) / DATA_DIRECTORY / stem
+        if not cell_dir.is_dir():
+            continue                       # cell never ran
+        for meta_path in sorted(cell_dir.iterdir()):
+            name = meta_path.name
+            if not (name.startswith(stem + "_") and name.endswith("_meta.csv")):
+                continue
+            try:
+                with _META_LOCK:
+                    if _set_meta_field(meta_path, "cell_notes", note, after="n_points"):
+                        updated += 1
+            except Exception as e:
+                errors.append("{}: {!r}".format(name, e))
+    return updated, errors
 
 
 
@@ -231,7 +364,7 @@ PARAM_DEFAULTS = {
         "maxcycle":      2,
         "sample_period": 0.1,
     },
-    "CA": {"voltage": 1.8, "time_run": 120, "sample_period": 0.1},
+    "CA": {"voltage": 1.8, "time_run": 120, "sample_period": 1},
 }
 
 import os
@@ -240,8 +373,8 @@ import threading
 PARAM_DEFAULTS["CA_CYCLE"] = {
     "voltage": 1.8, 
     "overall_time": 7200.0,  # total seconds for the whole run
-    "interval": 0.1,        # seconds spent on each cell before switching
-    "sample_period": 0.0001,    # s between points
+    "interval": 1,        # seconds spent on each cell before switching
+    "sample_period": 0.01,    # s between points
     "idle_mode": "local",    # "local": mux DAC holds selected cells at `voltage; "open": disconnected
     "checkpoint_s": 600.0,   # partial-CSV flush in case of failures; probably update to shorter intervals
 }
@@ -320,7 +453,7 @@ def _run_ca(cell, params, name):
     return run_ca_cell(cell, output_file_name=name,
                        voltage=params.get("voltage", 1.0),
                        time_run=params.get("time_run", 30),
-                       sample_period=params.get("sample_period", 0.1))
+                       sample_period=params.get("sample_period", 1))
 
 def _resolve_cell(plate, row, column) -> int:
     """Hardware index (0-23, mux = index // 8) for a plate position: row-major."""
@@ -459,7 +592,8 @@ def run_test_cell(plate: Plate, row: int, column: str, plate_properties: dict = 
         plate_properties = plate_inputs()                 # prompt if not supplied
     print(f"You are running Cell: {_resolve_cell(plate, row, column)}")
     measurements = run_cell(plate, row, column, tests=tests)   # tests=None -> ACTIVE_TESTS
-    record_sample(plate.plate_id, plate.created_at, plate.config["operator"], plate.config["hypothesis"], plate.config["notes"])
+    record_sample(plate.plate_id, plate.created_at, plate.config["operator"], plate.config["hypothesis"], plate.config["notes"],
+                  area_cm2=plate.config.get("area_cm2"))  # FIX (plate area): None keeps the logged area
     record_plate_cell(plate.plate_id, f"{row}{column}",
                       material_name=plate_properties["materialName"],
                       catalyst_loading=plate_properties["catalystLoading"],
@@ -567,6 +701,7 @@ def upload_cell_run(plate_id, cell_id, cell_num, test, params, time_ran, data_pa
             "material_name": platelog.get("Material Name", ""),
             "hypothesis": sample.get("Hypothesis", ""),
             "notes": sample.get("Notes", ""),
+            "area_cm2": _as_area(sample.get(AREA_COL)),  # FIX (plate area)
             "runs.{}".format(test): run_doc,
             "last_upload": _fmt_time(dt.now()),
         }}, upsert=True)
@@ -616,7 +751,7 @@ from datetime import timedelta
 from utils.PStat import ca as _ca_driver
 
 FULL_REVISIT_S = 60.0
-FULL_VISIT_S = 0.1
+FULL_VISIT_S = 1
 
 
 def _full_runners():
@@ -934,15 +1069,20 @@ def write_full_ca(measurement, plate_id, root="."):
     processed, analysis = analyze_full_ca(measurement.data)
     _atomic_csv(processed, cell_dir / (stem + "_FULL_CA_processed.csv"))
     _atomic_csv(pd.DataFrame([analysis]), cell_dir / (stem + "_FULL_CA_summary.csv"))
+    area = _plate_area(plate_id)  # FIX (plate area)
     fields = {"plateID": plate_id, "cell_id": measurement.cell_id, "row": measurement.row,
               "column": measurement.column, "cell_num": measurement.cell_num,
               "electrochemical_test": "CA", "start_time": measurement.start_time.isoformat(),
               "finish_time": measurement.finish_time.isoformat(), "n_points": len(measurement.data),
+              "area_cm2": "" if area is None else area,  # FIX (plate area)
+              "cell_notes": "",  # FIX (cell notes): filled under _META_LOCK below
               **measurement.params, **analysis}
-    with meta_path.open("w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["field", "value"])
-        writer.writerows(fields.items())
+    with _META_LOCK:  # FIX (cell notes): same lock/encoding as write_measurement
+        fields["cell_notes"] = _cell_notes(plate_id, measurement.cell_id)
+        with meta_path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["field", "value"])
+            writer.writerows(fields.items())
     if MONGO_LIVE_UPLOAD:
         try:
             coll = _get_collection()
@@ -954,6 +1094,7 @@ def write_full_ca(measurement, plate_id, root="."):
                     "mux": measurement.params["hw_cell"] // 8,
                     "material_name": cell.get("Material Name", ""),
                     "hypothesis": sample.get("Hypothesis", ""), "notes": sample.get("Notes", ""),
+                    "area_cm2": _as_area(sample.get(AREA_COL)),  # FIX (plate area)
                     "runs.CA": {"params": _mongo_safe(measurement.params),
                                 "time_ran": _fmt_time(measurement.start_time), "path": str(data_path),
                                 "analysis": _mongo_safe(analysis)},

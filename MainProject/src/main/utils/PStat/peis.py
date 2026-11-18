@@ -239,11 +239,24 @@ def run_peis_cell(cell, output_file_name = "potentiostatic_eis", parameter_list 
 
     imx_list.sort()
     pstat_list.sort()
-    mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
-    if mux_pstat_index >= len(pstat_list) or mux_pstat_index >= len(imx_list):
+    mux_pstat_index = 0
+    pstat_index = 0 
+    if cell < 8:
+        mux_pstat_index = 0
+        pstat_index = 0
+    elif cell < 16:
+        mux_pstat_index = 1
+        pstat_index = 2
+    else:
+        mux_pstat_index = 2
+        pstat_index = 1
+
+    # mux_pstat_index = 0 if cell < 8 else 2 if cell < 16 else 1
+
+    if pstat_index > len(pstat_list) or mux_pstat_index > len(imx_list):
         raise RuntimeError(
             f"cell {cell} needs pstat/mux #{mux_pstat_index} but visible devices are "
-            f"pstats={pstat_list}, muxes={imx_list} (vial pstat {VIAL_PSTAT_SERIAL} excluded). "
+            # f"pstats={pstat_list}, muxes={imx_list} (vial pstat {VIAL_PSTAT_SERIAL} excluded). "
             f"Is that block powered / plugged in?")
     print(pstat_list)
     print(mux_pstat_index)
@@ -264,9 +277,9 @@ def run_peis_cell(cell, output_file_name = "potentiostatic_eis", parameter_list 
     vnoise = 0.0
     ienoise = 0.0
 
-    pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+    pstat = tkp.Pstat("Pstat", pstat_list[pstat_index])
     mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
-
+    print(pstat_list[pstat_index], imx_list[mux_pstat_index])
     steps = []                                   # (freq, ok) per commanded point
     # FIX: the try now starts at mux.open() -- previously the mux was opened and the
     # cell energized BEFORE the try, so a failure during setup leaked both devices
@@ -448,8 +461,21 @@ def run_peis_full(cell, output_file_name = "potentiostatic_eis", parameter_list 
 
         imx_list.sort()
         pstat_list.sort()
-        mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
-        if mux_pstat_index >= len(pstat_list) or mux_pstat_index >= len(imx_list):
+        # mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+        mux_pstat_index = 0
+        pstat_index = 0 
+        # mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+        if cell < 8:
+            mux_pstat_index = 0
+            pstat_index = 0
+        elif cell < 16:
+            mux_pstat_index = 1
+            pstat_index = 2
+        else:
+            mux_pstat_index = 2
+            pstat_index = 1
+        
+        if pstat_index >= len(pstat_list) or mux_pstat_index >= len(imx_list):
             raise RuntimeError(
                 f"cell {cell} needs pstat/mux #{mux_pstat_index} but visible devices are "
                 f"pstats={pstat_list}, muxes={imx_list}. "
@@ -471,7 +497,7 @@ def run_peis_full(cell, output_file_name = "potentiostatic_eis", parameter_list 
     ienoise = 0.0
 
     if hardware is None:
-        pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+        pstat = tkp.Pstat("Pstat", pstat_list[pstat_index])
         mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
     else:
         pstat, mux = hardware.pstat, hardware.mux

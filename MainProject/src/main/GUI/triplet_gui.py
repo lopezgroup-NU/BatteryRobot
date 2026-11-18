@@ -350,8 +350,12 @@ class PlateSetup:
         frame = tk.Frame(root, padx=10, pady=10)
         frame.pack(fill=tk.BOTH, expand=True)
         default_tests = ",".join(triplet.ACTIVE_TESTS)
+        # FIX (plate area): prefill with the last plate's area (New Plate), else 0.25
+        prev = holder.get("plate")
+        default_area = (prev.config.get("area_cm2") if prev is not None else None) or 0.25
         self.vars = {}
         fields = [("Plate ID", ""), ("Operator", ""), ("Hypothesis", ""), ("Notes", ""),
+                  ("Area (cm²)", "{:g}".format(default_area)),  # FIX (plate area)
                   ("Tests (order)", default_tests)]
         for i, (label, default) in enumerate(fields):
             tk.Label(frame, text=label).grid(row=i, column=0, sticky="e", padx=5, pady=4)
@@ -365,11 +369,20 @@ class PlateSetup:
 
     def create_plate(self):
         # read every entry BEFORE the setup widgets are destroyed below
+        # FIX (plate area): validate first so a typo keeps the dialog open
+        try:
+            area = float(self.vars["Area (cm²)"].get().strip())
+        except ValueError:
+            area = float("nan")
+        if not 0 < area < float("inf"):  # also rejects nan
+            messagebox.showerror("Error", "Area (cm²) must be a number above 0.", parent=self.root)
+            return
         pid = self.vars["Plate ID"].get().strip()
         tests_string = self.vars["Tests (order)"].get()
         config = {"operator": self.vars["Operator"].get().strip(),
                   "hypothesis": self.vars["Hypothesis"].get().strip(),
-                  "notes": self.vars["Notes"].get().strip()}
+                  "notes": self.vars["Notes"].get().strip(),
+                  "area_cm2": area}  # FIX (plate area)
         if pid:
             plate = triplet.Plate(plate_id=pid, config=config)
         else:
@@ -377,7 +390,8 @@ class PlateSetup:
         self.holder["plate"] = plate
         try:
             triplet.record_sample(plate.plate_id, plate.created_at, operator=config["operator"],
-                                  hypothesis=config["hypothesis"], notes=config["notes"])
+                                  hypothesis=config["hypothesis"], notes=config["notes"],
+                                  area_cm2=config["area_cm2"])  # FIX (plate area)
         except Exception as e:
             print("sample log auto-record failed: {!r}".format(e))
         # reuse the same Tk root for the grid (a second Tk() instance leaves
@@ -660,7 +674,11 @@ class PlateGrid:
         never blank out an existing note; Material/Comments columns are never
         touched; nothing is rewritten when there is no actual change.
         auto=True (run starts) is silent when there is nothing to do and never
-        pops a modal dialog -- a log problem must not block hardware."""
+        pops a modal dialog -- a log problem must not block hardware.
+        FIX (cell notes): the logged notes are then mirrored into the cell_notes
+        row of every meta file the plate already has (triplet.sync_meta_cell_notes):
+        a manual press syncs every cell of the plate, auto only cells whose note
+        just changed. Runs still in progress pick the note up when they write."""
         import os
         import pandas as pd
         path = triplet.PLATE_LOG_DIRECTORY
@@ -694,6 +712,7 @@ class PlateGrid:
             df = df[[c for c in df.columns if c != "Cell Notes"] + ["Cell Notes"]]
             pid = str(self.plate.plate_id)
             added = updated = 0
+            changed = []  # FIX (cell notes): cells whose logged note changed -> meta sync
             for cell_id in sorted(want):
                 mask = (df["PlateID"] == pid) & (df["Cell Position"] == cell_id)
                 if mask.any():
@@ -703,6 +722,7 @@ class PlateGrid:
                             (df.loc[mask, "Cell Notes"] != notes[cell_id]).any():
                         df.loc[mask, "Cell Notes"] = notes[cell_id]
                         updated += int(mask.sum())
+                        changed.append(cell_id)
                 else:
                     row = {c: "" for c in df.columns}
                     row["PlateID"] = pid
@@ -710,6 +730,8 @@ class PlateGrid:
                     row["Cell Notes"] = notes.get(cell_id, "")
                     df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
                     added += 1
+                    if cell_id in notes:
+                        changed.append(cell_id)
             if added or updated:      # FIX: no pointless rewrite every run start
                 df.to_csv(path, index=False)
         except Exception as e:
@@ -722,9 +744,29 @@ class PlateGrid:
                 messagebox.showerror("Error", "Could not write the plate log ({}) -- "
                                      "is it open in Excel?\n{}".format(path, e))
             return
-        if added or updated or not auto:
-            self.status_var.set("Plate log: {} row(s) added, {} updated -> {}".format(
-                added, updated, path))
+        # FIX (cell notes): mirror the plate log into this plate's meta files.
+        # Only after the plate log write succeeded, so meta never gets ahead of it.
+        meta_note = ""
+        if not auto or changed:
+            sync = getattr(triplet, "sync_meta_cell_notes", None)
+            if sync is None:
+                print("[gui] meta notes skipped: the deployed triplet.py is OLD -- "
+                      "redeploy it (sync_meta_cell_notes is missing)")
+            else:
+                try:
+                    n_meta, meta_errs = sync(self.plate.plate_id,
+                                             cell_ids=changed if auto else None)
+                except Exception as e:  # sync never raises; belt and braces
+                    n_meta, meta_errs = 0, [repr(e)]
+                for err in meta_errs:
+                    print("[gui] meta note not written: {}".format(err))
+                if n_meta or meta_errs:
+                    meta_note = ", {} meta file(s) updated".format(n_meta)
+                if meta_errs:
+                    meta_note += ", {} NOT updated (open in Excel? see shell)".format(len(meta_errs))
+        if added or updated or not auto or meta_note:
+            self.status_var.set("Plate log: {} row(s) added, {} updated{} -> {}".format(
+                added, updated, meta_note, path))
 
     def _ui(self, fn):
         self.ui_q.put(fn)  # worker threads must never touch tkinter directly

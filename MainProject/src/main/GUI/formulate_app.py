@@ -155,8 +155,8 @@ class FormulationEditor:
         self.dropcast = tk.Button(self.action_frame, text="Dropcast", command=lambda: dropcast_popup())
         self.dropcast.place(x=120, y=210, width=90, height=70)
 
-        self.placeholder0 = tk.Button(self.action_frame, text="Placeholder", command=lambda: print("nothing here yet"))
-        self.placeholder0.place(x=20, y=290, width=90, height=70)
+        self.filter = tk.Button(self.action_frame, text="Vacuum \nFilter", command=lambda: filtration_popup())
+        self.filter.place(x=20, y=290, width=90, height=70)
 
         self.error_check = tk.Button(self.action_frame, text="Check for \n Errors", command=lambda: print("nothing here yet"))
         self.error_check.place(x=120, y=290, width=90, height=70)
@@ -326,6 +326,104 @@ class FormulationEditor:
             
             self.close_button = tk.Button(popup, text="Close", command=popup.destroy)
             self.close_button.place(x=350-xshift, y=100, width=250, height=30)
+
+        def filtration_popup():
+            #TODO add filtration stuff. 
+            """
+            There should be like sub-popups which let you add washing and extraction steps, respectively. 
+            Then once you get everything added in in our non-sub-popup, you should be able to press add 
+            and it should send all of the lists and values needed back to the robot to perform actions!
+            """
+            popup = tk.Toplevel(root)
+            popup.title("Vacuum Filter")
+            popup.geometry("470x370")
+
+            self.wash_source = tk.StringVar()
+            self.wash_amount = tk.StringVar()
+
+            self.wash_vial_list = []
+            self.wash_amount_list = []
+
+            self.extract_source = tk.StringVar()
+            self.extract_amount = tk.StringVar()
+
+            self.extract_vial_list = []
+            self.extract_amount_list = []
+
+            self.wash_list = tk.Listbox(root)
+            self.wash_list.insert("end", "Item 1")
+            self.wash_list.insert("end", "Item 2")
+            self.wash_list.insert("end", "Item 3")
+            self.wash_list.place(x=20, y=50, width=130, height=210)
+
+            self.label1 = tk.Label(root, text="Washing Solvents")
+            self.label1.place(x=40, y=10, width=90, height=40)
+
+            self.label2 = tk.Label(root, text="Extraction Solvents")
+            self.label2.place(x=190, y=10, width=90, height=40)
+
+            self.extract_list = tk.Listbox(root)
+            self.extract_list.insert("end", "Item 1")
+            self.extract_list.insert("end", "Item 2")
+            self.extract_list.insert("end", "Item 3")
+            self.extract_list.place(x=170, y=50, width=130, height=210)
+
+            self.add_wash = tk.Button(root, text="Add Washing Step", command=lambda: on_add_wash())
+            self.add_wash.place(x=320, y=50, width=130, height=50)
+
+            self.add_extract = tk.Button(root, text="Add Extraction Solvent", command=lambda: on_add_extract())
+            self.add_extract.place(x=320, y=110, width=130, height=50)
+
+            self.reset_wash = tk.Button(root, text="Reset", command=lambda: on_reset_wash())
+            self.reset_wash.place(x=20, y=270, width=130, height=30)
+
+            self.reset_extract = tk.Button(root, text="Reset", command=lambda: on_reset_extract())
+            self.reset_extract.place(x=170, y=270, width=130, height=30)
+
+            self.add_button = tk.Button(root, text="Add to Formulation", command=lambda: on_add_button())
+            self.add_button.place(x=320, y=175, width=130, height=110)
+
+            self.close_button = tk.Button(root, text="Close Without Saving", command=lambda: on_close_button())
+            self.close_button.place(x=20, y=310, width=280, height=40)
+
+            def on_add_wash(self):
+                popup2 = tk.Toplevel(popup)
+                popup2.title("Add Washing Step")
+                popup2.geometry("420x150")
+    
+                tk.Label(popup2, text="Vial Location").place(x=50, y=5, width=100, height=20)
+                self.rad = tk.Entry(popup2, textvariable=self.wash_source)
+                self.rad.place(x=50, y=20, width=100, height=30)
+                ToolTip(self.rad, "Side length of the square, in millimeters")
+    
+                tk.Label(popup2, text="Volume(mL)").place(x=160, y=5, width=100, height=20)
+                self.vol = tk.Entry(popup2, textvariable=self.wash_amount)
+                self.vol.place(x=160, y=20, width=100, height=30)
+                ToolTip(self.vol, "volume in mL, like 0.5")
+
+                self.addButton = tk.Button(popup2, text="Add", command=lambda: print("nothing here yet"))
+                self.addButton.place(x=50, y=60, width=250, height=30)
+                
+                self.close_button = tk.Button(popup2, text="Close", command=popup2.destroy)
+                self.close_button.place(x=50, y=100, width=250, height=30)
+                pass
+
+            def on_add_extract(self):
+                pass
+
+            def on_reset_wash(self):
+                pass
+
+            def on_reset_extract(self):
+                pass
+
+            def on_add_button(self):
+                pass
+
+            def on_close_button(self):
+                pass
+
+            
 
 
         def save_routine_popup():
@@ -699,6 +797,19 @@ class FormulationEditor:
         self.list_of_components.append(("move_vial_from_carousel", f"d{loc.upper()}", '', '', f"Carousel -> {loc.upper()}"))
         self.listbox.insert("end", f"Carousel -> {loc.upper()}")
         self.loc.delete(0, tk.END)
+
+    def on_filtration_button(self):
+        rad = float(self.dropcast_radius.get())
+        vol = float(self.dropcast_volume.get())
+        drop_type = int(self.dropcast_type.get())
+        if drop_type == 0:
+            self.list_of_components.append(("sqdropcast",'', rad, vol, f"Square dropcast: r={rad}, v={vol}"))
+            self.listbox.insert("end", f"Square dropcast: r={rad}, v={vol}")
+        if drop_type == 1:
+                self.list_of_components.append(("stdropcast",'', rad, vol, f"Star dropcast: r={rad}, v={vol}"))
+                self.listbox.insert("end", f"Star dropcast: r={rad}, v={vol}")
+        self.rad.delete(0, tk.END)
+        self.vol.delete(0, tk.END)
 
     def on_dropcast_button(self):
         rad = float(self.dropcast_radius.get())

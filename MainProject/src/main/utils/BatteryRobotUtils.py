@@ -832,6 +832,12 @@ class BatteryRobot(NorthC9):
         self.remove_pipette()
         self.cap_and_return_vial_to_rack(original_position)
 
+    def check_dispense_locs(self):
+        #CELL_LOCATIONS = [[80, 11990, 30490, 20180], [80, 9930, 28793, 20390], [80, 8200, 27650, 20419], [80, 6712, 26800, 20238], [77, 12924, 32732, 20368], [78, 10894, 31231, 20586], [74, 9136, 30126, 20348], [76, 7688, 29445, 20621], [143, 14370, 35489, 20349], [146, 12028, 33688, 20617], [164, 10216, 32602, 20480], [164, 8852, 32081, 20650], [252, 16198, 38589, 20491], [252, 13593, 36557, 20738], [266, 11628, 35322, 20409], [267, 10121, 34701, 21068], [310, 20400, 44187, 20505], [340, 15617, 39720, 21132], [342, 13354, 38268, 21125], [353, 11665, 37438, 20768], [559, 20616, 45358, 20413], [640, 19016, 44405, 20413], [635, 15412, 41419, 20931], [650, 13516, 40415, 21015]]
+        for loc in ciara_cell_locations:
+            self.delay(0.1)
+            self.goto_safe(loc)
+
     def run_cell_tests(self, cell_triplet_seeds, source, mL_to_dispense, cp_amps, test_run = True):
         """
         Docstring for run_cell_tests
@@ -1133,7 +1139,18 @@ class BatteryRobot(NorthC9):
         imx_list.sort()
         pstat_list.sort()
 
-        mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+        # mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+        mux_pstat_index = 0
+        pstat_index = 0 
+        if cell < 8:
+            mux_pstat_index = 0
+            pstat_index = 0
+        elif cell < 16:
+            mux_pstat_index = 1
+            pstat_index = 2
+        else:
+            mux_pstat_index = 2
+            pstat_index = 1
         print(imx_list)
         print(pstat_list)
 

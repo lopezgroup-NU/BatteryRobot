@@ -7,8 +7,8 @@ from Locator import *
 
 # ---- source vial (uncapped) ----
 # SOURCE_VIAL_APPROACH = [1021, 35980, 39915, 15937]   # above the vial; simulate pulls its 1 mL of air here
-SOURCE_VIAL = [1021, 35980, 39915, 21512] 
-SOURCE_VIAL_APPROACH = [1021, 35980, 39919, 21512]            # tip in the liquid; draw aspirates here
+SOURCE_VIAL = [146, 36130, 39925, 19752]
+SOURCE_VIAL_APPROACH = [146, 36130, 39925, 19752]            # tip in the liquid; draw aspirates here
 
 # ---- where the tip dispenses into each cell ----
 UNIFORM_Z = 20179

@@ -286,7 +286,7 @@ run_cv2 = run_cv_output
 def run_cv_cell(cell, output_file_name = "chronovoltometry", values = [[0, 1.8, 1.08, 0], [0.01, 0.01, 0.01], [0.05, 0.05, 0.05], 2, 0.1], electrode_used = "Pt", path_to_save_to = r"C:\AttomRobotFiles\Data\DB_Ciara\cv", save_to_db_folder = True, standard = False, potentials_to_hold = [[0,0]], stop_event = None):
     """Plate-rig CV on one cell (0-23). Returns a DataFrame; the caller (triplet.py)
     owns saving/metadata. output_file_name etc. kept for signature compatibility.
-                                       [[voltagelist],[  scanrates  ],[   holdtimes   ], maxcycles, sample_period]"""
+                                       [[voltagelist],[  scanrates V/s ],[   holdtimes   ], maxcycles, sample_period]"""
     _ensure_tkp("open_circuit_voltage.py")  # FIX: was tkp.toolkitpy_init on every call (24x per plate)
     device_list = tkp.enum_sections()
     imx_list = []
@@ -299,9 +299,21 @@ def run_cv_cell(cell, output_file_name = "chronovoltometry", values = [[0, 1.8, 
             pstat_list.append(device_name)
         else:
             print(f"!!!!! Found a non IMX or IFC type device. It is called: {device_name}")
-    mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+    # mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
     imx_list.sort()
     pstat_list.sort()
+
+    mux_pstat_index = 0
+    pstat_index = 0 
+    if cell < 8:
+        mux_pstat_index = 0
+        pstat_index = 0
+    elif cell < 16:
+        mux_pstat_index = 1
+        pstat_index = 2
+    else:
+        mux_pstat_index = 2
+        pstat_index = 1
     print(pstat_list)
     print(mux_pstat_index)
     if mux_pstat_index >= len(pstat_list):
@@ -309,7 +321,7 @@ def run_cv_cell(cell, output_file_name = "chronovoltometry", values = [[0, 1.8, 
             f"cell {cell} needs plate pstat #{mux_pstat_index} but only {pstat_list} are visible "
             # f"(vial pstat {VIAL_PSTAT_SERIAL} excluded). Is a plate IFC1010 powered off / unplugged?"
         )
-    pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+    pstat = tkp.Pstat("Pstat", pstat_list[pstat_index])
     mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
     # FIX: close mux/pstat on every exit -- an exception here used to leak GamryCom
     # leases (DEVICE_IN_USE on the next run)

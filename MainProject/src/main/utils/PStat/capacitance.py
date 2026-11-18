@@ -96,12 +96,23 @@ def run_capacitance_cell(cell, output_file_name="capacitance",
     device_list = tkp.enum_sections()
     imx_list = sorted(d for d in device_list if d[0:3] == "IMX")
     pstat_list = sorted(d for d in device_list if d[0:3] == "IFC")
-    mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+    # mux_pstat_index = 0 if cell < 8 else 1 if cell < 16 else 2
+    mux_pstat_index = 0
+    pstat_index = 0 
+    if cell < 8:
+        mux_pstat_index = 0
+        pstat_index = 0
+    elif cell < 16:
+        mux_pstat_index = 1
+        pstat_index = 2
+    else:
+        mux_pstat_index = 2
+        pstat_index = 1
     
     if mux_pstat_index >= len(pstat_list):
         raise RuntimeError(
             f"cell {cell} needs plate pstat #{mux_pstat_index} but only {pstat_list} are visible")
-    pstat = tkp.Pstat("Pstat", pstat_list[mux_pstat_index])
+    pstat = tkp.Pstat("Pstat", pstat_list[pstat_index])
     mux = tkp.IMX("IMX", imx_list[mux_pstat_index])
     try:
         mux.open()
