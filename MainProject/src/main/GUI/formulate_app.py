@@ -91,7 +91,7 @@ class FormulationEditor:
         self.root = root
         self.robot = robot
         root.title("Formulation Editor")
-        root.geometry("600x620")
+        root.geometry("700x620")
 
         self.source_position = tk.StringVar(value="A1")
         self.sonicator_source = tk.StringVar(value="A1")
@@ -103,14 +103,22 @@ class FormulationEditor:
         self.sonicate_text = tk.StringVar(value="Sonicate")
         self.sonicator = Sonicator()
         self.sonicator_busy = False
+
         self.dispense_position = tk.StringVar(value="A1")
         self.quantity_var = tk.StringVar()
         self.choice_var = tk.StringVar()
         self.mass_var = tk.StringVar()
+
         self.dropcast_radius = tk.StringVar()
         self.dropcast_volume = tk.StringVar()
         self.dropcast_type = tk.StringVar()
+
         self.routine_name = tk.StringVar()
+
+        self.heatloc = tk.StringVar()
+        self.heat_rack_0_temp = tk.StringVar()
+        self.heat_rack_1_temp = tk.StringVar()
+        
         # self.chemLabel = tk.Label(root, text="Add Chemical", font=("Helvetica", 11, "bold underline"))
         # self.chemLabel.place(x=350, y=20, width=160, height=30)
         
@@ -125,7 +133,7 @@ class FormulationEditor:
         self.dleButton.place(x=220, y=20, width=70, height=30)
 
         self.formulateButton = tk.Button(root, text="Formulate", command=self.on_formulateButton, font=("Helvetica", 20, "bold"))
-        self.formulateButton.place(x=350, y=500, width=230, height=100)
+        self.formulateButton.place(x=350, y=500, width=330, height=100)
 
         
 
@@ -135,7 +143,7 @@ class FormulationEditor:
         self.compsLabel.place(x=10, y=20, width=130, height=30)
 
         self.action_frame = tk.Frame(root, relief="groove", bd=2)
-        self.action_frame.place(x=350, y=20, width=230, height=460)
+        self.action_frame.place(x=350, y=20, width=330, height=460)
 
         self.vial_to_carousel = tk.Button(self.action_frame, text="Move Vial\n to Carousel", command=lambda: move_to_carousel_popup())
         self.vial_to_carousel.place(x=20, y=50, width=90, height=70)
@@ -170,8 +178,23 @@ class FormulationEditor:
         self.action_buttons = tk.Label(self.action_frame, text="Insert Action", font=("Helvetica", 13, "bold"))
         self.action_buttons.place(x=10, y=10, width=210, height=30)
 
-    
+        #third column buttons
+        self.placeholder0 = tk.Button(self.action_frame, text="Heat Vials", command=lambda: heat_vial_popup())
+        self.placeholder0.place(x=220, y=50, width=90, height=70)
 
+        self.placeholder1 = tk.Button(self.action_frame, text="placeholder", command=lambda: print("nothing here yet"))
+        self.placeholder1.place(x=220, y=130, width=90, height=70)
+
+        self.placeholder2 = tk.Button(self.action_frame, text="placeholder", command=lambda: print("nothing here yet"))
+        self.placeholder2.place(x=220, y=210, width=90, height=70)
+
+        self.placeholder3 = tk.Button(self.action_frame, text="placeholder", command=lambda: print("nothing here yet"))
+        self.placeholder3.place(x=220, y=290, width=90, height=70)
+
+        self.placeholder4 = tk.Button(self.action_frame, text="placeholder", command=lambda: print("nothing here yet"))
+        self.placeholder4.place(x=220, y=370, width=90, height=70)
+
+        
         def move(lb, direction):
             try:
                 # Get selected item index
@@ -301,31 +324,67 @@ class FormulationEditor:
         def dropcast_popup():
             popup = tk.Toplevel(root)
             popup.title("Dropcast")
-            popup.geometry("420x150")
+            popup.geometry("420x380")
 
             xshift = 300
             yshift = 50
-            tk.Label(popup, text="Radius(mm)").place(x=350-xshift, y=55-yshift, width=100, height=20)
+            tk.Label(popup, text="Radius(mm)").place(x=50, y=55-yshift, width=100, height=20)
             self.rad = tk.Entry(popup, textvariable=self.dropcast_radius)
             self.rad.place(x=350-xshift, y=70-yshift, width=100, height=30)
             ToolTip(self.rad, "Side length of the square, in millimeters")
 
-            tk.Label(popup, text="Volume(mL)").place(x=460-xshift, y=55-yshift, width=100, height=20)
+            tk.Label(popup, text="Volume(mL)").place(x=160, y=55-yshift, width=100, height=20)
             self.vol = tk.Entry(popup, textvariable=self.dropcast_volume)
             self.vol.place(x=460-xshift, y=70-yshift, width=100, height=30)
             ToolTip(self.vol, "volume in mL, like 0.5")
 
+            tk.Label(popup, text="Location").place(x=270, y=55-yshift, width=100, height=20)
+            self.loc = tk.Entry(popup, textvariable=self.heatloc)
+            self.loc.place(x=270, y=20, width=100, height=30)
+            ToolTip(self.loc, "Location; like \"A1\"")
+
             self.star_radio = tk.Radiobutton(popup, text="Star", variable=self.dropcast_type, value="1")
-            self.star_radio.place(x=600-xshift, y=70-yshift, width=80, height=26)
+            self.star_radio.place(x=600-xshift, y=70, width=80, height=26)
 
             self.square_radio = tk.Radiobutton(popup, text="Square", variable=self.dropcast_type, value="0")
-            self.square_radio.place(x=600-xshift, y=100-yshift, width=80, height=26)
+            self.square_radio.place(x=600-xshift, y=100, width=80, height=26)
+
+            #we are copying the heat rack location picking code here from heat_vial_popup
+            self.heat_rack = tk.LabelFrame(popup, text="Heating Rack Dropcast Grid", bg="#f6f7fe", relief="groove")
+            self.heat_rack.place(x=50, y=60, width=250, height=200)
+                        
+            COLS = ["A", "B", "C", "D"]
+            ROWS = ["1", "2", "3", "4"]
+
+            for col_idx, col_label in enumerate(COLS):
+                header = tk.Label(self.heat_rack, text=col_label, font=("Arial", 10, "bold"))
+                header.grid(row=0, column=col_idx + 1, padx=10, pady=5)
+
+            for r_idx, row_label in enumerate(ROWS):
+
+                header = tk.Label(self.heat_rack, text=row_label, font=("Arial", 10, "bold"))
+                header.grid(row=r_idx + 1, column=0, padx=10, pady=5)
+                
+                for c_idx, col_label in enumerate(COLS):
+                    # Create the position string
+                    pos_value = f"{col_label}{row_label}"
+                    
+                    # Create the radio button
+                    rb = tk.Radiobutton(
+                        self.heat_rack, 
+                        text=pos_value, 
+                        variable=self.heatloc, 
+                        value=pos_value
+                    )
+                    
+                    # Place it in the grid window (+1 accounts for headers)
+                    rb.grid(row=r_idx + 1, column=c_idx + 1, padx=5, pady=5)
 
             self.addButton = tk.Button(popup, text="Add", command=self.on_dropcast_button)
-            self.addButton.place(x=350-xshift, y=110-yshift, width=250, height=30)
+            self.addButton.place(x=350-xshift, y=280, width=250, height=30)
             
             self.close_button = tk.Button(popup, text="Close", command=popup.destroy)
-            self.close_button.place(x=350-xshift, y=100, width=250, height=30)
+            self.close_button.place(x=350-xshift, y=320, width=250, height=30)
 
         def filtration_popup():
             #TODO add filtration stuff. 
@@ -691,6 +750,112 @@ class FormulationEditor:
             self.close_button.place(x=350-xshift, y=380, width=250, height=30)
             #close_button.pack(pady=10)
 
+        def heat_vial_popup():
+            popup = tk.Toplevel(root)
+            popup.title("Heat vial")
+            popup.geometry("1000x420")
+
+            self.heat_rack_0_label = tk.Label(popup, text="Upper Rack Temp.", font=("Arial", 10))
+            self.heat_rack_0_label.place(x=780, y=100, width=130, height=30)
+            self.heat_rack_0_entry = tk.Entry(popup, textvariable=self.heat_rack_0_temp)
+            self.heat_rack_0_entry.place(x=780, y=130, width=100, height=30)
+            ToolTip(self.heat_rack_0_entry, "Temperature in degrees Celsius, like 60")
+
+            self.heat_rack_1_label = tk.Label(popup, text="Lower Rack Temp.", font=("Arial", 10))
+            self.heat_rack_1_label.place(x=780, y=220, width=130, height=30)
+            self.heat_rack_1_entry = tk.Entry(popup, textvariable=self.heat_rack_1_temp)
+            self.heat_rack_1_entry.place(x=780, y=250, width=100, height=30)
+            ToolTip(self.heat_rack_1_entry, "Temperature in degrees Celsius, like 60")
+
+            self.loc = tk.Entry(popup, textvariable=self.dispense_position)
+            self.loc.place(x=50, y=20, width=60, height=30)
+            ToolTip(self.loc, "Location; like \"A1\"")
+
+            self.dispense_rack = tk.LabelFrame(popup, text="Dispense Rack", bg="#f6f7fe", relief="groove")
+            self.dispense_rack.place(x=50, y=100, width=460, height=270)
+                        
+            COLS = ["A", "B", "C", "D", "E", "F", "G"] #there is technically supposed to be an H here but it's unindexable rn #TODO
+            ROWS = ["1", "2", "3", "4", "5", "6"]
+
+            for col_idx, col_label in enumerate(COLS):
+                header = tk.Label(self.dispense_rack, text=col_label, font=("Arial", 10, "bold"))
+                header.grid(row=0, column=col_idx + 1, padx=10, pady=5)
+
+            for r_idx, row_label in enumerate(ROWS):
+
+                header = tk.Label(self.dispense_rack, text=row_label, font=("Arial", 10, "bold"))
+                header.grid(row=r_idx + 1, column=0, padx=10, pady=5)
+                
+                for c_idx, col_label in enumerate(COLS):
+
+                    if not ((col_label=="D" or col_label=="E" or col_label=="F" or col_label=="G" or col_label=="H") and int(row_label) < 4) and not ((col_label=="E" or col_label=="F" or col_label=="G" or col_label=="H") and int(row_label) == 4):
+
+                        # Create the position string
+                        pos_value = f"{col_label}{row_label}"
+                        
+                        # Create the radio button
+                        rb = tk.Radiobutton(
+                            self.dispense_rack, 
+                            text=pos_value, 
+                            variable=self.dispense_position, 
+                            value=pos_value
+                        )
+                        
+                        # Place it in the grid window (+1 accounts for headers)
+                        rb.grid(row=r_idx + 1, column=c_idx + 1, padx=5, pady=5)
+
+            rbc = tk.Radiobutton(
+                self.dispense_rack, 
+                text="CAROUSEL", 
+                variable=self.dispense_position, 
+                value="CAROUSEL"
+            )
+            rbc.grid(row=1, column=6, padx=5, pady=5)
+
+            self.heatloc_entry = tk.Entry(popup, textvariable=self.heatloc)
+            self.heatloc_entry.place(x=520, y=20, width=60, height=30)
+            ToolTip(self.heatloc_entry, "Location; like \"A1\"")
+
+            self.heat_rack = tk.LabelFrame(popup, text="Heating Racks", bg="#f6f7fe", relief="groove")
+            self.heat_rack.place(x=520, y=100, width=250, height=270)
+                        
+            COLS = ["A", "B", "C", "D"]
+            ROWS = ["1", "2", "3", "4", "5", "6"]
+
+            for col_idx, col_label in enumerate(COLS):
+                header = tk.Label(self.heat_rack, text=col_label, font=("Arial", 10, "bold"))
+                header.grid(row=0, column=col_idx + 1, padx=10, pady=5)
+
+            for r_idx, row_label in enumerate(ROWS):
+
+                header = tk.Label(self.heat_rack, text=row_label, font=("Arial", 10, "bold"))
+                header.grid(row=r_idx + 1, column=0, padx=10, pady=5)
+                
+                for c_idx, col_label in enumerate(COLS):
+                    # Create the position string
+                    pos_value = f"{col_label}{row_label}"
+                    
+                    # Create the radio button
+                    rb = tk.Radiobutton(
+                        self.heat_rack, 
+                        text=pos_value, 
+                        variable=self.heatloc, 
+                        value=pos_value
+                    )
+                    
+                    # Place it in the grid window (+1 accounts for headers)
+                    rb.grid(row=r_idx + 1, column=c_idx + 1, padx=5, pady=5)
+
+            self.separator1 = ttk.Separator(self.heat_rack, orient="horizontal")
+            self.separator1.place(x=20, y=132, width=210, height=5)
+
+            self.addButton = tk.Button(popup, text="Add", command=self.on_heat_vial)
+            self.addButton.place(x=50, y=60, width=250, height=30)
+            
+            self.close_button = tk.Button(popup, text="Close", command=popup.destroy)
+            self.close_button.place(x=50, y=380, width=250, height=30)
+
+
         self.listbox = tk.Listbox(root)
         
         self.listbox.place(x=20, y=60, width=270, height=550)
@@ -715,6 +880,30 @@ class FormulationEditor:
         pass
 
     def on_arbitrary_move(self):
+        pass
+
+    def on_heat_vial(self):
+
+        grab_loc = self.dispense_position.get()
+        heat_loc = self.heatloc.get()
+        rack0temp = float(self.heat_rack_0_temp.get())
+        rack1temp = float(self.heat_rack_1_temp.get())
+
+
+        if grab_loc == "CAROUSEL":
+            self.list_of_components.append(("heat_vial", "carousel", f"{heat_loc.upper()}", [rack0temp, rack1temp], f"Carousel -> Heat Rack {heat_loc.upper()}; H0@ {rack0temp}C, H1@ {rack1temp}C"))
+            self.listbox.insert("end", f"Carousel -> Heat Rack {heat_loc.upper()}; H0@ {rack0temp}C, H1@ {rack1temp}C")
+            self.loc.delete(0, tk.END)
+            self.heatloc_entry.delete(0, tk.END)
+            self.heat_rack_0_entry.delete(0, tk.END)
+            self.heat_rack_1_entry.delete(0, tk.END)
+        else:
+            self.list_of_components.append(("heat_vial", f"d{grab_loc.upper()}", f"{heat_loc.upper()}", [rack0temp, rack1temp],f"Carousel -> Heat Rack {heat_loc.upper()}; H0@ {rack0temp}C, H1@ {rack1temp}C"))
+            self.listbox.insert("end", f"Carousel -> Heat Rack {heat_loc.upper()}; H0@ {rack0temp}C, H1@ {rack1temp}C")
+            self.loc.delete(0, tk.END)
+            self.heatloc_entry.delete(0, tk.END)
+            self.heat_rack_0_entry.delete(0, tk.END)
+            self.heat_rack_1_entry.delete(0, tk.END)
         pass
 
     def on_addButton(self):
@@ -812,17 +1001,20 @@ class FormulationEditor:
         self.vol.delete(0, tk.END)
 
     def on_dropcast_button(self):
+        loc = self.heatloc.get()
         rad = float(self.dropcast_radius.get())
         vol = float(self.dropcast_volume.get())
         drop_type = int(self.dropcast_type.get())
         if drop_type == 0:
-            self.list_of_components.append(("sqdropcast",'', rad, vol, f"Square dropcast: r={rad}, v={vol}"))
+            self.list_of_components.append(("sqdropcast",loc, rad, vol, f"Square dropcast: r={rad}, v={vol}"))
             self.listbox.insert("end", f"Square dropcast: r={rad}, v={vol}")
         if drop_type == 1:
-                self.list_of_components.append(("stdropcast",'', rad, vol, f"Star dropcast: r={rad}, v={vol}"))
+                self.list_of_components.append(("stdropcast",loc, rad, vol, f"Star dropcast: r={rad}, v={vol}"))
                 self.listbox.insert("end", f"Star dropcast: r={rad}, v={vol}")
         self.rad.delete(0, tk.END)
         self.vol.delete(0, tk.END)
+        self.loc.delete(0, tk.END)
+        
 
     def on_save_button(self):
         from pathlib import Path

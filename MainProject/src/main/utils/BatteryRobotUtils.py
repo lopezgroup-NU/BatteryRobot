@@ -833,8 +833,8 @@ class BatteryRobot(NorthC9):
         self.cap_and_return_vial_to_rack(original_position)
 
     def check_dispense_locs(self):
-        #CELL_LOCATIONS = [[80, 11990, 30490, 20180], [80, 9930, 28793, 20390], [80, 8200, 27650, 20419], [80, 6712, 26800, 20238], [77, 12924, 32732, 20368], [78, 10894, 31231, 20586], [74, 9136, 30126, 20348], [76, 7688, 29445, 20621], [143, 14370, 35489, 20349], [146, 12028, 33688, 20617], [164, 10216, 32602, 20480], [164, 8852, 32081, 20650], [252, 16198, 38589, 20491], [252, 13593, 36557, 20738], [266, 11628, 35322, 20409], [267, 10121, 34701, 21068], [310, 20400, 44187, 20505], [340, 15617, 39720, 21132], [342, 13354, 38268, 21125], [353, 11665, 37438, 20768], [559, 20616, 45358, 20413], [640, 19016, 44405, 20413], [635, 15412, 41419, 20931], [650, 13516, 40415, 21015]]
-        for loc in ciara_cell_locations:
+        CELL_LOCATIONS = [[100, 10831, 27444, 20000], [185, 8893, 25746, 20000], [264, 7196, 24393, 20000], [342, 5668, 23340, 20000], [128, 11605, 29673, 20000], [219, 9628, 28063, 20000], [304, 7932, 26866, 20000], [389, 6434, 26025, 20000], [144, 12609, 32065, 20000], [242, 10552, 30473, 20000], [333, 8839, 29373, 20000], [421, 7358, 28677, 20000], [145, 13907, 34683, 20000], [252, 11692, 32997, 20000], [348, 9927, 31922, 20000], [440, 8442, 31303, 20000], [127, 15668, 37708, 20000], [248, 13110, 35705, 20000], [351, 11226, 34554, 20000], [446, 9703, 33936, 20000], [63, 18645, 41973, 20000], [225, 14956, 38765, 20000], [338, 12805, 37351, 20000], [437, 11177, 36638, 20000]]
+        for loc in CELL_LOCATIONS:
             self.delay(0.1)
             self.goto_safe(loc)
 
@@ -1015,6 +1015,36 @@ class BatteryRobot(NorthC9):
                 print(num_loc)
                 self.open_clamp()
                 self.move_vial(vial_carousel, ciara_disp_rack[num_loc])
+            elif action_name == "heat_vial":
+                heatloc = heatplate_official[0]
+
+                t8 = T8('B', network = self.network)
+                
+                if int(value[1]) <= 3:
+                    #if we chose the upper heatplate
+                    col_ind = 3-(ord(value[0]) - 65 )
+                    row_ind = int(value[1])-1
+                    ind = col_ind*3 + row_ind
+                    print(ind)
+                    heatloc = heatplate_official[ind]
+                else:
+                    #if we chose the lower heatplate
+                    col_ind = 3-(ord(value[0]) - 65 )
+                    row_ind = int(value[1])-4
+                    ind = col_ind*3 + row_ind
+                    print(ind)
+                    heatloc = heatplate_official2[ind]
+                if location == "carousel":
+                    self.open_clamp()
+                    self.move_vial(vial_carousel, heatloc)
+                    t8.set_temp(1, sub_setting[0])
+                    t8.set_temp(0, sub_setting[1])
+                else:
+                    self.move_vial(ciara_disp_rack[num_loc], heatloc)
+                    t8.set_temp(1, sub_setting[0])
+                    t8.set_temp(0, sub_setting[1])
+
+                
             elif action_name == "pipette_into_source":
                 print(num_loc)
                 #remove cap from sourcerack vial
@@ -1051,50 +1081,30 @@ class BatteryRobot(NorthC9):
             elif action_name == "pipette_into_carousel" and sub_setting == 'v':
                 self.ciara_dispense_vol(0, num_loc, value, collect=False, ret=False)
             elif action_name =="sqdropcast":
+                col_ind = 3-(ord(location[0]) - 65 )
+                row_ind = int(location[1])-1
+                ind = col_ind*4 + row_ind
+                print(ind)
+                drop_loc = heatplate_dropcast[ind]
+
                 self.get_pipette()
                 self.star_dropcast_prep()
                 self.goto_safe(carousel_aspirate)
-                self.aspirate_ml(sub_setting)
-                self.square_dropcast(position=dropcast_test_0, r=value, volume=sub_setting)
+                self.aspirate_ml(3, sub_setting)
+                self.square_dropcast(position=drop_loc, r=value, volume=sub_setting)
             elif action_name =="stdropcast":
+                col_ind = 3-(ord(location[0]) - 65 )
+                row_ind = int(location[1])-1
+                ind = col_ind*4 + row_ind
+                print(ind)
+                drop_loc = heatplate_dropcast[ind]
+
                 self.get_pipette()
                 self.star_dropcast_prep()
                 self.goto_safe(carousel_aspirate)
-                self.aspirate_ml(sub_setting)
-                self.star_dropcast(position=dropcast_test_0, r=value, volume=sub_setting)
+                self.aspirate_ml(3, sub_setting)
+                self.star_dropcast(position=drop_loc, r=value, volume=sub_setting)
             self.goto_safe(safe_zone)
-
-    """def formulate_in_order(self, list_of_components, dispense_coordinates=None):
-        for action in list_of_components:
-            if action[0] == "move_vial_to_carousel":
-                if dispense_coordinates is None:
-                    raise ValueError("Dispense rack coordinates must be provided.")
-                location = action[1]
-                if not location.startswith('d') or location[1:] not in dispense_coordinates:
-                    raise ValueError(f"No dispense rack coordinates for {location!r}.")
-
-        for action in list_of_components:
-            action_name = action[0]
-            location = action[1]
-            value = action[2]
-            sub_setting = action[3]
-            print(action)
-            if action_name == "move_vial_to_carousel":
-                self.move_vial(dispense_coordinates[location[1:]], vial_carousel)
-            elif action_name == "pipette_into_carousel":
-                if not location.startswith('s') or location[1:] not in [
-                    f"{col}{row}" for col in "ABCDEF" for row in "123456"
-                ]:
-                    raise ValueError(f"Invalid source rack position: {location!r}.")
-                col_ind = 5-(ord(location[1]) - 65 )
-                row_ind = int(location[2])-1
-                # Source rack ordering still needs confirmation.
-                num_loc = col_ind*5 + row_ind
-                if sub_setting == 'm':
-                    self.ciara_dispense_mass(num_loc)
-                if sub_setting == 'v':
-                    self.ciara_dispense_vol(0, num_loc, value, collect=False, ret=False)
-            self.goto_safe(safe_zone)"""
 
 
                 
